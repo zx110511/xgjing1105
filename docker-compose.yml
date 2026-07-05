@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  tianji-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tianji-api
+    ports:
+      - "8778:8778"
+    environment:
+      - AI_MEMORY_PORT=8778
+      - AI_MEMORY_ROOT=/app
+      - AI_MEMORY_DB=/app/data/icme.db
+      - TIANJI_LOG_LEVEL=INFO
+      - TIANJI_V91_PROTOCOL_MODE=true
+      - TIANJI_V91_EVENT_WIRING=true
+    volumes:
+      - tianji-data:/app/data
+      - tianji-logs:/app/logs
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8778/api/health')"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - tianji-net
+
+  tianji-web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_BASE_URL=http://tianji-api:8778
+    container_name: tianji-web
+    ports:
+      - "80:80"
+    depends_on:
+      tianji-api:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - tianji-net
+
+volumes:
+  tianji-data:
+    driver: local
+  tianji-logs:
+    driver: local
+
+networks:
+  tianji-net:
+    driver: bridge

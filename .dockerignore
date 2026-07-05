@@ -1,0 +1,38 @@
+# Python
+python/
+Lib/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+
+# Node
+web/node_modules/
+web/dist/
+
+# IDE & Git
+.git/
+.gitignore
+.vscode/
+.trae/
+.trae-cn/
+.qoder/
+.agents/
+
+# 数据和日志（容器内新建）
+data/
+logs/
+backups/
+
+# 环境文件（容器内用ENV）
+.env
+.env.*
+
+# 编译产物和守护进程
+dist/
+.daemon/
+
+# 文档
+*.md
+AI记忆开发资料/

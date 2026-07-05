@@ -1,0 +1,201 @@
+"""
+天机依赖注入容器 v1.0
+统一管理模块间依赖，降低耦合度
+
+灵境道谱溯源: D2-1【依赖注入煞】· 道二·依赖体 · 四地煞之解之术
+  - 统一依赖容器 + 接口隔离 + 生命周期管理
+  - 源文件: core/dependency_container.py → DependencyContainer
+"""
+
+from typing import Any, Dict, Type, TypeVar, Optional, Callable
+from dataclasses import dataclass, field
+from enum import Enum
+import threading
+
+T = TypeVar('T')
+
+
+class ServiceLifetime(Enum):
+    SINGLETON = "singleton"
+    TRANSIENT = "transient"
+    SCOPED = "scoped"
+
+
+@dataclass
+class ServiceDescriptor:
+    service_type: Type
+    implementation: Optional[Type] = None
+    instance: Optional[Any] = None
+    factory: Optional[Callable] = None
+    lifetime: ServiceLifetime = ServiceLifetime.SINGLETON
+    dependencies: list = field(default_factory=list)
+
+
+class DependencyContainer:
+    """依赖注入容器"""
+    
+    def __init__(self):
+        self._services: Dict[Type, ServiceDescriptor] = {}
+        self._instances: Dict[Type, Any] = {}
+        self._lock = threading.RLock()
+    
+    def register_singleton(
+        self, 
+        service_type: Type[T], 
+        implementation: Optional[Type[T]] = None,
+        instance: Optional[T] = None,
+        factory: Optional[Callable[[], T]] = None
+    ) -> 'DependencyContainer':
+        """注册单例服务"""
+        with self._lock:
+            descriptor = ServiceDescriptor(
+                service_type=service_type,
+                implementation=implementation or service_type,
+                instance=instance,
+                factory=factory,
+                lifetime=ServiceLifetime.SINGLETON
+            )
+            self._services[service_type] = descriptor
+            
+            if instance is not None:
+                self._instances[service_type] = instance
+        
+        return self
+    
+    def register_transient(
+        self,
+        service_type: Type[T],
+        implementation: Optional[Type[T]] = None,
+        factory: Optional[Callable[[], T]] = None
+    ) -> 'DependencyContainer':
+        """注册瞬态服务（每次获取创建新实例）"""
+        with self._lock:
+            descriptor = ServiceDescriptor(
+                service_type=service_type,
+                implementation=implementation or service_type,
+                factory=factory,
+                lifetime=ServiceLifetime.TRANSIENT
+            )
+            self._services[service_type] = descriptor
+        
+        return self
+    
+    def register_scoped(
+        self,
+        service_type: Type[T],
+        implementation: Optional[Type[T]] = None,
+        factory: Optional[Callable[[], T]] = None
+    ) -> 'DependencyContainer':
+        """注册作用域服务"""
+        with self._lock:
+            descriptor = ServiceDescriptor(
+                service_type=service_type,
+                implementation=implementation or service_type,
+                factory=factory,
+                lifetime=ServiceLifetime.SCOPED
+            )
+            self._services[service_type] = descriptor
+        
+        return self
+    
+    def resolve(self, service_type: Type[T]) -> T:
+        """解析服务实例"""
+        with self._lock:
+            if service_type not in self._services:
+                raise ValueError(f"服务未注册: {service_type.__name__}")
+            
+            descriptor = self._services[service_type]
+            
+            if descriptor.lifetime == ServiceLifetime.SINGLETON:
+                if service_type in self._instances:
+                    return self._instances[service_type]
+                
+                instance = self._create_instance(descriptor)
+                self._instances[service_type] = instance
+                return instance
+            
+            elif descriptor.lifetime == ServiceLifetime.TRANSIENT:
+                return self._create_instance(descriptor)
+            
+            elif descriptor.lifetime == ServiceLifetime.SCOPED:
+                return self._create_instance(descriptor)
+    
+    def _create_instance(self, descriptor: ServiceDescriptor) -> Any:
+        """创建服务实例"""
+        if descriptor.instance is not None:
+            return descriptor.instance
+        
+        if descriptor.factory is not None:
+            return descriptor.factory()
+        
+        if descriptor.implementation is not None:
+            return descriptor.implementation()
+        
+        raise ValueError(f"无法创建实例: {descriptor.service_type.__name__}")
+    
+    def try_resolve(self, service_type: Type[T]) -> Optional[T]:
+        """尝试解析服务（失败返回None）"""
+        try:
+            return self.resolve(service_type)
+        except ValueError:
+            return None
+    
+    def is_registered(self, service_type: Type) -> bool:
+        """检查服务是否已注册"""
+        return service_type in self._services
+    
+    def clear(self) -> None:
+        """清空容器"""
+        with self._lock:
+            self._services.clear()
+            self._instances.clear()
+
+
+class TianjiContainer:
+    """天机依赖容器 - 全局单例"""
+    
+    _instance: Optional[DependencyContainer] = None
+    _lock = threading.Lock()
+    
+    @classmethod
+    def get_instance(cls) -> DependencyContainer:
+        """获取全局容器实例"""
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = DependencyContainer()
+        return cls._instance
+    
+    @classmethod
+    def initialize(cls, config: Optional[Any] = None) -> DependencyContainer:
+        """初始化天机依赖容器"""
+        container = cls.get_instance()
+        
+        if config is None:
+            from .config import DEFAULT_CONFIG
+            config = DEFAULT_CONFIG
+        
+        container.register_singleton(
+            service_type=type('ICMEConfig', (), {}),
+            instance=config
+        )
+        
+        return container
+    
+    @classmethod
+    def reset(cls) -> None:
+        """重置容器"""
+        with cls._lock:
+            if cls._instance is not None:
+                cls._instance.clear()
+                cls._instance = None
+
+
+def get_container() -> DependencyContainer:
+    """获取依赖容器"""
+    return TianjiContainer.get_instance()
+
+
+def initialize_container(config: Optional[Any] = None) -> DependencyContainer:
+    """初始化依赖容器"""
+    return TianjiContainer.initialize(config)

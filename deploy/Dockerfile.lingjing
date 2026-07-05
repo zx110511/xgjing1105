@@ -1,0 +1,55 @@
+﻿# 天机v9.0 灵境 — 分布式AI记忆操作系统
+# ===============================================
+# Dockerfile: Python 3.12 + gRPC + Resilience
+# 基于官方Python镜像，最小化体积
+
+FROM python:3.12-slim
+
+LABEL org.opencontainers.image.title="TIANJI v8.2 Lingjing"
+LABEL org.opencontainers.image.description="Distributed AI Memory OS — ICME + gRPC + Resilience"
+LABEL org.opencontainers.image.version="8.2.0-lingjing"
+
+WORKDIR /app
+
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV AI_MEMORY_ROOT=/app
+ENV AI_MEMORY_DATA=/app/data/.memory
+ENV AI_MEMORY_HOST=0.0.0.0
+ENV AI_MEMORY_PORT=8771
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc g++ libopenblas-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt deploy/requirements.lingjing.txt ./
+
+RUN pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir -r requirements.lingjing.txt 2>/dev/null || true
+
+RUN pip install --no-cache-dir grpcio==1.64.0 grpcio-tools==1.64.0 grpcio-reflection==1.64.0 2>/dev/null || true
+
+COPY . .
+
+RUN mkdir -p /app/data/.memory/{sensory,working,short_term,episodic,semantic,meta}
+RUN mkdir -p /app/proto
+
+RUN python -c "
+try:
+from grpc_tools import protoc
+protoc.main([
+'grpc_tools.protoc',
+'-I.', '--python_out=.', '--grpc_python_out=.',
+'proto/lingjing.proto'
+])
+print('[Lingjing] Proto stubs generated successfully')
+except Exception as e:
+print(f'[Lingjing] Proto generation skipped: {e}')
+" || echo "[Lingjing] Proto generation skipped (non-critical)"
+
+EXPOSE 8771 8700
+
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8771/api/health')" || exit 1
+
+CMD ["python", "-m", "uvicorn", "server.main:app", "--host", "0.0.0.0", "--port", "8771"]

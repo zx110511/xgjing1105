@@ -1,0 +1,471 @@
+﻿# 🏆 天机v9.0 SSS级通用落地指令
+
+---
+
+## 📋 指令模板（每轮对话使用此模板，替换 `{模块名}` 即可）
+
+```
+═══════════════════════════════════════════════════════════════
+  天机v9.0 模块落地指令 — {模块名}
+  法定四步流程 · 不折不扣 · 绝不跳步
+═══════════════════════════════════════════════════════════════
+
+【目标模块】{模块编号} - {模块中文名}（{模块英文类名}）
+【来源定义】d:\元初系统\天机\天机修复研究区文件\14大模块完整闭环逻辑思维导图 (M1-M14) / d:\元初系统\灵境\灵境研究区\灵境道谱_36地煞72天罡_大道归一_v1.1.md (M15-M35)
+【参考实现】
+  · v8.0备份:   d:\元初系统\天机\core\
+  · 天机基石:   d:\元初系统\_archived_天机基石_20260519\core\
+  · 天机AI平台: d:\元初系统\天机AI平台化研究\system\
+  · 灵境DCOS:   d:\元初系统\灵境\灵境开发管控管理系统\
+【目标落地】d:\元初系统\天机v9.0\core\ (核心模块) / launcher\ (启动集成)
+【审计标准】d:\元初系统\天机v9.0\天机v9.0科研区\成果
+
+───────────────────────────────────────────────────────────────
+
+## STEP 1/4: 搜索——检索v8.0备份+记忆
+
+1.1 搜索v8.0源码备份:
+   - 扫描 d:\元初系统\天机\core\ 目录
+   - 定位 {模块名} 相关的 .py 文件
+   - 提取类定义(@dataclass)、方法签名、依赖关系
+
+1.2 搜索v8.0记忆数据库:
+   - 连接 d:\元初系统\天机\data\.memory\tianji_memory.db
+   - SQL查询: SELECT * FROM memories WHERE tags LIKE '%{模块关键词}%'
+   - 提取历史实现记录、Bug修复记录、功能演进记录
+
+1.3 搜索v9.0现有代码:
+   - 扫描 d:\元初系统\天机v9.0\ 目录
+   - 确认该模块是否已有部分实现
+   - 对比v8.0与v9.0的差异
+
+→ 输出: {模块名}_v8.0源码清单 + v8.0记忆条目 + v9.0现有代码状态
+
+───────────────────────────────────────────────────────────────
+
+## STEP 2/4: 审计——评估v8.0功能实现状态
+
+2.1 功能完整性审计（M1-M14对照14大模块闭环逻辑思维导图 / M15-M35对照灵境道谱36地煞72天罡）:
+   □ 数据模型(@dataclass): 字段是否完整
+   □ 核心闭环: [写入/读取/查询/进化] 各环节是否存在
+   □ 依赖注入: depends_on 列表中的模块是否可用
+   □ 健康检查: health_fn() 是否实现
+   □ 统计接口: get_stats() 返回值是否完整
+   □ 进化闭环: EvolutionLoop(OBSERVE→LEARN→EVOLVE→VALIDATE) 是否接入
+
+2.2 代码质量审计:
+   □ 类型注解覆盖率: 所有函数是否有完整类型注解
+   □ 异常处理: try/except 覆盖所有外部调用
+   □ 日志记录: log() 调用覆盖关键路径
+   □ 线程安全: threading.Lock 保护共享状态
+   □ 超时保护: 所有I/O操作有无超时参数
+
+2.3 集成对齐审计:
+   □ API端点: 是否在 server/api/ 中有对应路由
+   □ 托盘菜单: 是否在 tianji_launcher.py 中有右键菜单项
+   □ Dashboard面板: 是否在 web/src/pages/ 中有展示组件
+   □ 启动注册: 是否在 main.py include_router 中注册
+
+→ 输出: {模块名}_审计报告（通过N/M项，缺失项清单，优先级P0/P1/P2）
+
+───────────────────────────────────────────────────────────────
+
+## STEP 3/4: 实现——全量开发+修复+闭环
+
+3.1 创建/修复核心模块文件:
+   - 路径: d:\元初系统\天机v9.0\core\{module_name}.py
+   - 必须包含: __init__构造 → start/stop → 核心闭环 → health检查 → stats接口
+   - 严格遵守: M1-M14遵循14大模块闭环逻辑的每一环节 / M15-M35遵循灵境道谱地煞定义
+
+3.2 注册API端点:
+   - 路径: d:\元初系统\天机v9.0\server\api\{module}_routes.py
+   - 必须包含: GET /api/{module}/health + GET /api/{module}/status + GET /
+   - 注册: 在 server/main.py 添加 app.include_router()
+
+3.3 集成托盘菜单:
+   - 文件: d:\元初系统\天机v9.0\launcher\tianji_launcher.py
+   - 在 _build_menu() 中添加子菜单
+   - 在 TianjiTray.__init__() 中初始化模块实例
+
+3.4 集成Dashboard（如需要）:
+   - 路径: d:\元初系统\天机v9.0\web\src\pages\
+   - 添加状态面板组件
+   - 执行 npm run build 重新构建前端
+
+3.5 编写测试验证脚本:
+   - 路径: d:\元初系统\天机v9.0\scripts\test_{module}.py
+   - 测试: 模块初始化 → 核心功能 → API端点 → 异常路径
+
+→ 输出: 新增/修改文件清单 + 代码行数 + 每个闭环环节的实现证据
+
+───────────────────────────────────────────────────────────────
+
+## STEP 4/4: 审计——验证实现状态
+
+4.1 单元级审计:
+   □ 模块 import 无报错
+   □ __init__() 构造成功
+   □ 核心方法调用返回正确结果
+   □ 异常路径有降级处理
+
+4.2 API级审计:
+   □ curl http://127.0.0.1:8770/api/{module}/health → 200
+   □ curl http://127.0.0.1:8770/api/{module}/status → 200
+   □ curl http://127.0.0.1:8770/api/{module}/ → 200
+
+4.3 闭环级审计:
+   □ 写入闭环: 数据能成功持久化到SQLite
+   □ 读取闭环: 查询能返回正确结果
+   □ 进化闭环(如适用): OBSERVE→LEARN→EVOLVE→VALIDATE 四阶段跑通
+   □ 降级闭环: 依赖不可用时模块能降级运行
+
+4.4 集成级审计:
+   □ 托盘菜单点击 → 功能正常触发
+   □ Dashboard面板 → 数据正确展示
+   □ 看门狗监控 → 异常时触发自愈
+   □ 启动器启动 → 模块随系统自动启动
+
+→ 输出: {模块名}_最终审计报告（通过率X/Y = Z%，未通过项+修复方案）
+
+═══════════════════════════════════════════════════════════════
+  本轮结果: [{模块名}] 落地完成 ✅ / 部分通过 ⚠️ / 失败 ❌
+  下一模块: [{下一个模块名}]
+═══════════════════════════════════════════════════════════════
+```
+
+---
+
+## 🔢 14大模块执行队列（按依赖顺序排列）
+
+| 轮次 | 模块编号 | 模块名 | 中文名 | 依赖 | 落地文件 | 状态 |
+|------|---------|--------|--------|------|---------|------|
+| 1 | M1 | TianjiContainer | 天机总控容器 | 无 | `core/tianji_container.py` | ✅ 已完成 |
+| 2 | M2 | ICMEStorageEngine | ICME存储引擎 | M1 | `core/engine.py` (已有) | ✅ 已完成 |
+| 3 | M13 | EnforcementHookMCP | 强制执行钩子 | M2 | `core/enforcement_hook.py` (已有) | ✅ 已完成 |
+| 4 | M14 | InterceptLayer | 拦截层 | M13 | `active_memory/protocol.py` (已有) | ✅ 已完成 |
+| 5 | M3 | QualityGate | 质量门禁 | M2 | `core/quality_gate.py` (已有) | ✅ 已完成 |
+| 6 | M6 | CausalPairRecorder | 因果对记录器 | M3 | `core/evolution_loop.py` (已有) | ✅ 已完成 |
+| 7 | M9 | EvolutionLoop | 进化闭环协议 | M6 | `core/evolution_loop.py` | ✅ 已完成 |
+| 8 | M7 | EvolutionEngine | 进化引擎 | M9 | `core/evolution_engine.py` (已有) | ✅ 已完成 |
+| 9 | M8 | ClosedLoopLearningEngine | 闭环学习引擎 | M7 | `core/learning_loop.py` (已有) | ✅ 已完成 |
+| 10 | M4 | SkillRegistry | Skill注册中心 | M8 | `core/skill_registry.py` (已有) | ✅ 已完成 |
+| 11 | M5 | SkillLifecycleTracker | Skill生命周期追踪器 | M4 | `core/skill_registry.py` | ✅ 已完成 |
+| 12 | M10 | WorkflowEngine | 工作流引擎 | M4 | `core/workflow_engine.py` (已有) | ✅ 已完成 |
+| 13 | M12 | AutoSchedulerDaemon | 智能调度守护进程 | M10 | `core/intelligent_scheduler.py` (已有) | ✅ 已完成 |
+| 14 | M11 | MessageGateway | 消息网关 | M1 | `core/message_gateway.py` (已有) | ✅ 已完成 |
+
+> 进度: 14/14 ✅ 🎉 全部闭环完成!
+
+---
+
+## 🔢 15-36模块 + 工具执行队列（依托灵境道谱36地煞72天罡）
+
+| 轮次 | 模块编号 | 模块名 | 中文名 | 依赖 | 落地文件 | 状态 |
+|------|---------|--------|--------|------|---------|------|
+| 15 | M15 | DeepSeekDriver | DeepSeek三循环驾驶 | M2 | `core/deepseek_driver.py` | ✅ |
+| 16 | M28 | ConfigManager | 配置管理中心 | M1 | `core/config.py` | ✅ |
+| 17 | M33 | DeepSeekDecisionEngine | DeepSeek决策引擎 | M15 | `llm_integration/decision_engine.py` | ✅ |
+| 18 | M20 | ModuleRegistry | 模块注册中心 | M1 | `core/module_registry.py` | ✅ |
+| 19 | M21 | StaticAnalyzer | 静态依赖分析器 | M20 | `core/static_analyzer.py` | ✅ |
+| 20 | M26 | LLMBridge | LLM桥接层 | M33 | `core/llm_bridge.py` | ✅ |
+| 21 | M25 | SQLiteMemoryStore | SQLite存储后端 | M2 | `core/sqlite_store.py` | ✅ |
+| 22 | M18 | GovernancePipeline | 治理流水线 | M20+M21 | `core/governance_pipeline.py` | ✅ |
+| 23 | M27 | ChineseTokenizer | 中文分词器 | M25 | `core/chinese_tokenizer.py` | ✅ |
+| 24 | M22 | LayerRouter | 智能层级路由 | M2 | `core/router.py` | ✅ |
+| 25 | M17 | GovernanceOrchestrator | 治理编排器 | M18+M20 | `core/governance_orchestrator.py` | ✅ |
+| 26 | M24 | HybridStorageEngine | 混合存储引擎 | M2+M25 | `core/hybrid_engine.py` | ✅ |
+| 27 | M31 | EmbeddingService | 语义向量服务 | M2 | `indexing/embeddings.py` | ✅ |
+| 28 | M23 | NamespaceManager | 命名空间管理 | M2 | `core/namespace_manager.py` | ✅ |
+| 29 | M16 | TVPBridge | TVP透明调度桥 | M12 | `core/tvp_bridge.py` | ✅ |
+| 30 | M19 | AutoOpsEngine | 自动化运维引擎 | M17+M20+M7 | `core/auto_ops.py` | ✅ |
+| 31 | M32 | KnowledgeGraph | 知识图谱构建器 | M24+M25 | `indexing/knowledge_graph.py` | ✅ |
+| 32 | M34 | AgentOrchestrator | Agent编排器 | M10+M12+M11 | `agents/orchestrator.py` | ✅ |
+| 33 | M29 | MCPServer | 天机MCP服务器 | M13+M14 | `mcp/tianji_mcp_server.py` | ✅ |
+| 34 | M30 | TianjiDaemon | 天机守护进程 | M17+M19 | `daemon/tianji_daemon.py` | ✅ |
+| 35 | M35 | EvolutionBus | 进化总线 | M6+M9 | `core/evolution_loop.py` | ✅ |
+| 36 | M36 | DaoRegistry | 道谱注册中心(72天罡入口) | M1+M20 | `core/dao_registry.py` | ✅ |
+| T1 | T1 | ReadmeTracker | R-SATIS路径索引追踪 | M1+M28 | `core/readme_tracker.py` | ✅ |
+
+> 进度: 36/36 ✅ + 1/1 工具 ✅ 🎉 全部完成!
+
+---
+
+## 🛡️ 硬性约束
+
+| 约束 | 说明 |
+|------|------|
+| **每轮1模块** | 一次对话只实现一个模块，绝不并行 |
+| **四步不走样** | 搜索→审计→实现→审计，不可跳过任一步 |
+| **六源深度扫描** | v8.0备份 + v9.0现有 + 天机基石 + 天机AI平台 + 灵境DCOS + 记忆数据库 |
+| **两阶段对照** | M1-M14以v8.0为基线，M15-M35以灵境道谱36地煞72天罡为蓝图 |
+| **闭环必达** | 每个模块必须实现完整闭环（定义/执行/恢复/自进化），+ record_action喂入 |
+| **审计不可作弊** | 不能只看HTTP 200，必须在浏览器中验证，必须在控制台0错误 |
+| **增量不破坏** | 升级现有文件只做增量修改，不丢失已有功能，133路由永保无损 |
+| **道谱映射** | 每个M15-M35模块可溯源到灵境道谱·36地煞的具体地煞编号 |
+
+---
+
+## 📐 灵境道谱·36地煞 → M15-M35映射表
+
+> 核心哲学: 道→一→二→三→九道→36地煞(术)+72天罡(法)=108元素
+
+| 道 | 地煞 | 地煞名 | 对应模块 | 落地 | 说明 |
+|----|------|--------|---------|------|------|
+| 道一·记忆体 | D1-1 | 六层引擎煞 | M2 ICMEStorageEngine | ✅ M2 | ICME六层记忆引擎 |
+| 道一·记忆体 | D1-2 | Δ阈值煞 | M3 QualityGate | ✅ M3 | 自适应阈值门禁 |
+| 道一·记忆体 | D1-3 | 混合检索煞 | M22 LayerRouter | ✅ M22 | 多后端智能路由 |
+| 道一·记忆体 | D1-4 | 事件溯源煞 | M24 HybridStorageEngine | ✅ M24 | SQLite+JSON双后端 |
+| 道二·认知体 | D2-1 | 三循环驾驶煞 | M15 DeepSeekDriver | ✅ M15 | 快速/深度/进化三循环 |
+| 道二·认知体 | D2-2 | 主动守护煞 | M8 LearningEngine | ✅ M8 | 闭环学习主动优化 |
+| 道二·认知体 | D2-3 | 记忆感知煞 | M14 InterceptLayer | ✅ M14 | 双端拦截感知 |
+| 道二·认知体 | D2-4 | 因果效应煞 | M6 CausalPairRecorder | ✅ M6 | 因果对追踪计量 |
+| 道三·进化体 | D3-1 | 三级进化煞 | M7 EvolutionEngine | ✅ M7 | 参数/规则/架构三级进化 |
+| 道三·进化体 | D3-2 | 闭环学习煞 | M8 LearningEngine | ✅ M8 | Hermes五阶段闭环 |
+| 道三·进化体 | D3-3 | 技能抽取煞 | M4 SkillRegistry | ✅ M4 | 工具自注册发现 |
+| 道三·进化体 | D3-4 | 模式发现煞 | M35 EvolutionBus | ✅ M35 | 跨模块信号路由 |
+| 道四·质量体 | D4-1 | 三问门禁煞 | M3 QualityGate | ✅ M3 | Q1意志/Q2因果/Q3反向过滤 |
+| 道四·质量体 | D4-2 | 冲突解析煞 | M13 EnforcementHook | ✅ M13 | 冲突-矛盾-冗余检测 |
+| 道四·质量体 | D4-3 | 漂移检测煞 | M21 StaticAnalyzer | ✅ M21 | AST/循环依赖/规范验证 |
+| 道四·质量体 | D4-4 | 强制记录煞 | M13 EnforcementHook | ✅ M13 | 强制执行钩子 |
+| 道五·编排体 | D5-1 | 多Agent调度煞 | M34 AgentOrchestrator | ✅ M34 | 多Agent协同编排 |
+| 道五·编排体 | D5-2 | 工作流DAG煞 | M10 WorkflowEngine | ✅ M10 | DAG工作流引擎 |
+| 道五·编排体 | D5-3 | 意图路由煞 | M11 MessageGateway | ✅ M11 | 消息路由+意图解析 |
+| 道五·编排体 | D5-4 | TVP协议煞 | M16 TVPBridge | ✅ M16 | TVP透明调度桥接 |
+| 道六·容器体 | D6-1 | 依赖拓扑煞 | M1 TianjiContainer | ✅ M1 | 拓扑排序启动 |
+| 道六·容器体 | D6-2 | 生命周期煞 | M20 ModuleRegistry | ✅ M20 | 模块生命周期管理 |
+| 道六·容器体 | D6-3 | 事件总线煞 | M35 EvolutionBus | ✅ M35 | 事件发布订阅 |
+| 道六·容器体 | D6-4 | 命名空间煞 | M23 NamespaceManager | ✅ M23 | Agent命名空间隔离 |
+| 道七·守护体 | D7-1 | 四级容器煞 | M30 TianjiDaemon | ✅ M30 | Watchdog+Backup+Repair+Integrity |
+| 道七·守护体 | D7-2 | 自愈恢复煞 | M19 AutoOpsEngine | ✅ M19 | 自愈+基线+扩缩容 |
+| 道七·守护体 | D7-3 | 性能剖析煞 | M30 TianjiDaemon | ✅ M30 | 性能监控守护 |
+| 道七·守护体 | D7-4 | 安全扫描煞 | M18 GovernancePipeline | ✅ M18 | 治理流水线+合规审计 |
+| 道八·知识体 | D8-1 | 知识图谱煞 | M32 KnowledgeGraph | ✅ M32 | 实体关系自动提取 |
+| 道八·知识体 | D8-2 | 三元提取煞 | M33 DeepSeekDecisionEngine | ✅ M33 | DeepSeek知识三元组 |
+| 道八·知识体 | D8-3 | 认知流水煞 | M17 GovernanceOrchestrator | ✅ M17 | 治理认知流水线 |
+| 道八·知识体 | D8-4 | 语义检索煞 | M31 EmbeddingService | ✅ M31 | TF-IDF+余弦相似度 |
+| 道九·配置体 | D9-1 | 配置中心煞 | M28 ConfigManager | ✅ M28 | ICME/MCP/LLM统一配置 |
+| 道九·配置体 | D9-2 | Δ配置煞 | M7 EvolutionEngine | ✅ M7 | 动态参数调优 |
+| 道九·配置体 | D9-3 | 令牌权限煞 | M29 MCPServer | ✅ M29 | MCP协议令牌鉴权 |
+| 道九·配置体 | D9-4 | 桥接通道煞 | M26 LLMBridge | ✅ M26 | DeepSeek双向桥接 |
+
+---
+
+## ⚡ 闪电启动示例
+
+```
+═══════════════════════════════════════════════════════════════
+  天机v9.0 模块落地指令 — 天机总控容器 (TianjiContainer)
+  法定四步流程 · 不折不扣 · 绝不跳步
+═══════════════════════════════════════════════════════════════
+
+【目标模块】M1 - 天机总控容器（TianjiContainer）
+【来源定义】d:\元初系统\天机\天机修复研究区文件\14大模块完整闭环逻辑思维导图
+【参考实现】d:\元初系统\天机\core\tianji_container.py (v8.0)
+【目标落地】d:\元初系统\天机v9.0\launcher\ (集成到唯一启动文件)
+
+───────────────────────────────────────────────────────────────
+STEP 1/4: 搜索v8.0备份+记忆
+
+请执行:
+1.1 读取 d:\元初系统\天机\core\tianji_container.py 完整源码
+1.2 连接 d:\元初系统\天机\data\.memory\tianji_memory.db，查询:
+    SELECT id, content, layer, tags FROM memories
+    WHERE tags LIKE '%tianji_container%' OR tags LIKE '%container%'
+1.3 扫描 d:\元初系统\天机v9.0\core\ 是否存在 tianji_container.py
+1.4 列出 d:\元初系统\天机v9.0\launcher\tianji_launcher.py 中已有的模块初始化代码
+
+───────────────────────────────────────────────────────────────
+STEP 2/4: 审计v8.0实现状态
+
+对照14大模块闭环逻辑的[TianjiContainer]章节，逐项审计:
+□ ModuleDescriptor声明
+□ _topological_sort() 依赖拓扑排序
+□ start() 按序启动+关键模块失败回滚
+□ health() 遍历检查+running/degraded/failed统计
+□ stop() 反向拓扑停止+EventBus取消订阅
+□ self_heal() 扫描FAILED→重新init+start→恢复
+
+───────────────────────────────────────────────────────────────
+STEP 3/4: 全量实现
+3.1 创建 d:\元初系统\天机v9.0\core\tianji_container.py (如缺失)
+3.2 在 tianji_launcher.py 的 TianjiTray.__init__() 中初始化容器
+3.3 容器管理全部模块的注册/启动/停止/健康检查/自愈
+3.4 创建 scripts\test_container.py 测试脚本
+
+───────────────────────────────────────────────────────────────
+STEP 4/4: 审计实现状态
+4.1 curl http://127.0.0.1:8770/api/container/health → 验证
+4.2 托盘菜单 → "容器状态" → 验证
+4.3 停止一个子模块 → self_heal() 触发 → 验证自愈
+
+═══════════════════════════════════════════════════════════════
+  本轮结果: [✅] 落地完成 ✅  [ ] 部分通过 ⚠️  [ ] 失败 ❌
+  下一模块: [M2 - ICME存储引擎]
+═══════════════════════════════════════════════════════════════
+```
+
+---
+
+## 📊 ICME记忆索引 — 全部37轮执行实录速查
+
+> 每条执行实录的完整四步流程(搜索/审计/实现/审计)已存入天机ICME记忆体。
+> 检索指令: ICME查询 `ICME_KEY` 即可还原完整细节(审计矩阵+落地文件+测试结果)。
+
+| 序号 | ICME_KEY | 模块 | 日期 | 核心产出 | 行数 |
+|------|----------|------|------|---------|------|
+| M1 | `tianji_container_v9.0` | TianjiContainer | 05-24 | 容器移植v8.0→v9.0, 6API, 托盘集成 | 598 |
+| M2 | `icme_engine_v6.1` | ICMEStorageEngine | 05-24 | Δ驱动+8因子晋升+余量管理 | +260 |
+| M13 | `enforcement_hook_v9.0` | EnforcementHookMCP | 05-24 | 11API, mcp_bridge桥接 | +245 |
+| M14 | `intercept_layer_v7.0` | InterceptLayer | 05-24 | 双端拦截+3平台适配 | +310 |
+| M3 | `quality_gate_v5.1` | QualityGate | 05-24 | 7因子+冲突自解+漂移检测 | +80 |
+| M6 | `causal_pair_v9.0` | CausalPairRecorder | 05-24 | Hermes五阶段, 12项审计 | 审计通过 |
+| M9 | `evolution_loop_v9.0` | EvolutionLoop | 05-24 | 四阶段闭环+三层语义指纹 | 审计通过 |
+| M7 | `evolution_engine_v8.2` | EvolutionEngine | 05-24 | record_action+LearningEngine桥接 | +110 |
+| M8 | `learning_engine_v8.2` | ClosedLoopLearningEngine | 05-24 | 重组+施肥+反向归纳 | +160 |
+| M4 | `skill_registry_v1.1` | SkillRegistry | 05-24 | 工具自注册+发现 | +100 |
+| M5 | `lifecycle_tracker_v1.2` | SkillLifecycleTracker | 05-24 | 6阶段生命周期+JSONL审计 | +208 |
+| M10 | `workflow_engine_v9.0` | WorkflowEngine | 05-24 | record_action+EvoLoop自举 | +120 |
+| M12 | `scheduler_daemon_v8.2` | AutoSchedulerDaemon | 05-24 | record_action+EvoLoop自举 | +100 |
+| M11 | `message_gateway_v8.2` | MessageGateway | 05-24 | record_action+EvoLoop自举 | +100 |
+| M15 | `deepseek_driver_v2.0` | DeepSeekDriver | 05-24 | 三循环驾驶(ABC) | 审计通过 |
+| M28 | `config_manager_v9.0` | ConfigManager | 05-24 | 统一配置中心5大类 | 审计通过 |
+| M33 | `decision_engine_v9.0` | DeepSeekDecisionEngine | 05-24 | 知识三元组提取 | 审计通过 |
+| M20 | `module_registry_v9.0` | ModuleRegistry | 05-24 | 模块生命周期+循环检测 | 审计通过 |
+| M21 | `static_analyzer_v9.0` | StaticAnalyzer | 05-24 | AST分析+依赖检测 | 审计通过 |
+| M26 | `llm_bridge_v9.0` | LLMBridge | 05-24 | DeepSeek双向桥接 | 审计通过 |
+| M25 | `sqlite_store_v9.0` | SQLiteMemoryStore | 05-24 | 事件溯源存储 | 审计通过 |
+| M18 | `governance_pipeline_v9.0` | GovernancePipeline | 05-24 | 治理流水线+合规审计 | 审计通过 |
+| M27 | `chinese_tokenizer_v9.0` | ChineseTokenizer | 05-24 | 中文分词 | 审计通过 |
+| M22 | `layer_router_v9.0` | LayerRouter | 05-24 | 智能层级路由 | 审计通过 |
+| M17 | `governance_orch_v9.0` | GovernanceOrchestrator | 05-24 | 治理编排 | 审计通过 |
+| M24 | `hybrid_engine_v9.0` | HybridStorageEngine | 05-24 | SQLite+JSON双后端 | 审计通过 |
+| M31 | `embedding_service_v9.0` | EmbeddingService | 05-24 | TF-IDF+余弦相似度 | 审计通过 |
+| M23 | `namespace_manager_v9.0` | NamespaceManager | 05-24 | Agent命名空间隔离 | 审计通过 |
+| M16 | `tvp_bridge_v9.0` | TVPBridge | 05-24 | TVP透明调度桥 | 审计通过 |
+| M19 | `auto_ops_v9.0` | AutoOpsEngine | 05-24 | 自愈+基线+扩缩容 | 审计通过 |
+| M32 | `knowledge_graph_v9.0` | KnowledgeGraph | 05-25 | 知识图谱构建 | 审计通过 |
+| M34 | `agent_orchestrator_v9.0` | AgentOrchestrator | 05-25 | 多Agent协同编排 | 审计通过 |
+| M30 | `tianji_daemon_v9.0` | TianjiDaemon | 05-25 | 四级容器守护 | 审计通过 |
+| M29 | `mcp_server_v9.0` | MCPServer | 05-25 | MCP协议服务器 | 审计通过 |
+| M35 | `evolution_bus_v9.0` | EvolutionBus | 05-25 | 模式发现+事件总线双闭环 | +160 |
+| M36 | `dao_registry_v9.0` | DaoRegistry | 05-25 | 36地煞注册+72天罡预留 | 218 |
+| T1 | `r_satis_v9.0` | ReadmeTracker (R-SATIS) | 05-25 | 路径索引+摘要+README动态维护 | 626 |
+
+> 37/37 全部落地 ✅ · 完整四步流程通过 ICME_KEY 一键检索还原
+
+---
+
+## 🔗 配套指令集
+
+| 指令集 | 文件 | 用途 |
+|--------|------|------|
+| **专业测试员指令集** | `天机v9.0专业测试员通用指令集` | 五级门禁(SG-0~4) + 37模块测试矩阵 + 跨模块集成 + 压力测试 |
+| **集成与托盘定制指令集** | `天机v9.0专业化集成与托盘定制指令集` | 三步集成(审计→实现→验证) + 托盘/MCP/Agent协同 + 启动编排 |
+| **Agent-MCP升级指令集** | `天机v9.0 Agent-MCP集成桥接与体系升级指令集` | 三层断裂缝合 + AMIM桥接模块(M37) + 20Agent运行类 + 工具归属映射 |
+| **R-SATIS工具手册** | `core/readme_tracker.py` | 路径索引+摘要+README动态维护 |
+
+---
+
+## 🗄️ H6 数据库文件建设指令
+
+```
+═══════════════════════════════════════════════════════════════
+  天机v9.0 模块落地指令 — H6 数据库文件建设
+  法定四步流程 · 不折不扣 · 绝不跳步
+═══════════════════════════════════════════════════════════════
+
+【目标模块】H6 - 数据迁移预案（灵境兼容集成）
+【来源定义】天机v9.0专业化集成与托盘定制指令集 · H篇灵境兼容集成
+【参考实现】d:\元初系统\天机v9.0\core\sqlite_store.py (v9.0)
+【目标落地】d:\元初系统\天机v9.0\data\.memory\icme.db
+
+───────────────────────────────────────────────────────────────
+STEP 1/4: 搜索——检索数据库相关配置和路径
+
+请执行:
+1.1 扫描 d:\元初系统\天机v9.0\data\ 目录结构
+1.2 检查 d:\元初系统\天机v9.0\data\.memory\icme.db 是否存在
+1.3 读取 d:\元初系统\天机v9.0\core\sqlite_store.py 中的表结构定义
+1.4 确认 DATA_DIR 和 DB_PATH 的配置路径
+
+───────────────────────────────────────────────────────────────
+STEP 2/4: 审计——评估数据库初始化需求
+
+对照ICME六层记忆引擎，逐项审计:
+□ 数据库文件存在性
+□ 表结构完整性 (memories, embeddings, knowledge_graph, evolution_history, etc.)
+□ 索引有效性
+□ 数据可访问性
+□ 灵境迁移兼容性
+
+───────────────────────────────────────────────────────────────
+STEP 3/4: 实现——创建/验证数据库文件
+
+3.1 如数据库不存在，执行初始化:
+    - 创建 data/.memory/ 目录
+    - 执行 SQLiteMemoryStore._init_schema() 创建表结构
+3.2 如数据库已存在，验证表结构完整性:
+    - 检查所有必要表是否存在
+    - 检查索引是否有效
+3.3 更新验证脚本中的数据库路径:
+    - integration_verify.py: H6_数据迁移预案 路径修正
+3.4 创建 scripts\test_db_init.py 测试脚本
+
+───────────────────────────────────────────────────────────────
+STEP 4/4: 审计——验证数据库文件可用性
+
+4.1 连接数据库并执行测试查询:
+    SELECT COUNT(*) FROM memories
+4.2 验证表结构:
+    SELECT name FROM sqlite_master WHERE type='table'
+4.3 验证集成测试:
+    python integration_verify.py → H6_数据迁移预案 = True
+4.4 灵境兼容验证:
+    - 数据库可序列化
+    - 支持增量迁移
+    - 支持备份恢复
+
+═══════════════════════════════════════════════════════════════
+  本轮结果: [✅] 数据库就绪 ✅  [ ] 需初始化 ⚠️  [ ] 失败 ❌
+  状态: icme.db 存在, 11表, 记录数正常
+═══════════════════════════════════════════════════════════════
+```
+
+### 数据库路径规范
+
+| 数据库 | 路径 | 用途 |
+|--------|------|------|
+| ICME主库 | `data/.memory/icme.db` | 六层记忆存储 |
+| 进化历史 | `data/evolution_history/evolution_history.db` | 进化闭环记录 |
+| 测试引擎 | `data/.memory/test_engine/icme.db` | 测试数据隔离 |
+
+### 验证脚本路径修正
+
+```python
+# 修正前 (错误路径)
+"H6_数据迁移预案": Path(r"D:\元初系统\天机v9.0\data\tianji_memory.db").exists()
+
+# 修正后 (正确路径)
+"H6_数据迁移预案": Path(r"D:\元初系统\天机v9.0\data\.memory\icme.db").exists()
+```
+
+---
+
+<!-- AUTO-START -->
+## 📁 文件夹索引
+
+- ./成果/
+
+## 📄 文件索引
+
+- ./天机v9.0落地开发通用指令
+- ./天机v9.0专业测试员通用指令集
+- ./天机v9.0专业化集成与托盘定制指令集
+- ./天机v9.0 Agent-MCP集成桥接与体系升级指令集
+
+## 🔖 文件摘要映射
+
+| 文件路径 | 摘要 |
+|---------|------|
+| ./天机v9.0落地开发通用指令 | SHA-256: `动态更新` |
+<!-- AUTO-END -->

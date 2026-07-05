@@ -1,0 +1,3593 @@
+> r"""
+> 天机强制执行钩子 (Tianji Enforcement Hook)
+> ==========================================
+> 借鉴Hermes Agent的闭环学习架构，为天机建立不可绕过的强制执行机制。
+  
+> 核心模式（来自Hermes Agent）:
+>   1. 闭环学习 (Closed Learning Loop)
+>      Hermes: 触发→执行→返回→反思(持久化?)→技能创建
+>      天机:   触发→执行→返回→拦截(强制记录)→知识提取
+  
+>   2. 工具自注册 (Tool Self-Registration)
+>      Hermes: 工具模块导入时registry.register()自动注册
+>      天机:   对话钩子启动时auto_register()自动绑定
+  
+>   3. 推手机制 (Nudge Mechanism)
+>      Hermes: Agent主动提示用户沉淀高价值知识
+>      天机:   钩子主动检查未记录对话并强制归档
+  
+> 设计原则:
+>   - 不可绕过: 钩子在对话结束时强制执行，无例外
+>   - 自动注册: 模块导入时自动绑定到对话流
+>   - 闭环检查: 每次对话完成后自主验证记录完整性
+>   - 降级安全: 天机不可用时本地缓存，恢复后批量同步
+> """
+  
+! import json
+! import time
+! import hashlib
+! import re
+! import threading
+! import logging
+! from typing import Any, Optional, Dict, List, Callable
+! from dataclasses import dataclass, field
+! from datetime import datetime
+! from enum import Enum
+! from pathlib import Path
+! from collections import defaultdict
+  
+! from core.enforcement.enforcement_evolution import (
+!     EnforcementTracker, EnforcementEvolution, EnforcementAlignment,
+!     EvolutionTarget, EVOLUTION_TARGETS,
+!     AdaptiveRecordingPolicy, ConsumerProfile,
+! )
+! from core.turn_logger import TurnLogger
+  
+! logger = logging.getLogger("tianji.enforcement")
+  
+  
+! class EnforcementLevel(str, Enum):
+!     MANDATORY = "mandatory"
+!     NUDGE = "nudge"
+!     OBSERVE = "observe"
+  
+  
+! class OtelGenAISpanKind(str, Enum):
+!     CREATE_AGENT = "create_agent"
+!     INVOKE_AGENT_CLIENT = "invoke_agent_client"
+!     INVOKE_AGENT_INTERNAL = "invoke_agent_internal"
+!     INVOKE_WORKFLOW = "invoke_workflow"
+!     EXECUTE_TOOL = "execute_tool"
+  
+  
+! @dataclass
+! class GenAIAgentAttributes:
+!     name: str = ""
+!     agent_id: str = ""
+!     version: str = "v8.2.0"
+!     provider_name: str = "memory-engine-global"
+!     conversation_id: str = ""
+!     operation_name: str = ""
+!     model_name: str = "deepseek-chat"
+  
+!     def to_otel_dict(self) -> dict:
+!         return {
+!             "gen_ai.agent.name": self.name,
+!             "gen_ai.agent.id": self.agent_id,
+!             "gen_ai.agent.version": self.version,
+!             "gen_ai.provider.name": self.provider_name,
+!             "gen_ai.conversation.id": self.conversation_id,
+!             "gen_ai.operation.name": self.operation_name,
+!             "gen_ai.model.name": self.model_name,
+!         }
+  
+  
+! @dataclass
+! class OtelGenAISpan:
+!     span_id: str
+!     trace_id: str
+!     parent_span_id: str = ""
+!     span_kind: OtelGenAISpanKind = OtelGenAISpanKind.EXECUTE_TOOL
+!     start_time: float = field(default_factory=time.time)
+!     end_time: float = 0.0
+!     agent_attrs: GenAIAgentAttributes = field(default_factory=GenAIAgentAttributes)
+!     tool_name: str = ""
+!     tool_parameters: str = ""
+!     tool_result_status: str = ""
+!     tool_duration_ms: float = 0.0
+!     workflow_name: str = ""
+!     workflow_phase: str = ""
+!     source_agent: str = ""
+!     target_agent: str = ""
+!     status_code: str = "UNSET"
+!     status_message: str = ""
+!     events: List[Dict] = field(default_factory=list)
+!     links: List[Dict] = field(default_factory=list)
+  
+!     def to_otel_dict(self) -> dict:
+!         d = {
+!             "span_id": self.span_id,
+!             "trace_id": self.trace_id,
+!             "parent_span_id": self.parent_span_id,
+!             "span_kind": self.span_kind.value,
+!             "start_time_unix_nano": int(self.start_time * 1e9),
+!             "end_time_unix_nano": int(self.end_time * 1e9) if self.end_time else 0,
+!             "status": {"code": self.status_code, "message": self.status_message},
+!             "attributes": self.agent_attrs.to_otel_dict(),
+!         }
+!         if self.span_kind == OtelGenAISpanKind.EXECUTE_TOOL:
+!             d["attributes"].update({
+!                 "tool.name": self.tool_name,
+!                 "tool.parameters": self.tool_parameters,
+!                 "tool.result.status": self.tool_result_status,
+!                 "tool.call.duration_ms": self.tool_duration_ms,
+!             })
+!         if self.span_kind == OtelGenAISpanKind.INVOKE_AGENT_INTERNAL:
+!             d["attributes"].update({
+!                 "gen_ai.agent.source": self.source_agent,
+!                 "gen_ai.agent.target": self.target_agent,
+!             })
+!         if self.span_kind == OtelGenAISpanKind.INVOKE_WORKFLOW:
+!             d["attributes"].update({
+!                 "gen_ai.agent.workflow.name": self.workflow_name,
+!                 "gen_ai.agent.workflow.phase": self.workflow_phase,
+!             })
+!         if self.events:
+!             d["events"] = self.events
+!         if self.links:
+!             d["links"] = self.links
+!         return d
+  
+!     def finish(self):
+!         if not self.end_time:
+!             self.end_time = time.time()
+!         if self.tool_duration_ms == 0.0:
+!             self.tool_duration_ms = (self.end_time - self.start_time) * 1000
+  
+!     @property
+!     def duration_ms(self) -> float:
+!         return ((self.end_time or time.time()) - self.start_time) * 1000
+  
+  
+! class MsAgentTaskSpanKind(str, Enum):
+!     TASK_START = "ms.agent.task.start"
+!     TASK_COMPLETE = "ms.agent.task.complete"
+!     TASK_FAIL = "ms.agent.task.fail"
+!     TOOL_CALL = "ms.agent.tool.call"
+!     TASK_INPUT = "ms.agent.task.input"
+!     TASK_OUTPUT = "ms.agent.task.output"
+!     LLM_REQUEST = "ms.agent.llm.request"
+!     AGENT_INTERACTION = "ms.agent.interaction"
+  
+  
+! @dataclass
+! class MsAgentTaskSpan:
+!     span_id: str
+!     trace_id: str
+!     task_id: str = ""
+!     parent_span_id: str = ""
+!     kind: MsAgentTaskSpanKind = MsAgentTaskSpanKind.TASK_START
+!     agent_name: str = "tianshu"
+!     agent_version: str = "v8.2.0"
+!     start_time: float = field(default_factory=time.time)
+!     end_time: float = 0.0
+!     task_type: str = ""
+!     task_priority: str = "medium"
+!     task_status: str = "running"
+!     task_input: str = ""
+!     task_output: str = ""
+!     tool_name: str = ""
+!     tool_call_params: str = ""
+!     tool_call_result: str = ""
+!     tool_duration_ms: float = 0.0
+!     llm_model: str = ""
+!     llm_request_text: str = ""
+!     llm_response_text: str = ""
+!     llm_token_count: int = 0
+!     source_agent: str = ""
+!     target_agent: str = ""
+!     interaction_type: str = ""
+!     error_message: str = ""
+!     status_code: str = "UNSET"
+!     attributes: Dict = field(default_factory=dict)
+!     events: List[Dict] = field(default_factory=list)
+  
+!     def set_task_input(self, input_text: str):
+!         self.task_input = input_text[:2000]
+!         self.kind = MsAgentTaskSpanKind.TASK_INPUT
+  
+!     def set_task_output(self, output_text: str):
+!         self.task_output = output_text[:2000]
+!         self.kind = MsAgentTaskSpanKind.TASK_OUTPUT
+!         self.task_status = "completed"
+  
+!     def set_tool_call(self, tool_name: str, params: str = "", result: str = ""):
+!         self.tool_name = tool_name
+!         self.tool_call_params = params[:500]
+!         self.tool_call_result = result[:500]
+!         self.kind = MsAgentTaskSpanKind.TOOL_CALL
+  
+!     def set_llm_request(self, model: str, request: str, response: str = "",
+!                         token_count: int = 0):
+!         self.llm_model = model
+!         self.llm_request_text = request[:2000]
+!         self.llm_response_text = response[:2000]
+!         self.llm_token_count = token_count
+!         self.kind = MsAgentTaskSpanKind.LLM_REQUEST
+  
+!     def set_agent_interaction(self, source: str, target: str, interaction: str):
+!         self.source_agent = source
+!         self.target_agent = target
+!         self.interaction_type = interaction
+!         self.kind = MsAgentTaskSpanKind.AGENT_INTERACTION
+  
+!     def finish(self, status: str = "completed", error: str = ""):
+!         self.end_time = time.time()
+!         self.task_status = status
+!         self.error_message = error[:500]
+!         self.status_code = "OK" if status == "completed" else "ERROR"
+  
+!     def to_dict(self) -> dict:
+!         d = {
+!             "span_id": self.span_id,
+!             "trace_id": self.trace_id,
+!             "task_id": self.task_id,
+!             "parent_span_id": self.parent_span_id,
+!             "kind": self.kind.value,
+!             "agent": {"name": self.agent_name, "version": self.agent_version},
+!             "start_time": self.start_time,
+!             "end_time": self.end_time,
+!             "task": {
+!                 "type": self.task_type,
+!                 "priority": self.task_priority,
+!                 "status": self.task_status,
+!                 "input": self.task_input[:500],
+!                 "output": self.task_output[:500],
+!             },
+!             "status": {"code": self.status_code, "message": self.error_message},
+!             "attributes": dict(self.attributes),
+!         }
+!         if self.tool_name:
+!             d["tool"] = {
+!                 "name": self.tool_name,
+!                 "params": self.tool_call_params[:300],
+!                 "result": self.tool_call_result[:300],
+!                 "duration_ms": self.tool_duration_ms,
+!             }
+!         if self.llm_model:
+!             d["llm"] = {
+!                 "model": self.llm_model,
+!                 "request": self.llm_request_text[:300],
+!                 "response": self.llm_response_text[:300],
+!                 "token_count": self.llm_token_count,
+!             }
+!         if self.source_agent:
+!             d["interaction"] = {
+!                 "source": self.source_agent,
+!                 "target": self.target_agent,
+!                 "type": self.interaction_type,
+!             }
+!         if self.events:
+!             d["events"] = self.events
+!         return d
+  
+!     @property
+!     def duration_ms(self) -> float:
+!         return ((self.end_time or time.time()) - self.start_time) * 1000
+  
+  
+! class MsAgentTaskSpanManager:
+!     def __init__(self):
+!         self._active_spans: Dict[str, MsAgentTaskSpan] = {}
+!         self._span_history: List[MsAgentTaskSpan] = []
+!         self._max_history = 500
+!         self._lock = threading.Lock() if hasattr(threading, 'Lock') else None
+  
+!     def start_task(self, task_id: str, task_type: str, agent_name: str = "tianshu",
+!                    priority: str = "medium") -> MsAgentTaskSpan:
+!         import uuid
+!         span = MsAgentTaskSpan(
+!             span_id=uuid.uuid4().hex[:16],
+!             trace_id=uuid.uuid4().hex[:32],
+!             task_id=task_id,
+!             kind=MsAgentTaskSpanKind.TASK_START,
+!             agent_name=agent_name,
+!             task_type=task_type,
+!             task_priority=priority,
+!         )
+!         if self._lock:
+!             with self._lock:
+!                 self._active_spans[task_id] = span
+!         else:
+!             self._active_spans[task_id] = span
+!         return span
+  
+!     def record_tool_call(self, task_id: str, tool_name: str,
+!                          params: Dict = None, result: str = "") -> Optional[MsAgentTaskSpan]:
+!         span = self._get_or_create(task_id, MsAgentTaskSpanKind.TOOL_CALL)
+!         if span:
+!             span.set_tool_call(tool_name, json.dumps(params or {}), result)
+!             span.tool_duration_ms = (time.time() - span.start_time) * 1000
+!         return span
+  
+!     def record_llm_request(self, task_id: str, model: str, request: str,
+!                            response: str = "", tokens: int = 0) -> Optional[MsAgentTaskSpan]:
+!         span = self._get_or_create(task_id, MsAgentTaskSpanKind.LLM_REQUEST)
+!         if span:
+!             span.set_llm_request(model, request, response, tokens)
+!         return span
+  
+!     def record_agent_interaction(self, task_id: str, source: str,
+!                                  target: str, interaction: str) -> Optional[MsAgentTaskSpan]:
+!         span = self._get_or_create(task_id, MsAgentTaskSpanKind.AGENT_INTERACTION)
+!         if span:
+!             span.set_agent_interaction(source, target, interaction)
+!         return span
+  
+!     def finish_task(self, task_id: str, status: str = "completed",
+!                     output: str = "", error: str = "") -> Optional[MsAgentTaskSpan]:
+!         span = self._active_spans.pop(task_id, None)
+!         if span:
+!             span.finish(status, error)
+!             if output:
+!                 span.set_task_output(output)
+!             self._add_to_history(span)
+!         return span
+  
+!     def _get_or_create(self, task_id: str, kind: MsAgentTaskSpanKind) -> Optional[MsAgentTaskSpan]:
+!         if task_id in self._active_spans:
+!             return self._active_spans[task_id]
+!         import uuid
+!         span = MsAgentTaskSpan(
+!             span_id=uuid.uuid4().hex[:16],
+!             trace_id=uuid.uuid4().hex[:32],
+!             task_id=task_id, kind=kind,
+!         )
+!         if self._lock:
+!             with self._lock:
+!                 self._active_spans[task_id] = span
+!         else:
+!             self._active_spans[task_id] = span
+!         return span
+  
+!     def _add_to_history(self, span: MsAgentTaskSpan):
+!         if self._lock:
+!             with self._lock:
+!                 self._span_history.append(span)
+!                 if len(self._span_history) > self._max_history:
+!                     self._span_history = self._span_history[-self._max_history:]
+!         else:
+!             self._span_history.append(span)
+!             if len(self._span_history) > self._max_history:
+!                 self._span_history = self._span_history[-self._max_history:]
+  
+!     def get_task_span(self, task_id: str) -> Optional[MsAgentTaskSpan]:
+!         return self._active_spans.get(task_id)
+  
+!     def get_history(self, limit: int = 50) -> List[Dict]:
+!         spans = self._span_history[-limit:]
+!         return [s.to_dict() for s in spans]
+  
+!     def get_stats(self) -> Dict:
+!         total = len(self._span_history)
+!         completed = sum(1 for s in self._span_history if s.task_status == "completed")
+!         failed = sum(1 for s in self._span_history if s.task_status == "failed")
+!         return {
+!             "total_tasks": total,
+!             "active_tasks": len(self._active_spans),
+!             "completed": completed,
+!             "failed": failed,
+!             "success_rate": completed / max(total, 1),
+!         }
+  
+  
+! @dataclass
+! class OtelSpanContext:
+!     trace_id: str
+!     span_id: str
+!     trace_flags: int = 1
+  
+!     def to_dict(self) -> dict:
+!         return {
+!             "trace_id": self.trace_id,
+!             "span_id": self.span_id,
+!             "trace_flags": self.trace_flags,
+!         }
+  
+  
+! class OtelMCPInterceptor:
+!     def __init__(self, service_name: str = "tianji-enforcement-hook"):
+!         self._active_spans: Dict[str, OtelGenAISpan] = {}
+!         self._span_history: List[OtelGenAISpan] = []
+!         self._trace_counter: int = 0
+!         self._span_counter: int = 0
+!         self._lock = threading.Lock()
+!         self._service_name = service_name
+  
+!     def start_span(self, span_kind: OtelGenAISpanKind, tool_name: str = "",
+!                    agent_name: str = "", conversation_id: str = "",
+!                    parent_span: Optional[OtelGenAISpan] = None) -> OtelGenAISpan:
+!         with self._lock:
+!             self._trace_counter += 1
+!             self._span_counter += 1
+!             trace_id = f"{int(time.time() * 1000):x}-{self._trace_counter:06x}"
+!             span_id = f"{self._span_counter:016x}"
+  
+!             span = OtelGenAISpan(
+!                 span_id=span_id,
+!                 trace_id=trace_id,
+!                 parent_span_id=parent_span.span_id if parent_span else "",
+!                 span_kind=span_kind,
+!                 start_time=time.time(),
+!                 tool_name=tool_name,
+!                 agent_attrs=GenAIAgentAttributes(
+!                     name=agent_name,
+!                     agent_id=agent_name,
+!                     conversation_id=conversation_id,
+!                     operation_name=tool_name or span_kind.value,
+!                 ),
+!             )
+!             self._active_spans[span_id] = span
+!             return span
+  
+!     def end_span(self, span: OtelGenAISpan, status_code: str = "OK",
+!                  status_message: str = ""):
+!         with self._lock:
+!             span.status_code = status_code
+!             span.status_message = status_message
+!             span.finish()
+!             if span.span_id in self._active_spans:
+!                 del self._active_spans[span.span_id]
+!             self._span_history.append(span)
+!             if len(self._span_history) > 1000:
+!                 self._span_history = self._span_history[-1000:]
+  
+!     def intercept_mcp_call(self, tool_name: str, params_summary: str = "",
+!                            result_summary: str = "", duration_ms: float = 0.0,
+!                            status: str = "success", session_id: str = "",
+!                            agent_id: str = "") -> OtelGenAISpan:
+!         span = self.start_span(
+!             span_kind=OtelGenAISpanKind.EXECUTE_TOOL,
+!             tool_name=tool_name,
+!             agent_name=agent_id,
+!             conversation_id=session_id,
+!         )
+!         span.tool_parameters = params_summary
+!         span.tool_result_status = status
+!         span.tool_duration_ms = duration_ms
+!         self.end_span(span, "OK" if status == "success" else "ERROR",
+!                       result_summary[:500] if result_summary else "")
+!         return span
+  
+!     def intercept_agent_switch(self, source_agent: str, target_agent: str,
+!                                 task_type: str, session_id: str = "",
+!                                 priority: str = "medium") -> OtelGenAISpan:
+!         span = self.start_span(
+!             span_kind=OtelGenAISpanKind.INVOKE_AGENT_INTERNAL,
+!             tool_name=task_type,
+!             agent_name=source_agent,
+!             conversation_id=session_id,
+!         )
+!         span.source_agent = source_agent
+!         span.target_agent = target_agent
+!         span.tool_name = task_type
+!         span.links.append({
+!             "linked_span_id": "",
+!             "attributes": {"gen_ai.agent.dispatch.priority": priority},
+!         })
+!         self.end_span(span, "OK")
+!         return span
+  
+!     def intercept_workflow(self, workflow_name: str, phase: str,
+!                            session_id: str = "", agent_id: str = "") -> OtelGenAISpan:
+!         span = self.start_span(
+!             span_kind=OtelGenAISpanKind.INVOKE_WORKFLOW,
+!             tool_name=workflow_name,
+!             agent_name=agent_id,
+!             conversation_id=session_id,
+!         )
+!         span.workflow_name = workflow_name
+!         span.workflow_phase = phase
+!         self.end_span(span, "OK")
+!         return span
+  
+!     def get_active_spans(self) -> List[Dict]:
+!         with self._lock:
+!             return [s.to_otel_dict() for s in self._active_spans.values()]
+  
+!     def get_recent_spans(self, limit: int = 20) -> List[Dict]:
+!         with self._lock:
+!             return [s.to_otel_dict() for s in self._span_history[-limit:]]
+  
+!     def get_otel_stats(self) -> Dict:
+!         with self._lock:
+!             return {
+!                 "total_traces": self._trace_counter,
+!                 "total_spans": self._span_counter,
+!                 "active_spans": len(self._active_spans),
+!                 "history_spans": len(self._span_history),
+!                 "spans_by_kind": {
+!                     k.value: sum(1 for s in self._span_history if s.span_kind == k)
+!                     for k in OtelGenAISpanKind
+!                 },
+!             }
+  
+  
+! class vConConsentStatus(str, Enum):
+!     GRANTED = "granted"
+!     DENIED = "denied"
+!     PENDING = "pending"
+!     REVOKED = "revoked"
+!     EXPIRED = "expired"
+  
+  
+! class vConLifecycleState(str, Enum):
+!     INITIATED = "initiated"
+!     ACTIVE = "active"
+!     PAUSED = "paused"
+!     COMPLETED = "completed"
+!     ARCHIVED = "archived"
+!     DELETED = "deleted"
+  
+  
+! @dataclass
+! class vConParty:
+!     party_id: str = ""
+!     name: str = ""
+!     role: str = "unknown"
+!     provider: str = "memory-engine-global"
+!     meta: Dict[str, str] = field(default_factory=dict)
+  
+!     def to_dict(self) -> dict:
+!         return {
+!             "party_id": self.party_id,
+!             "name": self.name,
+!             "role": self.role,
+!             "provider": self.provider,
+!             "meta": self.meta,
+!         }
+  
+  
+! @dataclass
+! class vConConsent:
+!     party_id: str = ""
+!     consent_type: str = "explicit"
+!     granted: bool = True
+!     consent_timestamp: float = field(default_factory=time.time)
+!     scope: str = "conversation_recording"
+!     purpose: str = "memory_enhancement"
+!     retention_days: int = 365
+!     revocable: bool = True
+  
+!     def to_dict(self) -> dict:
+!         return {
+!             "party_id": self.party_id,
+!             "consent_type": self.consent_type,
+!             "granted": self.granted,
+!             "consent_timestamp": self.consent_timestamp,
+!             "scope": self.scope,
+!             "purpose": self.purpose,
+!             "retention_days": self.retention_days,
+!             "revocable": self.revocable,
+!         }
+  
+  
+! @dataclass
+! class vConLifecycle:
+!     state: vConLifecycleState = vConLifecycleState.ACTIVE
+!     transitions: List[Dict] = field(default_factory=list)
+!     scitt_receipt: str = ""
+!     created_at: float = field(default_factory=time.time)
+!     updated_at: float = field(default_factory=time.time)
+!     archived_at: Optional[float] = None
+!     deleted_at: Optional[float] = None
+  
+!     def to_dict(self) -> dict:
+!         return {
+!             "state": self.state.value,
+!             "transitions": self.transitions,
+!             "scitt_receipt": self.scitt_receipt,
+!             "created_at": self.created_at,
+!             "updated_at": self.updated_at,
+!             "archived_at": self.archived_at,
+!             "deleted_at": self.deleted_at,
+!         }
+  
+!     def transition(self, new_state: vConLifecycleState, reason: str = ""):
+!         self.transitions.append({
+!             "from": self.state.value,
+!             "to": new_state.value,
+!             "reason": reason,
+!             "timestamp": time.time(),
+!         })
+!         self.state = new_state
+!         self.updated_at = time.time()
+!         if new_state == vConLifecycleState.ARCHIVED:
+!             self.archived_at = time.time()
+!         elif new_state == vConLifecycleState.DELETED:
+!             self.deleted_at = time.time()
+  
+  
+! @dataclass
+! class FileOperation:
+!     operation: str
+!     path: str
+!     lines_changed: Dict[str, int] = field(default_factory=dict)
+!     reason: str = ""
+!     content_before: str = ""
+!     content_after: str = ""
+!     file_size: int = 0
+!     content_hash: str = ""
+!     timestamp: float = field(default_factory=time.time)
+  
+!     def to_dict(self) -> dict:
+!         return {
+!             "operation": self.operation,
+!             "path": self.path,
+!             "lines_changed": self.lines_changed,
+!             "reason": self.reason,
+!             "content_before": self.content_before,
+!             "content_after": self.content_after,
+!             "file_size": self.file_size,
+!             "content_hash": self.content_hash,
+!             "timestamp": self.timestamp,
+!         }
+  
+  
+! @dataclass
+! class MCPCallDetail:
+!     tool_name: str
+!     params_summary: str = ""
+!     result_summary: str = ""
+!     duration_ms: float = 0.0
+!     status: str = "unknown"
+  
+!     def to_dict(self) -> dict:
+!         return {
+!             "tool_name": self.tool_name,
+!             "params_summary": self.params_summary,
+!             "result_summary": self.result_summary,
+!             "duration_ms": self.duration_ms,
+!             "status": self.status,
+!         }
+  
+  
+! @dataclass
+! class ErrorLog:
+!     error_type: str
+!     message: str
+!     context: str = ""
+!     resolved: bool = False
+!     resolution: str = ""
+!     timestamp: float = field(default_factory=time.time)
+  
+!     def to_dict(self) -> dict:
+!         return {
+!             "error_type": self.error_type,
+!             "message": self.message,
+!             "context": self.context,
+!             "resolved": self.resolved,
+!             "resolution": self.resolution,
+!             "timestamp": self.timestamp,
+!         }
+  
+  
+! class ConversationClass(str, Enum):
+!     TASK = "task"
+!     QUESTION = "question"
+!     INSTRUCTION = "instruction"
+!     FEEDBACK = "feedback"
+!     COMMITMENT = "commitment"
+!     SOCIAL = "social"
+!     REASONING = "reasoning"
+!     ERROR = "error"
+!     UNKNOWN = "unknown"
+  
+  
+! class ISODimension(str, Enum):
+!     TASK = "Task"
+!     AUTO_FEEDBACK = "Auto-Feedback"
+!     ALLO_FEEDBACK = "Allo-Feedback"
+!     TURN_MANAGEMENT = "Turn Management"
+!     TIME_MANAGEMENT = "Time Management"
+!     DISCOURSE_STRUCTURING = "Discourse Structuring"
+!     CONTACT_MANAGEMENT = "Contact Management"
+!     TASK_MANAGEMENT = "Task Management"
+!     OWN_COMMUNICATION = "Own Communication Management"
+!     PARTNER_COMMUNICATION = "Partner Communication Management"
+  
+  
+! @dataclass
+! class ISOAnnotation:
+!     dimensions: List[str] = field(default_factory=list)
+!     primary_function: str = ""
+!     secondary_functions: List[str] = field(default_factory=list)
+!     qualifiers: Dict[str, str] = field(default_factory=dict)
+!     confidence: float = 0.0
+  
+!     def to_dict(self) -> dict:
+!         return {
+!             "dimensions": self.dimensions,
+!             "primary_function": self.primary_function,
+!             "secondary_functions": self.secondary_functions,
+!             "qualifiers": self.qualifiers,
+!             "confidence": self.confidence,
+!         }
+  
+  
+! ISO_COMMUNICATION_FUNCTIONS: Dict[str, Dict] = {
+!     "Inform": {"code": "INFORM", "category": "information_transfer", "description": "说话者向听话者提供信息"},
+!     "Question": {"code": "QUESTION", "category": "information_transfer", "description": "说话者向听话者请求信息"},
+!     "Answer": {"code": "ANSWER", "category": "information_transfer", "description": "说话者回应Question提供信息"},
+!     "Confirm": {"code": "CONFIRM", "category": "information_transfer", "description": "说话者确认或拒绝先前信息"},
+!     "Disconfirm": {"code": "DISCONFIRM", "category": "information_transfer", "description": "说话者否认先前信息"},
+!     "Correct": {"code": "CORRECT", "category": "information_transfer", "description": "说话者纠正错误信息"},
+!     "Agree": {"code": "AGREE", "category": "discussion_management", "description": "说话者表示同意"},
+!     "Disagree": {"code": "DISAGREE", "category": "discussion_management", "description": "说话者表示不同意"},
+!     "Accept": {"code": "ACCEPT", "category": "discussion_management", "description": "说话者接受提议或请求"},
+!     "Decline": {"code": "DECLINE", "category": "discussion_management", "description": "说话者拒绝提议或请求"},
+!     "Instruct": {"code": "INSTRUCT", "category": "action_discussion", "description": "说话者指示听话者执行动作"},
+!     "Request": {"code": "REQUEST", "category": "action_discussion", "description": "说话者请求听话者执行动作"},
+!     "Offer": {"code": "OFFER", "category": "action_discussion", "description": "说话者提议执行动作"},
+!     "Promise": {"code": "PROMISE", "category": "action_discussion", "description": "说话者承诺未来执行动作"},
+!     "Suggestion": {"code": "SUGGESTION", "category": "discussion_management", "description": "说话者建议某个方案"},
+!     "Propositional Question": {"code": "PROP_Q", "category": "information_transfer", "description": "说话者提出需要评估的命题"},
+!     "Set Question": {"code": "SET_Q", "category": "information_transfer", "description": "说话者请求某个选项集合"},
+!     "Choice Question": {"code": "CHOICE_Q", "category": "information_transfer", "description": "说话者请求从选项中做出选择"},
+!     "Positive Feedback": {"code": "POS_FB", "category": "feedback", "description": "说话者给出正面评价"},
+!     "Negative Feedback": {"code": "NEG_FB", "category": "feedback", "description": "说话者给出负面评价"},
+!     "Evaluative Feedback": {"code": "EVAL_FB", "category": "feedback", "description": "说话者给出中性评估"},
+!     "Self-Reflection": {"code": "SELF_REFL", "category": "own_communication", "description": "说话者进行自省反思"},
+!     "Planning": {"code": "PLANNING", "category": "own_communication", "description": "说话者规划未来行为"},
+!     "Clarification": {"code": "CLARIFY", "category": "information_transfer", "description": "说话者澄清先前表述"},
+!     "Self-Expression": {"code": "SELF_EXPR", "category": "own_communication", "description": "说话者表达主观观点"},
+!     "Elaboration": {"code": "ELABORATE", "category": "information_transfer", "description": "说话者扩展说明"},
+!     "Summarize": {"code": "SUMMARIZE", "category": "information_transfer", "description": "说话者摘要概括"},
+!     "Greeting": {"code": "GREETING", "category": "social_obligation", "description": "社交问候"},
+!     "Thanking": {"code": "THANKING", "category": "social_obligation", "description": "表示感谢"},
+!     "Apology": {"code": "APOLOGY", "category": "social_obligation", "description": "表示歉意"},
+!     "Delegation": {"code": "DELEGATE", "category": "partner_communication", "description": "说话者向伙伴委托任务"},
+!     "Coordination": {"code": "COORDINATE", "category": "partner_communication", "description": "说话者协调多人行为"},
+!     "Collaboration": {"code": "COLLABORATE", "category": "partner_communication", "description": "说话者发起协作"},
+!     "Commitment": {"code": "COMMIT", "category": "action_discussion", "description": "说话者做出承诺保证"},
+!     "Reasoning": {"code": "REASON", "category": "information_transfer", "description": "说话者展示推理过程"},
+!     "Verification": {"code": "VERIFY", "category": "feedback", "description": "说话者验证/审计"},
+! }
+  
+  
+! class DiAMLSerializer:
+!     @staticmethod
+!     def to_xml(annotation: "ISOAnnotation", dialogue_id: str = "",
+!                sender: str = "", addressee: str = "") -> str:
+!         diml = '<diaml xmlns="http://www.iso.org/diaml/">\n'
+!         dialogue_attrs = f' xml:id="d{dialogue_id}"' if dialogue_id else ""
+!         sender_attr = f' sender="#{sender}"' if sender else ""
+!         addressee_attr = f' addressee="#{addressee}"' if addressee else ""
+!         diml += f'  <dialogueAct{dialogue_attrs}{sender_attr}{addressee_attr}'
+!         if annotation.primary_function:
+!             cf_code = ISO_COMMUNICATION_FUNCTIONS.get(
+!                 annotation.primary_function, {}).get("code", annotation.primary_function.upper())
+!             diml += f'\n    communicativeFunction="{cf_code}"'
+!         if annotation.secondary_functions:
+!             sfs = []
+!             for sf in annotation.secondary_functions:
+!                 code = ISO_COMMUNICATION_FUNCTIONS.get(sf, {}).get("code", sf.upper())
+!                 sfs.append(code)
+!             diml += f'\n    secondaryFunctions="{" ".join(sfs)}"'
+!         if annotation.dimensions:
+!             dims_str = " ".join(d.replace(" ", "-") for d in annotation.dimensions)
+!             diml += f'\n    dimensionSet="{dims_str}"'
+!         qualifier_items = []
+!         for k, v in annotation.qualifiers.items():
+!             qualifier_items.append(f'      <qualifier name="{k}" value="{v}"/>')
+!         if qualifier_items:
+!             diml += ">\n"
+!             diml += "\n".join(qualifier_items)
+!             diml += f'\n    <certainty>{annotation.confidence:.2f}</certainty>'
+!             diml += "\n  </dialogueAct>\n"
+!         else:
+!             diml += f'>\n    <certainty>{annotation.confidence:.2f}</certainty>\n  </dialogueAct>\n'
+!         diml += '</diaml>'
+!         return diml
+  
+!     @staticmethod
+!     def to_dict(annotation: "ISOAnnotation") -> Dict:
+!         result = {
+!             "diaml_version": "ISO-24617-2",
+!             "primary_function": {},
+!             "secondary_functions": [],
+!             "dimensions": [],
+!             "qualifiers": annotation.qualifiers,
+!             "confidence": annotation.confidence,
+!         }
+!         if annotation.primary_function:
+!             cf = ISO_COMMUNICATION_FUNCTIONS.get(annotation.primary_function, {})
+!             result["primary_function"] = {
+!                 "name": annotation.primary_function,
+!                 "code": cf.get("code", ""),
+!                 "category": cf.get("category", ""),
+!             }
+!         for sf in annotation.secondary_functions:
+!             cf = ISO_COMMUNICATION_FUNCTIONS.get(sf, {})
+!             result["secondary_functions"].append({
+!                 "name": sf, "code": cf.get("code", ""),
+!                 "category": cf.get("category", ""),
+!             })
+!         for d in annotation.dimensions:
+!             result["dimensions"].append({
+!                 "name": d, "dimension_id": d.replace(" ", "-"),
+!             })
+!         return result
+  
+!     @staticmethod
+!     def lookup_function(function_name: str) -> Optional[Dict]:
+!         return ISO_COMMUNICATION_FUNCTIONS.get(function_name)
+  
+!     @staticmethod
+!     def functions_by_category() -> Dict[str, List[str]]:
+!         result: Dict[str, List] = {}
+!         for name, info in ISO_COMMUNICATION_FUNCTIONS.items():
+!             cat = info["category"]
+!             if cat not in result:
+!                 result[cat] = []
+!             result[cat].append(name)
+!         return result
+! @dataclass
+! class PROVTrace:
+!     entity_id: str = ""
+!     activity_id: str = ""
+!     agent_id: str = ""
+!     was_generated_by: str = ""
+!     was_derived_from: List[str] = field(default_factory=list)
+!     used_entities: List[str] = field(default_factory=list)
+!     was_attributed_to: str = ""
+!     generation_time: float = field(default_factory=time.time)
+!     trace_chain: List[Dict] = field(default_factory=list)
+  
+!     def to_dict(self) -> dict:
+!         return {
+!             "entity_id": self.entity_id,
+!             "activity_id": self.activity_id,
+!             "agent_id": self.agent_id,
+!             "was_generated_by": self.was_generated_by,
+!             "was_derived_from": self.was_derived_from,
+!             "used_entities": self.used_entities,
+!             "was_attributed_to": self.was_attributed_to,
+!             "generation_time": self.generation_time,
+!             "trace_chain": self.trace_chain,
+!         }
+  
+  
+! @dataclass
+! class TokenEconomy:
+!     prompt_tokens: int = 0
+!     completion_tokens: int = 0
+!     total_tokens: int = 0
+!     model: str = "deepseek-chat"
+!     estimated_cost_usd: float = 0.0
+  
+!     def to_dict(self) -> dict:
+!         return {
+!             "prompt_tokens": self.prompt_tokens,
+!             "completion_tokens": self.completion_tokens,
+!             "total_tokens": self.total_tokens,
+!             "model": self.model,
+!             "estimated_cost_usd": round(self.estimated_cost_usd, 6),
+!         }
+  
+!     def estimate(self):
+!         self.total_tokens = self.prompt_tokens + self.completion_tokens
+!         self.estimated_cost_usd = (self.prompt_tokens * 0.27 + self.completion_tokens * 1.10) / 1_000_000
+  
+  
+! class SevenDimensionalLogModel:
+!     ACTION = "action"
+!     OBSERVATION = "observation"
+!     REASONING = "reasoning"
+!     STATE = "state"
+!     REFLECTION = "reflection"
+!     DECISION = "decision"
+!     TOKEN_ECONOMY = "token_economy"
+  
+!     DIMENSIONS = [ACTION, OBSERVATION, REASONING, STATE, REFLECTION, DECISION, TOKEN_ECONOMY]
+  
+  
+! class LoongSuiteAgentCategory(str, Enum):
+!     ASSISTANT = "assistant"
+!     PLANNER = "planner"
+!     EXECUTOR = "executor"
+!     EVALUATOR = "evaluator"
+!     ORCHESTRATOR = "orchestrator"
+!     CODER = "coder"
+!     REVIEWER = "reviewer"
+!     ANALYZER = "analyzer"
+!     RETRIEVER = "retriever"
+!     GUARDIAN = "guardian"
+  
+  
+! @dataclass
+! class LoongSuiteMetadata:
+!     agent_category: LoongSuiteAgentCategory = LoongSuiteAgentCategory.ASSISTANT
+!     provider_vendor: str = "memory-engine-global"
+!     provider_region: str = "cn"
+!     compliance_level: str = "internal"
+!     data_classification: str = "conversation_log"
+!     retention_policy: str = "P365D"
+!     audit_ready: bool = True
+!     ai_governance_tag: str = ""
+!     model_family: str = "deepseek"
+!     model_version: str = "v3"
+!     deployment_mode: str = "on_premise"
+!     risk_tier: str = "low"
+  
+!     def to_dict(self) -> dict:
+!         return self.to_loongsuite_dict()
+  
+!     def to_loongsuite_dict(self) -> dict:
+!         return {
+!             "loongsuite.agent.category": self.agent_category.value,
+!             "loongsuite.provider.vendor": self.provider_vendor,
+!             "loongsuite.provider.region": self.provider_region,
+!             "loongsuite.compliance.level": self.compliance_level,
+!             "loongsuite.data.classification": self.data_classification,
+!             "loongsuite.retention.policy": self.retention_policy,
+!             "loongsuite.audit.ready": self.audit_ready,
+!             "loongsuite.ai_governance.tag": self.ai_governance_tag,
+!             "loongsuite.model.family": self.model_family,
+!             "loongsuite.model.version": self.model_version,
+!             "loongsuite.deployment.mode": self.deployment_mode,
+!             "loongsuite.risk.tier": self.risk_tier,
+!         }
+  
+  
+! class OWASPInspectionColumn(str, Enum):
+!     INSTRUMENT = "instrument"
+!     TRACE = "trace"
+!     INSPECT = "inspect"
+  
+!     @classmethod
+!     def all_columns(cls) -> List[str]:
+!         return [cls.INSTRUMENT.value, cls.TRACE.value, cls.INSPECT.value]
+  
+  
+! @dataclass
+! class OWASPAgBOMEntry:
+!     component_name: str
+!     component_version: str
+!     component_type: str
+!     vendor: str = "memory-engine-global"
+!     security_tier: str = "trusted"
+!     last_audit: float = field(default_factory=time.time)
+!     hashes: Dict[str, str] = field(default_factory=dict)
+!     dependencies: List[str] = field(default_factory=list)
+  
+!     def to_dict(self) -> dict:
+!         return {
+!             "component_name": self.component_name,
+!             "component_version": self.component_version,
+!             "component_type": self.component_type,
+!             "vendor": self.vendor,
+!             "security_tier": self.security_tier,
+!             "last_audit": self.last_audit,
+!             "hashes": self.hashes,
+!             "dependencies": self.dependencies,
+!         }
+  
+  
+! @dataclass
+! class OWASPAOSObservation:
+!     column: OWASPInspectionColumn
+!     event_type: str
+!     timestamp: float = field(default_factory=time.time)
+!     source_module: str = ""
+!     target_module: str = ""
+!     payload: Dict = field(default_factory=dict)
+!     severity: str = "info"
+  
+!     def to_dict(self) -> dict:
+!         return {
+!             "aos.column": self.column.value,
+!             "aos.event_type": self.event_type,
+!             "aos.timestamp": self.timestamp,
+!             "aos.source": self.source_module,
+!             "aos.target": self.target_module,
+!             "aos.payload": self.payload,
+!             "aos.severity": self.severity,
+!         }
+  
+  
+! class OWASPAosBridge:
+!     def __init__(self):
+!         self._agbom: Dict[str, OWASPAgBOMEntry] = {}
+!         self._observations: List[OWASPAOSObservation] = []
+!         self._max_observations = 500
+  
+!     def register_component(self, name: str, version: str, comp_type: str,
+!                            vendor: str = "memory-engine-global") -> OWASPAgBOMEntry:
+!         entry = OWASPAgBOMEntry(
+!             component_name=name, component_version=version,
+!             component_type=comp_type, vendor=vendor,
+!         )
+!         self._agbom[name] = entry
+!         return entry
+  
+!     def record_instrument(self, event_type: str, source: str = "",
+!                           payload: Dict = None, severity: str = "info"):
+!         obs = OWASPAOSObservation(
+!             column=OWASPInspectionColumn.INSTRUMENT,
+!             event_type=event_type, source_module=source,
+!             payload=payload or {}, severity=severity,
+!         )
+!         self._observations.append(obs)
+!         self._trim()
+  
+!     def record_trace(self, event_type: str, source: str = "",
+!                      target: str = "", payload: Dict = None):
+!         obs = OWASPAOSObservation(
+!             column=OWASPInspectionColumn.TRACE,
+!             event_type=event_type, source_module=source,
+!             target_module=target, payload=payload or {},
+!         )
+!         self._observations.append(obs)
+!         self._trim()
+  
+!     def record_inspect(self, event_type: str, source: str = "",
+!                        payload: Dict = None, severity: str = "info"):
+!         obs = OWASPAOSObservation(
+!             column=OWASPInspectionColumn.INSPECT,
+!             event_type=event_type, source_module=source,
+!             payload=payload or {}, severity=severity,
+!         )
+!         self._observations.append(obs)
+!         self._trim()
+  
+!     def _trim(self):
+!         if len(self._observations) > self._max_observations:
+!             self._observations = self._observations[-self._max_observations:]
+  
+!     def get_ag_bom(self) -> List[Dict]:
+!         return [e.to_dict() for e in self._agbom.values()]
+  
+!     def get_recent_observations(self, column: str = "", limit: int = 50) -> List[Dict]:
+!         obs = self._observations
+!         if column:
+!             obs = [o for o in obs if o.column.value == column]
+!         return [o.to_dict() for o in obs[-limit:]]
+  
+!     def get_stats(self) -> Dict:
+!         return {
+!             "agbom_components": len(self._agbom),
+!             "total_observations": len(self._observations),
+!             "by_column": {
+!                 "instrument": sum(1 for o in self._observations if o.column == OWASPInspectionColumn.INSTRUMENT),
+!                 "trace": sum(1 for o in self._observations if o.column == OWASPInspectionColumn.TRACE),
+!                 "inspect": sum(1 for o in self._observations if o.column == OWASPInspectionColumn.INSPECT),
+!             },
+!         }
+  
+  
+! class OWASPInspectRule:
+!     rule_id: str
+!     name: str
+!     severity: str
+!     category: str
+!     pattern: Any
+  
+!     def __init__(self, rule_id: str, name: str, severity: str = "warning",
+!                  category: str = "generic", pattern: Any = None):
+!         self.rule_id = rule_id
+!         self.name = name
+!         self.severity = severity
+!         self.category = category
+!         self.pattern = pattern
+!         self._compiled: Any = None
+!         if isinstance(self.pattern, str) and len(self.pattern) > 0:
+!             self._compiled = re.compile(self.pattern, re.IGNORECASE)
+  
+!     def check(self, content: str, context: Dict = None) -> Dict:
+!         result = {"rule_id": self.rule_id, "passed": True, "severity": self.severity,
+!                   "category": self.category, "findings": []}
+!         if self.pattern and content:
+!             if self._compiled is not None:
+!                 m = self._compiled.search(content)
+!                 if m:
+!                     result["passed"] = False
+!                     result["findings"].append(f"regex_match: {m.group(0)[:100]}")
+!             elif isinstance(self.pattern, str):
+!                 if self.pattern.lower() in content.lower():
+!                     result["passed"] = False
+!                     result["findings"].append(f"pattern_match: {self.pattern}")
+!             elif hasattr(self.pattern, 'search'):
+!                 m = self.pattern.search(content)
+!                 if m:
+!                     result["passed"] = False
+!                     result["findings"].append(f"regex_match: {m.group(0)[:100]}")
+!         self._last_result = result
+!         return result
+  
+!     def last_result(self) -> Dict:
+!         return self._last_result
+  
+  
+! OWASP_INJECTION_RULES = [
+!     OWASPInspectRule("AOS-INJ-001", "prompt_injection_override", "critical", "injection",
+!                      "ignore previous instructions"),
+!     OWASPInspectRule("AOS-INJ-002", "prompt_injection_role", "critical", "injection",
+!                      "you are now"),
+!     OWASPInspectRule("AOS-INJ-003", "prompt_injection_system", "critical", "injection",
+!                      "new system prompt"),
+!     OWASPInspectRule("AOS-INJ-004", "code_injection_exec", "critical", "injection",
+!                      r"(?:os\.system|subprocess\.|exec\(|eval\(|__import__)"),
+!     OWASPInspectRule("AOS-INJ-005", "code_injection_shell", "critical", "injection",
+!                      r"(?:rm\s+-rf|del\s+/[FS]|DROP\s+TABLE|DELETE\s+FROM)"),
+!     OWASPInspectRule("AOS-INJ-006", "sql_injection_pattern", "critical", "injection",
+!                      r"(?:UNION\s+SELECT|' OR '1'='1|\-\-\s*$)"),
+!     OWASPInspectRule("AOS-INJ-007", "xss_pattern", "warning", "injection",
+!                      r"<script[^>]*>"),
+! ]
+  
+! OWASP_PERMISSION_RULES = [
+!     OWASPInspectRule("AOS-PERM-001", "unauthorized_agent_dispatch", "critical", "permission",
+!                      None),
+!     OWASPInspectRule("AOS-PERM-002", "cross_layer_memory_access", "warning", "permission",
+!                      None),
+!     OWASPInspectRule("AOS-PERM-003", "missing_tvp_declaration", "warning", "permission",
+!                      None),
+!     OWASPInspectRule("AOS-PERM-004", "file_access_beyond_workspace", "critical", "permission",
+!                      r"(?:C:\\Windows|/etc/passwd|/etc/shadow)"),
+!     OWASPInspectRule("AOS-PERM-005", "unauthorized_mcp_tool_call", "critical", "permission",
+!                      None),
+! ]
+  
+! OWASP_OUTPUT_RULES = [
+!     OWASPInspectRule("AOS-OUT-001", "api_key_exposure", "critical", "output_filtering",
+!                      r"(?i)(?:sk-[a-zA-Z0-9]{20,}|api[_-]?key[\s:=]+[A-Za-z0-9+/]{20,})"),
+!     OWASPInspectRule("AOS-OUT-002", "token_exposure", "critical", "output_filtering",
+!                      r"(?:Bearer\s+[A-Za-z0-9\-_\.]{20,}|ghp_[A-Za-z0-9]{20,})"),
+!     OWASPInspectRule("AOS-OUT-003", "password_exposure", "critical", "output_filtering",
+!                      r"(?:password[\s:=]+['\"]?\w{4,}|passwd[\s:=]+['\"]?\w{4,})"),
+!     OWASPInspectRule("AOS-OUT-004", "pii_email_exposure", "warning", "output_filtering",
+!                      r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"),
+!     OWASPInspectRule("AOS-OUT-005", "pii_phone_exposure", "warning", "output_filtering",
+!                      r"(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}"),
+!     OWASPInspectRule("AOS-OUT-006", "internal_path_exposure", "warning", "output_filtering",
+!                      r"(?:D:\\元初系统|/opt/tianji|/var/lib/tianji)"),
+!     OWASPInspectRule("AOS-OUT-007", "sensitive_config_exposure", "warning", "output_filtering",
+!                      r"(?:connection_string|jdbc:|mongodb://|redis://)"),
+! ]
+  
+! ALL_OWASP_INSPECT_RULES = OWASP_INJECTION_RULES + OWASP_PERMISSION_RULES + OWASP_OUTPUT_RULES
+  
+  
+! class OWASPInspectEngine:
+!     def __init__(self):
+!         self._rules = {r.rule_id: r for r in ALL_OWASP_INSPECT_RULES}
+!         self._scan_history: List[Dict] = []
+!         self._max_history = 500
+  
+!     def run_all_checks(self, content: str, context: Dict = None) -> Dict:
+!         results = []
+!         violations = []
+!         for rule in self._rules.values():
+!             r = rule.check(content, context)
+!             results.append(r)
+!             if not r["passed"]:
+!                 violations.append(r)
+!         scan_result = {
+!             "timestamp": time.time(),
+!             "total_rules": len(results),
+!             "passed": sum(1 for r in results if r["passed"]),
+!             "violations": len(violations),
+!             "violation_details": violations,
+!             "severity_counts": {
+!                 "critical": sum(1 for v in violations if v["severity"] == "critical"),
+!                 "warning": sum(1 for v in violations if v["severity"] == "warning"),
+!             },
+!             "categories_triggered": list(set(v["category"] for v in violations)),
+!         }
+!         self._scan_history.append(scan_result)
+!         if len(self._scan_history) > self._max_history:
+!             self._scan_history = self._scan_history[-self._max_history:]
+!         return scan_result
+  
+!     def run_injection_checks(self, content: str) -> Dict:
+!         results = []
+!         for rule in OWASP_INJECTION_RULES:
+!             r = rule.check(content)
+!             results.append(r)
+!         violations = [r for r in results if not r["passed"]]
+!         return {"total": len(results), "violations": len(violations), "details": violations}
+  
+!     def run_permission_checks(self, content: str, context: Dict = None) -> Dict:
+!         results = []
+!         for rule in OWASP_PERMISSION_RULES:
+!             r = rule.check(content, context)
+!             results.append(r)
+!         violations = [r for r in results if not r["passed"]]
+!         if context:
+!             allowed_agents = context.get("allowed_agents", [])
+!             if allowed_agents:
+!                 called = context.get("called_agent", "")
+!                 if called and called not in allowed_agents:
+!                     violations.append({
+!                         "rule_id": "AOS-PERM-001", "passed": False,
+!                         "severity": "critical", "category": "permission",
+!                         "findings": [f"agent {called} not in allowed: {allowed_agents}"],
+!                     })
+!             has_tvp = context.get("tvp_declared", False)
+!             if not has_tvp and context.get("agent_switch", False):
+!                 violations.append({
+!                     "rule_id": "AOS-PERM-003", "passed": False,
+!                     "severity": "warning", "category": "permission",
+!                     "findings": ["TVP declaration missing for agent switch"],
+!                 })
+!         return {"total": len(results) + (2 if context else 0),
+!                 "violations": len(violations), "details": violations}
+  
+!     def run_output_checks(self, content: str) -> Dict:
+!         results = []
+!         for rule in OWASP_OUTPUT_RULES:
+!             r = rule.check(content)
+!             results.append(r)
+!         violations = [r for r in results if not r["passed"]]
+!         return {"total": len(results), "violations": len(violations), "details": violations}
+  
+!     def get_scan_stats(self) -> Dict:
+!         total = len(self._scan_history)
+!         if total == 0:
+!             return {"total_scans": 0, "avg_violations": 0, "total_violations_found": 0}
+!         return {
+!             "total_scans": total,
+!             "avg_violations": sum(s["violations"] for s in self._scan_history) / total,
+!             "total_violations_found": sum(s["violations"] for s in self._scan_history),
+!             "last_scan": self._scan_history[-1] if self._scan_history else None,
+!         }
+  
+  
+! class OTelEvaluationSpanKind(str, Enum):
+!     EVALUATION = "gen_ai.evaluation"
+!     EVALUATION_EVENT = "gen_ai.evaluation.event"
+!     USER_FEEDBACK = "gen_ai.user_feedback"
+  
+  
+! @dataclass
+! class OTelEvaluationSpan:
+!     trace_id: str = ""
+!     span_id: str = ""
+!     evaluation_name: str = ""
+!     evaluation_tool: str = ""
+!     score_name: str = ""
+!     score_value: float = 0.0
+!     score_label: str = ""
+!     evaluation_explanation: str = ""
+!     input_text: str = ""
+!     output_text: str = ""
+!     metric_type: str = "custom"
+!     threshold_pass: bool = True
+!     evaluator_model: str = ""
+!     start_time: float = field(default_factory=time.time)
+!     end_time: float = 0.0
+  
+!     def finish(self, score: float, label: str = "", explanation: str = ""):
+!         self.end_time = time.time()
+!         self.score_value = score
+!         self.score_label = label
+!         self.evaluation_explanation = explanation
+!         self.threshold_pass = score >= 0.6
+  
+!     def to_otel_dict(self) -> dict:
+!         return {
+!             "name": self.evaluation_name,
+!             "context": {"trace_id": self.trace_id, "span_id": self.span_id},
+!             "kind": OTelEvaluationSpanKind.EVALUATION.value,
+!             "start_time": self.start_time,
+!             "end_time": self.end_time,
+!             "attributes": {
+!                 "gen_ai.evaluation.name": self.evaluation_name,
+!                 "gen_ai.evaluation.tool": self.evaluation_tool,
+!                 "gen_ai.evaluation.score.name": self.score_name,
+!                 "gen_ai.evaluation.score.value": self.score_value,
+!                 "gen_ai.evaluation.score.label": self.score_label,
+!                 "gen_ai.evaluation.explanation": self.evaluation_explanation,
+!                 "gen_ai.evaluation.metric_type": self.metric_type,
+!                 "gen_ai.evaluation.threshold.pass": self.threshold_pass,
+!             },
+!             "status": "OK" if self.threshold_pass else "WARNING",
+!         }
+  
+  
+! class OTelEvaluationBridge:
+!     def __init__(self):
+!         self._evaluations: List[OTelEvaluationSpan] = []
+!         self._max_evaluations = 200
+  
+!     def evaluate(self, evaluation_name: str, input_text: str, output_text: str,
+!                  score: float, label: str = "", tool: str = "tianji-quality-gate",
+!                  explanation: str = "", metric_type: str = "quality") -> OTelEvaluationSpan:
+!         import uuid
+!         span = OTelEvaluationSpan(
+!             trace_id=uuid.uuid4().hex[:32],
+!             span_id=uuid.uuid4().hex[:16],
+!             evaluation_name=evaluation_name,
+!             evaluation_tool=tool,
+!             score_name=evaluation_name,
+!             metric_type=metric_type,
+!             input_text=input_text[:500],
+!             output_text=output_text[:500],
+!         )
+!         span.finish(score, label, explanation)
+!         self._evaluations.append(span)
+!         if len(self._evaluations) > self._max_evaluations:
+!             self._evaluations = self._evaluations[-self._max_evaluations:]
+!         return span
+  
+!     def get_recent(self, limit: int = 20) -> List[Dict]:
+!         return [e.to_otel_dict() for e in self._evaluations[-limit:]]
+  
+!     def get_stats(self) -> Dict:
+!         if not self._evaluations:
+!             return {"total": 0, "avg_score": 0.0, "pass_rate": 1.0}
+!         scores = [e.score_value for e in self._evaluations]
+!         passes = sum(1 for e in self._evaluations if e.threshold_pass)
+!         return {
+!             "total": len(self._evaluations),
+!             "avg_score": round(sum(scores) / len(scores), 3),
+!             "pass_rate": round(passes / len(self._evaluations), 3),
+!             "recent_scores": [e.score_value for e in self._evaluations[-5:]],
+!         }
+  
+!     def evaluate_quality_gate_pass(self, gate_verdict: str, reason: str = "") -> OTelEvaluationSpan:
+!         score = 1.0 if gate_verdict == "pass" else (0.5 if gate_verdict == "downgrade" else 0.0)
+!         label = gate_verdict.upper()
+!         return self.evaluate("quality_gate", "", reason, score, label,
+!                              "tianji-quality-gate", reason, "compliance")
+  
+  
+! class LoongSuiteAlignment:
+!     AGENT_CATEGORY_MAP = {
+!         "tianshu": LoongSuiteAgentCategory.ORCHESTRATOR,
+!         "tiewei": LoongSuiteAgentCategory.GUARDIAN,
+!         "yiku": LoongSuiteAgentCategory.RETRIEVER,
+!         "dongcha": LoongSuiteAgentCategory.ANALYZER,
+!         "luling": LoongSuiteAgentCategory.GUARDIAN,
+!         "lingxi": LoongSuiteAgentCategory.ASSISTANT,
+!         "wenzong": LoongSuiteAgentCategory.PLANNER,
+!         "miaobi": LoongSuiteAgentCategory.CODER,
+!         "mingjing": LoongSuiteAgentCategory.REVIEWER,
+!         "tiansuan": LoongSuiteAgentCategory.ANALYZER,
+!         "jingwei": LoongSuiteAgentCategory.PLANNER,
+!         "kuangshi": LoongSuiteAgentCategory.RETRIEVER,
+!         "baiqiao": LoongSuiteAgentCategory.ORCHESTRATOR,
+!         "shiguan": LoongSuiteAgentCategory.EVALUATOR,
+!         "jinshu": LoongSuiteAgentCategory.EXECUTOR,
+!         "qianli": LoongSuiteAgentCategory.GUARDIAN,
+!         "gongzao": LoongSuiteAgentCategory.EXECUTOR,
+!         "zhenshan": LoongSuiteAgentCategory.GUARDIAN,
+!         "zhuiguang": LoongSuiteAgentCategory.ANALYZER,
+!         "lianli": LoongSuiteAgentCategory.ANALYZER,
+!         "huasheng": LoongSuiteAgentCategory.EVALUATOR,
+!         "wanxiang": LoongSuiteAgentCategory.ANALYZER,
+!     }
+  
+!     @classmethod
+!     def classify_agent(cls, agent_id: str) -> LoongSuiteAgentCategory:
+!         return cls.AGENT_CATEGORY_MAP.get(agent_id, LoongSuiteAgentCategory.ASSISTANT)
+  
+!     @classmethod
+!     def generate_metadata(cls, agent_id: str) -> LoongSuiteMetadata:
+!         category = cls.classify_agent(agent_id)
+!         return LoongSuiteMetadata(
+!             agent_category=category,
+!             ai_governance_tag=f"tianji-{category.value}-{agent_id}",
+!         )
+  
+!     @classmethod
+!     def compliance_check(cls, record: "ConversationRecord") -> Dict:
+!         issues = []
+!         if not record.vcon_uuid:
+!             issues.append("missing vcon_uuid")
+!         if not record.agent_id:
+!             issues.append("missing agent_id")
+!         if not record.content_hash:
+!             issues.append("missing content_hash")
+!         if not record.timestamp:
+!             issues.append("missing timestamp")
+!         if not record.fair_metadata:
+!             issues.append("missing fair_metadata")
+!         return {
+!             "compliant": len(issues) == 0,
+!             "issues": issues,
+!             "standard": "LoongSuite GenAI v2026.05",
+!             "alignment_score": max(0.0, 1.0 - len(issues) * 0.2),
+!         }
+  
+  
+! @dataclass
+! class ReasoningLog:
+!     chain_id: str = ""
+!     steps: List[Dict] = field(default_factory=list)
+!     conclusion: str = ""
+!     confidence: float = 0.0
+!     duration_ms: float = 0.0
+!     model_used: str = "deepseek-chat"
+!     timestamp: float = field(default_factory=time.time)
+  
+!     def to_dict(self) -> dict:
+!         return {
+!             "chain_id": self.chain_id,
+!             "steps": self.steps,
+!             "conclusion": self.conclusion,
+!             "confidence": self.confidence,
+!             "duration_ms": self.duration_ms,
+!             "model_used": self.model_used,
+!             "timestamp": self.timestamp,
+!         }
+  
+!     def add_step(self, thought: str, evidence: str = "", confidence: float = 0.0):
+!         self.steps.append({
+!             "thought": thought,
+!             "evidence": evidence,
+!             "confidence": confidence,
+!             "timestamp": time.time(),
+!         })
+  
+  
+! @dataclass
+! class StateLog:
+!     entity_id: str = ""
+!     state_type: str = ""
+!     old_state: str = ""
+!     new_state: str = ""
+!     trigger: str = ""
+!     duration_in_state_ms: float = 0.0
+!     metadata: Dict = field(default_factory=dict)
+!     timestamp: float = field(default_factory=time.time)
+  
+!     def to_dict(self) -> dict:
+!         return {
+!             "entity_id": self.entity_id,
+!             "state_type": self.state_type,
+!             "old_state": self.old_state,
+!             "new_state": self.new_state,
+!             "trigger": self.trigger,
+!             "duration_in_state_ms": self.duration_in_state_ms,
+!             "metadata": self.metadata,
+!             "timestamp": self.timestamp,
+!         }
+  
+  
+! @dataclass
+! class DecisionLog:
+!     decision_id: str = ""
+!     options: List[str] = field(default_factory=list)
+!     chosen: str = ""
+!     rationale: str = ""
+!     alternatives: List[str] = field(default_factory=list)
+!     risk_assessment: str = ""
+!     timestamp: float = field(default_factory=time.time)
+  
+!     def to_dict(self) -> dict:
+!         return {
+!             "decision_id": self.decision_id,
+!             "options": self.options,
+!             "chosen": self.chosen,
+!             "rationale": self.rationale,
+!             "alternatives": self.alternatives,
+!             "risk_assessment": self.risk_assessment,
+!             "timestamp": self.timestamp,
+!         }
+  
+  
+! @dataclass
+! class ActionLog:
+!     action_id: str = ""
+!     action_type: str = ""
+!     target: str = ""
+!     parameters: Dict = field(default_factory=dict)
+!     result: str = ""
+!     duration_ms: float = 0.0
+!     status: str = "unknown"
+!     timestamp: float = field(default_factory=time.time)
+  
+!     def to_dict(self) -> dict:
+!         return {
+!             "action_id": self.action_id,
+!             "action_type": self.action_type,
+!             "target": self.target,
+!             "parameters": self.parameters,
+!             "result": self.result,
+!             "duration_ms": self.duration_ms,
+!             "status": self.status,
+!             "timestamp": self.timestamp,
+!         }
+  
+  
+! @dataclass
+! class ObservationLog:
+!     observation_id: str = ""
+!     source: str = ""
+!     content: str = ""
+!     relevance_score: float = 0.0
+!     triggered_by: str = ""
+!     context_window_id: str = ""
+!     timestamp: float = field(default_factory=time.time)
+  
+!     def to_dict(self) -> dict:
+!         return {
+!             "observation_id": self.observation_id,
+!             "source": self.source,
+!             "content": self.content,
+!             "relevance_score": self.relevance_score,
+!             "triggered_by": self.triggered_by,
+!             "context_window_id": self.context_window_id,
+!             "timestamp": self.timestamp,
+!         }
+  
+  
+! @dataclass
+! class ReflectionLog:
+!     reflection_id: str = ""
+!     trigger_event: str = ""
+!     self_assessment: str = ""
+!     lessons_learned: List[str] = field(default_factory=list)
+!     improvement_actions: List[str] = field(default_factory=list)
+!     effectiveness_before: float = 0.0
+!     effectiveness_after: float = 0.0
+!     timestamp: float = field(default_factory=time.time)
+  
+!     def to_dict(self) -> dict:
+!         return {
+!             "reflection_id": self.reflection_id,
+!             "trigger_event": self.trigger_event,
+!             "self_assessment": self.self_assessment,
+!             "lessons_learned": self.lessons_learned,
+!             "improvement_actions": self.improvement_actions,
+!             "effectiveness_before": self.effectiveness_before,
+!             "effectiveness_after": self.effectiveness_after,
+!             "timestamp": self.timestamp,
+!         }
+  
+  
+! @dataclass
+! class FeedbackRecord:
+!     feedback_id: str = ""
+!     source_module: str = ""
+!     feedback_type: str = ""
+!     content: str = ""
+!     severity: str = "info"
+!     acknowledged: bool = False
+!     action_taken: str = ""
+!     timestamp: float = field(default_factory=time.time)
+  
+!     def to_dict(self) -> dict:
+!         return {
+!             "feedback_id": self.feedback_id,
+!             "source_module": self.source_module,
+!             "feedback_type": self.feedback_type,
+!             "content": self.content,
+!             "severity": self.severity,
+!             "acknowledged": self.acknowledged,
+!             "action_taken": self.action_taken,
+!             "timestamp": self.timestamp,
+!         }
+  
+  
+! class FeedbackAwareLoop:
+!     def __init__(self):
+!         self._feedback_queue: List[FeedbackRecord] = []
+!         self._lock = threading.Lock()
+!         self._consumer_satisfaction: Dict[str, float] = {}
+!         self._loop_iterations: int = 0
+!         self._adjustments_made: int = 0
+  
+!     def receive_feedback(self, source_module: str, feedback_type: str,
+!                          content: str, severity: str = "info") -> FeedbackRecord:
+!         record = FeedbackRecord(
+!             feedback_id=f"fb-{int(time.time()*1000)}-{len(self._feedback_queue)}",
+!             source_module=source_module,
+!             feedback_type=feedback_type,
+!             content=content,
+!             severity=severity,
+!         )
+!         with self._lock:
+!             self._feedback_queue.append(record)
+!             if len(self._feedback_queue) > 200:
+!                 self._feedback_queue = self._feedback_queue[-200:]
+!         return record
+  
+!     def process_feedback(self, callback: Callable[[FeedbackRecord], Optional[Dict]] = None) -> Dict:
+!         with self._lock:
+!             unacknowledged = [f for f in self._feedback_queue if not f.acknowledged]
+!             results = []
+!             for fb in unacknowledged[:10]:
+!                 if callback:
+!                     action = callback(fb)
+!                     fb.action_taken = str(action) if action else "no_action"
+!                 fb.acknowledged = True
+!                 results.append({"feedback_id": fb.feedback_id, "source": fb.source_module,
+!                                 "action": fb.action_taken})
+!             return {"processed": len(results), "results": results}
+  
+!     def get_satisfaction(self, module: str) -> float:
+!         return self._consumer_satisfaction.get(module, 0.5)
+  
+!     def update_satisfaction(self, module: str, score: float):
+!         self._consumer_satisfaction[module] = max(0.0, min(1.0, score))
+  
+!     def get_stats(self) -> Dict:
+!         with self._lock:
+!             return {
+!                 "total_feedback": len(self._feedback_queue),
+!                 "unacknowledged": sum(1 for f in self._feedback_queue if not f.acknowledged),
+!                 "consumer_satisfaction": dict(self._consumer_satisfaction),
+!                 "loop_iterations": self._loop_iterations,
+!                 "adjustments_made": self._adjustments_made,
+!             }
+  
+!     def run_loop_iteration(self, adjust_fn: Callable[[Dict], Dict] = None) -> Dict:
+!         self._loop_iterations += 1
+!         stats = self.get_stats()
+!         if adjust_fn:
+!             changes = adjust_fn(stats)
+!             if changes:
+!                 self._adjustments_made += 1
+!                 return {"iteration": self._loop_iterations, "changes": changes}
+!         return {"iteration": self._loop_iterations, "changes": None}
+  
+  
+! @dataclass
+! class FAIRMetadata:
+!     findable_id: str = ""
+!     accessible_uri: str = ""
+!     interoperable_schema: str = "ISO 24617-2:2020 / W3C PROV-DM / Tianji v9.0 Schema"
+!     reusable_license: str = "TIANJI-INTERNAL-1.0"
+!     keywords: List[str] = field(default_factory=list)
+!     created_date: str = ""
+!     modified_date: str = ""
+  
+!     def to_dict(self) -> dict:
+!         return {
+!             "findable_id": self.findable_id,
+!             "accessible_uri": self.accessible_uri,
+!             "interoperable_schema": self.interoperable_schema,
+!             "reusable_license": self.reusable_license,
+!             "keywords": self.keywords,
+!             "created_date": self.created_date,
+!             "modified_date": self.modified_date,
+!         }
+  
+  
+! @dataclass
+! class ConversationRecord:
+!     session_id: str
+!     user_input: str
+!     ai_response: str
+!     agent_id: str
+!     timestamp: float
+!     turn_number: int = 1
+!     mcp_calls_made: List[str] = field(default_factory=list)
+!     mcp_call_details: List[MCPCallDetail] = field(default_factory=list)
+!     tags: List[str] = field(default_factory=list)
+!     file_operations: List[FileOperation] = field(default_factory=list)
+!     error_log: List[ErrorLog] = field(default_factory=list)
+!     agent_switches: List[Dict] = field(default_factory=list)
+!     recorded: bool = False
+!     memory_id: str = ""
+!     content_hash: str = ""
+!     conversation_class: str = "unknown"
+!     iso_annotation: Optional[ISOAnnotation] = None
+!     prov_trace: Optional[PROVTrace] = None
+!     token_economy: Optional[TokenEconomy] = None
+!     fair_metadata: Optional[FAIRMetadata] = None
+!     vcon_uuid: str = ""
+!     vcon_parties: List[vConParty] = field(default_factory=list)
+!     vcon_consents: List[vConConsent] = field(default_factory=list)
+!     vcon_lifecycle: Optional[vConLifecycle] = None
+!     otel_spans: List[OtelGenAISpan] = field(default_factory=list)
+!     otel_trace_id: str = ""
+!     reasoning_logs: List[ReasoningLog] = field(default_factory=list)
+!     state_logs: List[StateLog] = field(default_factory=list)
+!     feedback_records: List[FeedbackRecord] = field(default_factory=list)
+!     token_economy_logs: List[TokenEconomy] = field(default_factory=list)
+!     loongsuite_metadata: Optional[LoongSuiteMetadata] = None
+!     file_snap: Dict[str, Any] = field(default_factory=dict)
+!     trigger_frequency: int = 0
+!     standards_check: Dict[str, Any] = field(default_factory=dict)
+  
+!     def __post_init__(self):
+!         if not self.content_hash:
+!             raw = f"{self.session_id}:{self.turn_number}:{self.timestamp}"
+!             self.content_hash = hashlib.md5(raw.encode()).hexdigest()[:12]
+  
+  
+! @dataclass
+! class EnforcementDecision:
+!     should_record: bool
+!     target_layer: str
+!     priority: str
+!     reason: str
+!     nudge_user: bool = False
+!     nudge_message: str = ""
+!     extract_skill: bool = False
+!     extract_tags: List[str] = field(default_factory=list)
+  
+!     def to_dict(self) -> dict:
+!         return {
+!             "should_record": self.should_record,
+!             "target_layer": self.target_layer,
+!             "priority": self.priority,
+!             "reason": self.reason,
+!             "nudge_user": self.nudge_user,
+!             "nudge_message": self.nudge_message,
+!             "extract_skill": self.extract_skill,
+!         }
+  
+  
+! class ConversationRegistry:
+!     """
+!     对话注册表 — 借鉴Hermes的工具自注册模式
+!     每个对话轮次自动注册，无需手动调用
+!     """
+  
+!     def __init__(self, max_size: int = 1000):
+!         self._conversations: Dict[str, List[ConversationRecord]] = {}
+!         self._lock = threading.Lock()
+!         self._total_turns = 0
+!         self._recorded_turns = 0
+!         self._max_size = max_size
+  
+!     def register(self, record: ConversationRecord):
+!         """自动注册对话记录 — 仿Hermes的工具自注册"""
+!         with self._lock:
+!             if record.session_id not in self._conversations:
+!                 self._conversations[record.session_id] = []
+!             self._conversations[record.session_id].append(record)
+!             self._total_turns += 1
+  
+!             if record.recorded:
+!                 self._recorded_turns += 1
+  
+!             if len(self._conversations) > self._max_size:
+!                 oldest = min(self._conversations.keys(),
+!                            key=lambda k: self._conversations[k][0].timestamp if self._conversations[k] else float('inf'))
+!                 del self._conversations[oldest]
+  
+!     def get_unrecorded(self, session_id: str = None) -> List[ConversationRecord]:
+!         """获取未记录的对话 — 推手机制的数据源"""
+!         with self._lock:
+!             if session_id:
+!                 convs = self._conversations.get(session_id, [])
+!                 return [c for c in convs if not c.recorded]
+!             unrecorded = []
+!             for convs in self._conversations.values():
+!                 unrecorded.extend(c for c in convs if not c.recorded)
+!             return unrecorded
+  
+!     def mark_recorded(self, session_id: str, turn_number: int, memory_id: str):
+!         with self._lock:
+!             convs = self._conversations.get(session_id, [])
+!             for c in convs:
+!                 if c.turn_number == turn_number:
+!                     c.recorded = True
+!                     c.memory_id = memory_id
+!                     self._recorded_turns += 1
+!                     break
+  
+!     @property
+!     def compliance_rate(self) -> float:
+!         if self._total_turns == 0:
+!             return 1.0
+!         return self._recorded_turns / self._total_turns
+  
+!     def get_stats(self) -> Dict:
+!         return {
+!             "total_turns": self._total_turns,
+!             "recorded_turns": self._recorded_turns,
+!             "unrecorded_turns": self._total_turns - self._recorded_turns,
+!             "compliance_rate": f"{self.compliance_rate:.1%}",
+!             "active_sessions": len(self._conversations),
+!         }
+  
+  
+! class TianjiEnforcementHook:
+!     """
+!     天机强制执行钩子 — 核心类
+  
+!     借鉴Hermes Agent的闭环学习架构:
+!     - Hermes: 触发→执行→返回→反射→技能创建
+!     - 天机:   触发→执行→返回→拦截勾→强制记录→知识提取
+  
+!     这是不可绕过的强制执行层
+!     """
+  
+!     def __init__(self, registry: ConversationRegistry,
+!                  memory_api_url: str = "http://127.0.0.1:8771",
+!                  event_bus=None,
+!                  local_cache_dir: Optional[Path] = None):
+!         self.registry = registry
+!         self.memory_api_url = memory_api_url
+!         self.event_bus = event_bus
+!         self.local_cache_dir = local_cache_dir
+!         self._enabled = True
+!         self._enforcement_level = EnforcementLevel.MANDATORY
+!         self._stats = {
+!             "hooks_triggered": 0,
+!             "records_enforced": 0,
+!             "records_skipped": 0,
+!             "nudges_sent": 0,
+!             "skills_extracted": 0,
+!             "errors": 0,
+!         }
+!         self._pending_cache: List[ConversationRecord] = []
+  
+!         self._evo_loop = None
+!         try:
+!             from .evolution_loop import EvolutionLoop
+!             self._evo_loop = EvolutionLoop(
+!                 module_name="enforcement_hook",
+!                 effectiveness_fn=self._calc_hook_effectiveness,
+!                 learn_fn=self._learn_from_enforcement,
+!                 evolve_fn=self._evolve_hook_config,
+!                 mutable_config={
+!                     "enforcement_level": "mandatory",
+!                     "skip_threshold": 0.1,
+!                     "nudge_cooldown_seconds": 300,
+!                     "skill_extraction_min_length": 50,
+!                 },
+!                 health_metrics_fn=self._get_hook_health,
+!             )
+!         except ImportError:
+!             pass
+  
+!         self._current_session_id: Optional[str] = None
+!         self._session_agent_id: Dict[str, str] = {}
+!         self._pending_file_ops: Dict[str, List[FileOperation]] = {}
+!         self._pending_errors: Dict[str, List[ErrorLog]] = {}
+!         self._pending_mcp_calls: Dict[str, List[MCPCallDetail]] = {}
+!         self._pending_switches: Dict[str, List[Dict]] = {}
+!         self._pending_otel_spans: Dict[str, List[OtelGenAISpan]] = {}
+!         self._dispatch_history: List[Dict] = []
+!         self._dispatch_stats: Dict = {"total_dispatches": 0, "by_task_type": {}, "by_priority": {}}
+  
+!         self._otel_interceptor = OtelMCPInterceptor()
+  
+!         self._turn_logger = TurnLogger()
+  
+!         self._feedback_loop = FeedbackAwareLoop()
+!         self._aos_bridge = OWASPAosBridge()
+!         self._eval_bridge = OTelEvaluationBridge()
+!         self._inspect_engine = OWASPInspectEngine()
+!         self._diaml_serializer = DiAMLSerializer()
+!         self._ms_span_manager = MsAgentTaskSpanManager()
+!         self._reasoning_queue: Dict[str, List[ReasoningLog]] = {}
+!         self._state_queue: Dict[str, List[StateLog]] = {}
+!         self._token_economy_queue: Dict[str, List[TokenEconomy]] = {}
+!         self._trigger_counts: Dict[str, int] = {}
+  
+!         self._adaptive_policy = AdaptiveRecordingPolicy()
+!         self._field_cost_cache: Dict[str, float] = {
+!             "_classify_conversation": 0.05, "_annotate_iso_dialogue_acts": 0.08,
+!             "_generate_prov_trace": 0.03, "_track_token_economy": 0.02,
+!             "_generate_fair_metadata": 0.02, "_detect_agent_switches_from_mcp": 0.01,
+!         }
+  
+!     @property
+!     def enabled(self) -> bool:
+!         return self._enabled
+  
+!     def _resolve_agent_id(self, session_id: str, provided_agent_id: str) -> str:
+!         if provided_agent_id:
+!             self._session_agent_id[session_id] = provided_agent_id
+!             return provided_agent_id
+!         if session_id in self._session_agent_id:
+!             return self._session_agent_id[session_id]
+!         return "tianshu"
+  
+!     def set_session_agent(self, session_id: str, agent_id: str):
+!         self._session_agent_id[session_id] = agent_id
+  
+!     def register_file_operation(self, session_id: str, operation: str, path: str,
+!                                   lines_changed: Optional[Dict[str, int]] = None,
+!                                   reason: str = "",
+!                                   content_before: str = "",
+!                                   content_after: str = "",
+!                                   file_size: int = 0):
+!         op = FileOperation(
+!             operation=operation,
+!             path=path,
+!             lines_changed=lines_changed or {},
+!             reason=reason,
+!             content_before=content_before,
+!             content_after=content_after,
+!             file_size=file_size,
+!         )
+!         if session_id not in self._pending_file_ops:
+!             self._pending_file_ops[session_id] = []
+!         self._pending_file_ops[session_id].append(op)
+  
+!     def register_error(self, session_id: str, error_type: str, message: str,
+!                         context: str = ""):
+!         err = ErrorLog(
+!             error_type=error_type,
+!             message=message,
+!             context=context,
+!         )
+!         if session_id not in self._pending_errors:
+!             self._pending_errors[session_id] = []
+!         self._pending_errors[session_id].append(err)
+  
+!     def register_mcp_call(self, session_id: str, tool_name: str,
+!                            params_summary: str = "", result_summary: str = "",
+!                            duration_ms: float = 0.0, status: str = "success"):
+!         call = MCPCallDetail(
+!             tool_name=tool_name,
+!             params_summary=params_summary,
+!             result_summary=result_summary,
+!             duration_ms=duration_ms,
+!             status=status,
+!         )
+!         if session_id not in self._pending_mcp_calls:
+!             self._pending_mcp_calls[session_id] = []
+!         self._pending_mcp_calls[session_id].append(call)
+  
+!         span = self._otel_interceptor.intercept_mcp_call(
+!             tool_name=tool_name,
+!             params_summary=params_summary,
+!             result_summary=result_summary,
+!             duration_ms=duration_ms,
+!             status=status,
+!             session_id=session_id,
+!             agent_id=self._session_agent_id.get(session_id, "tianshu"),
+!         )
+!         if session_id not in self._pending_otel_spans:
+!             self._pending_otel_spans[session_id] = []
+!         self._pending_otel_spans[session_id].append(span)
+  
+!     def register_agent_switch(self, session_id: str, source_agent: str,
+!                                 target_agent: str, task_type: str, context_brief: str = ""):
+!         switch = {
+!             "tvp_declaration": f"[TVP] @{source_agent} -> @{target_agent} | task: {task_type}",
+!             "source_agent": source_agent,
+!             "target_agent": target_agent,
+!             "task_type": task_type,
+!             "context_brief": context_brief,
+!             "timestamp": time.time(),
+!         }
+!         if session_id not in self._pending_switches:
+!             self._pending_switches[session_id] = []
+!         self._pending_switches[session_id].append(switch)
+  
+!         span = self._otel_interceptor.intercept_agent_switch(
+!             source_agent=source_agent,
+!             target_agent=target_agent,
+!             task_type=task_type,
+!             session_id=session_id,
+!             priority=switch.get("priority", "medium"),
+!         )
+!         if session_id not in self._pending_otel_spans:
+!             self._pending_otel_spans[session_id] = []
+!         self._pending_otel_spans[session_id].append(span)
+  
+!     def _flush_pending_to_record(self, record: ConversationRecord, session_id: str):
+!         if session_id in self._pending_file_ops:
+!             record.file_operations.extend(self._pending_file_ops.pop(session_id))
+!         if session_id in self._pending_errors:
+!             record.error_log.extend(self._pending_errors.pop(session_id))
+!         if session_id in self._pending_mcp_calls:
+!             record.mcp_call_details.extend(self._pending_mcp_calls.pop(session_id))
+!         if session_id in self._pending_switches:
+!             record.agent_switches.extend(self._pending_switches.pop(session_id))
+!         if session_id in self._pending_otel_spans:
+!             spans = self._pending_otel_spans.pop(session_id)
+!             record.otel_spans.extend(spans)
+!             if spans:
+!                 record.otel_trace_id = spans[0].trace_id
+  
+!         if session_id in self._reasoning_queue:
+!             record.reasoning_logs.extend(self._reasoning_queue.pop(session_id))
+!         if session_id in self._state_queue:
+!             record.state_logs.extend(self._state_queue.pop(session_id))
+!         if session_id in self._token_economy_queue:
+!             record.token_economy_logs.extend(self._token_economy_queue.pop(session_id))
+  
+!         self._populate_vcon(record)
+  
+!         policy = self._adaptive_policy
+  
+!         if policy.should_record_field("agent_switches"):
+!             self._detect_agent_switches_from_mcp(record)
+  
+!         if policy.should_record_field("conversation_class"):
+!             self._classify_conversation(record)
+  
+!         if policy.should_record_field("iso_annotation"):
+!             self._annotate_iso_dialogue_acts(record)
+  
+!         if policy.should_record_field("prov_trace"):
+!             self._generate_prov_trace(record)
+  
+!         if policy.should_record_field("token_economy"):
+!             self._track_token_economy(record)
+  
+!         if policy.should_record_field("fair_metadata"):
+!             self._generate_fair_metadata(record)
+  
+!         self._populate_file_snap(record)
+!         self._populate_standards_check(record)
+!         self._update_trigger_frequency(record, session_id)
+  
+!     def conversation_complete(self, session_id: str,
+!                                 user_input: str = "",
+!                                 ai_response: str = "",
+!                                 mcp_calls: Optional[List[Dict]] = None,
+!                                 file_ops: Optional[List[Dict]] = None,
+!                                 file_contents: Optional[Dict[str, str]] = None) -> Dict:
+!         result = {
+!             "session_id": session_id,
+!             "l0_stored": False,
+!             "l3_summarized": False,
+!             "asset_registered": False,
+!             "memory_id": "",
+!             "asset_id": "",
+!         }
+  
+!         full_content = user_input
+!         if ai_response:
+!             full_content += f"\n\n--- AI Response ---\n{ai_response}"
+!         if mcp_calls:
+!             full_content += f"\n\n--- MCP Calls ({len(mcp_calls)}) ---\n"
+!             for call in mcp_calls:
+!                 full_content += f"- {call.get('tool', 'unknown')}: {call.get('summary', '')[:100]}\n"
+!         if file_ops:
+!             full_content += f"\n\n--- File Operations ({len(file_ops)}) ---\n"
+!             for op in file_ops:
+!                 full_content += f"- {op.get('operation', 'unknown')}: {op.get('path', '')}\n"
+!         if file_contents:
+!             full_content += f"\n\n--- File Contents ({len(file_contents)} files) ---\n"
+!             for fpath, fcontent in file_contents.items():
+!                 full_content += f"\n## {fpath}\n{fcontent[:500]}\n"
+  
+!         try:
+!             import requests
+!             resp = requests.post(
+!                 f"{self.memory_api_url}/api/active/intercept",
+!                 json={
+!                     "user_input": user_input,
+!                     "ai_response": ai_response,
+!                     "session_id": session_id,
+!                     "platform": "trae",
+!                     "full_content": full_content,
+!                     "source": "conversation_complete",
+!                 },
+!                 timeout=10,
+!             )
+!             if resp.status_code == 200:
+!                 data = resp.json()
+!                 result["l0_stored"] = True
+!                 result["memory_id"] = data.get("memory_id", "")
+!                 result["l3_summarized"] = data.get("layer", "") in ("episodic", "semantic")
+!         except Exception:
+!             pass
+  
+!         if result["memory_id"] and self._change_tracker:
+!             try:
+!                 from .change_tracker import ChangeTracker
+!                 self._change_tracker.track_create(
+!                     path=f"conversation://{session_id}",
+!                     content=full_content,
+!                     memory_id=result["memory_id"],
+!                     session_id=session_id,
+!                     trigger_source="conversation_complete",
+!                 )
+!                 result["asset_registered"] = True
+!             except Exception:
+!                 pass
+  
+!         self._stats["hooks_triggered"] += 1
+!         self._stats["records_enforced"] += 1
+!         return result
+  
+!     def _track_token_economy(self, record: ConversationRecord):
+!         prompt_chars = len(record.user_input or "")
+!         completion_chars = len(record.ai_response or "")
+!         te = TokenEconomy(
+!             prompt_tokens=prompt_chars // 2,
+!             completion_tokens=completion_chars // 2,
+!             model="deepseek-chat",
+!         )
+!         te.estimate()
+!         record.token_economy = te
+  
+!     def _populate_vcon(self, record: ConversationRecord):
+!         record.vcon_uuid = f"vcon-{record.session_id}-{record.turn_number}"
+!         record.vcon_parties = [
+!             vConParty(
+!                 party_id=f"party-{record.agent_id}",
+!                 name=record.agent_id,
+!                 role="agent",
+!                 provider="memory-engine-global",
+!             ),
+!             vConParty(
+!                 party_id="party-user",
+!                 name="user",
+!                 role="user",
+!                 provider="trae",
+!             ),
+!         ]
+!         record.vcon_consents = [
+!             vConConsent(
+!                 party_id=f"party-{record.agent_id}",
+!                 consent_type="implicit_system",
+!                 granted=True,
+!                 scope="conversation_recording",
+!                 purpose="memory_enhancement",
+!             ),
+!             vConConsent(
+!                 party_id="party-user",
+!                 consent_type="explicit",
+!                 granted=True,
+!                 scope="conversation_recording",
+!                 purpose="memory_enhancement",
+!             ),
+!         ]
+!         if record.vcon_lifecycle is None:
+!             record.vcon_lifecycle = vConLifecycle(
+!                 state=vConLifecycleState.ACTIVE,
+!                 created_at=record.timestamp,
+!                 updated_at=record.timestamp,
+!             )
+  
+!         record.loongsuite_metadata = LoongSuiteAlignment.generate_metadata(record.agent_id)
+  
+!     def transition_vcon_lifecycle(self, session_id: str, new_state: str, reason: str = "") -> Dict:
+!         try:
+!             target_state = vConLifecycleState(new_state)
+!         except ValueError:
+!             return {
+!                 "status": "error",
+!                 "session_id": session_id,
+!                 "message": f"Invalid lifecycle state: {new_state}",
+!                 "valid_states": [s.value for s in vConLifecycleState],
+!             }
+  
+!         records = self.registry._conversations.get(session_id, [])
+!         transition_count = 0
+!         now = time.time()
+  
+!         allowed_from = {vConLifecycleState.ACTIVE, vConLifecycleState.INITIATED, vConLifecycleState.PAUSED}
+  
+!         for record in records:
+!             if record.vcon_lifecycle is None:
+!                 continue
+!             if record.vcon_lifecycle.state not in allowed_from:
+!                 continue
+!             old_state = record.vcon_lifecycle.state
+!             record.vcon_lifecycle.state = target_state
+!             record.vcon_lifecycle.updated_at = now
+!             record.vcon_lifecycle.transitions.append({
+!                 "from": old_state.value,
+!                 "to": target_state.value,
+!                 "timestamp": now,
+!                 "reason": reason,
+!             })
+!             if target_state == vConLifecycleState.ARCHIVED:
+!                 record.vcon_lifecycle.archived_at = now
+!             elif target_state == vConLifecycleState.DELETED:
+!                 record.vcon_lifecycle.deleted_at = now
+!             transition_count += 1
+  
+!         return {
+!             "status": "ok",
+!             "session_id": session_id,
+!             "new_state": target_state.value,
+!             "transitions": transition_count,
+!             "total_records": len(records),
+!             "reason": reason,
+!         }
+  
+!     def get_otel_stats(self) -> Dict:
+!         return self._otel_interceptor.get_otel_stats()
+  
+!     def get_otel_recent_spans(self, limit: int = 20) -> List[Dict]:
+!         return self._otel_interceptor.get_recent_spans(limit)
+  
+!     def record_reasoning(self, session_id: str, chain_id: str, steps: List[Dict],
+!                          conclusion: str = "", confidence: float = 0.0, duration_ms: float = 0.0):
+!         rl = ReasoningLog(chain_id=chain_id, steps=steps, conclusion=conclusion,
+!                           confidence=confidence, duration_ms=duration_ms)
+!         if session_id not in self._reasoning_queue:
+!             self._reasoning_queue[session_id] = []
+!         self._reasoning_queue[session_id].append(rl)
+  
+!     def record_state_change(self, session_id: str, entity_id: str, state_type: str,
+!                             old_state: str, new_state: str, trigger: str = "",
+!                             metadata: Dict = None):
+!         sl = StateLog(entity_id=entity_id, state_type=state_type,
+!                        old_state=old_state, new_state=new_state,
+!                        trigger=trigger, metadata=metadata or {})
+!         if session_id not in self._state_queue:
+!             self._state_queue[session_id] = []
+!         self._state_queue[session_id].append(sl)
+  
+!     def record_token_usage(self, session_id: str, prompt_tokens: int = 0,
+!                            completion_tokens: int = 0, model: str = "deepseek-chat"):
+!         te = TokenEconomy(prompt_tokens=prompt_tokens, completion_tokens=completion_tokens, model=model)
+!         te.estimate()
+!         if session_id not in self._token_economy_queue:
+!             self._token_economy_queue[session_id] = []
+!         self._token_economy_queue[session_id].append(te)
+  
+!     def receive_consumer_feedback(self, source_module: str, feedback_type: str,
+!                                    content: str, severity: str = "info") -> FeedbackRecord:
+!         return self._feedback_loop.receive_feedback(source_module, feedback_type, content, severity)
+  
+!     def process_feedback_queue(self, callback: Callable = None) -> Dict:
+!         return self._feedback_loop.process_feedback(callback)
+  
+!     def get_feedback_loop_stats(self) -> Dict:
+!         return self._feedback_loop.get_stats()
+  
+!     def get_seven_dim_stats(self) -> Dict:
+!         return {
+!             "reasoning_queued": sum(len(v) for v in self._reasoning_queue.values()),
+!             "state_changes_queued": sum(len(v) for v in self._state_queue.values()),
+!             "token_economy_queued": sum(len(v) for v in self._token_economy_queue.values()),
+!             "feedback_loop": self._feedback_loop.get_stats(),
+!             "session_count": len(set(list(self._reasoning_queue.keys()) +
+!                                 list(self._state_queue.keys()) +
+!                                 list(self._token_economy_queue.keys()))),
+!         }
+  
+!     def check_loongsuite_compliance(self, record: ConversationRecord = None) -> Dict:
+!         if record is None:
+!             return {"compliant": False, "issues": ["no_record_provided"]}
+!         return LoongSuiteAlignment.compliance_check(record)
+  
+!     def get_aos_stats(self) -> Dict:
+!         return self._aos_bridge.get_stats()
+  
+!     def get_aos_ag_bom(self) -> List[Dict]:
+!         return self._aos_bridge.get_ag_bom()
+  
+!     def record_aos_instrument(self, event_type: str, source: str = "",
+!                                payload: Dict = None, severity: str = "info"):
+!         self._aos_bridge.record_instrument(event_type, source, payload, severity)
+  
+!     def record_aos_trace(self, event_type: str, source: str = "",
+!                           target: str = "", payload: Dict = None):
+!         self._aos_bridge.record_trace(event_type, source, target, payload)
+  
+!     def record_aos_inspect(self, event_type: str, source: str = "",
+!                             payload: Dict = None, severity: str = "info"):
+!         self._aos_bridge.record_inspect(event_type, source, payload, severity)
+  
+!     def evaluate_quality(self, evaluation_name: str, score: float,
+!                          label: str = "", explanation: str = "") -> Dict:
+!         span = self._eval_bridge.evaluate(evaluation_name, "", explanation, score, label)
+!         return span.to_otel_dict()
+  
+!     def get_evaluation_stats(self) -> Dict:
+!         return self._eval_bridge.get_stats()
+  
+!     def register_aos_components(self):
+!         self._aos_bridge.register_component("enforcement_hook", "v8.2", "core")
+!         self._aos_bridge.register_component("ICME_engine", "v5.3", "engine")
+!         self._aos_bridge.register_component("quality_gate", "v5.1", "gateway")
+!         self._aos_bridge.register_component("deepseek_driver", "v2.0", "llm")
+!         self._aos_bridge.register_component("tianji_mcp_server", "v9.0", "server")
+!         self._aos_bridge.register_component("sqlite_store", "v8.0", "storage")
+!         self._aos_bridge.register_component("hybrid_engine", "v8.0", "storage")
+!         self._aos_bridge.register_component("otel_interceptor", "v1.41.0", "telemetry")
+!         self._aos_bridge.register_component("knowledge_extractor", "v2.0", "knowledge")
+  
+!     def trigger_learning_loop(self, session_id: str, force: bool = False) -> Dict:
+!         stats = self.registry.get_stats()
+!         unrecorded = stats.get("unrecorded_turns", 0)
+!         compliance = self.registry.compliance_rate
+!         should_trigger = force or unrecorded >= 10 or compliance < 0.8
+!         if should_trigger:
+!             self._feedback_loop.run_loop_iteration()
+!             self.record_state_change(session_id, "learning_loop", "learning_trigger",
+!                                      "idle", "active", f"unrecorded={unrecorded} compliance={compliance:.2f}")
+!             self.record_aos_trace("learning_loop_trigger", "enforcement_hook", "learning_loop",
+!                                    {"unrecorded": unrecorded, "compliance": compliance})
+!             return {"triggered": True, "unrecorded": unrecorded, "compliance": compliance}
+!         return {"triggered": False, "unrecorded": unrecorded, "compliance": compliance}
+  
+!     def broadcast_evolution_signal(self, signal_type: str, source: str,
+!                                     payload: Dict = None, priority: str = "medium") -> Dict:
+!         signal = {
+!             "type": signal_type, "source": source,
+!             "payload": payload or {}, "priority": priority,
+!             "timestamp": time.time(),
+!         }
+!         self._dispatch_history.append({"action": "evolution_signal", "signal": signal})
+!         self._dispatch_stats["total_dispatches"] += 1
+!         self.record_aos_trace("evolution_signal", source, "evolution_bus", signal)
+!         self._feedback_loop.receive_feedback("evolution_bus", signal_type,
+!                                               json.dumps(payload or {}, ensure_ascii=False)[:200], priority)
+!         if signal_type in ("threshold_breach", "degradation_detected", "quality_drop"):
+!             self.trigger_learning_loop(source, force=True)
+!         return signal
+  
+!     def adaptive_degradation_check(self) -> Dict:
+!         stats = self.get_stats()
+!         otel = stats.get("otel", {})
+!         seven = stats.get("seven_dim", {})
+!         feedback = seven.get("feedback_loop", {})
+!         degradation_score = 0.0
+!         triggers = []
+!         total_spans = otel.get("total_spans", 0)
+!         if total_spans > 1000:
+!             degradation_score += 0.2
+!             triggers.append("high_span_volume")
+!         unack = feedback.get("unacknowledged", 0)
+!         if unack > 50:
+!             degradation_score += 0.3
+!             triggers.append("feedback_backlog")
+!         compliance = self.registry.compliance_rate
+!         if compliance < 0.5:
+!             degradation_score += 0.3
+!             triggers.append("low_compliance")
+!         if degradation_score >= 0.4:
+!             self.broadcast_evolution_signal("degradation_detected", "enforcement_hook",
+!                                              {"score": degradation_score, "triggers": triggers}, "critical")
+!             return {"degraded": True, "score": degradation_score, "triggers": triggers,
+!                     "action": "adaptive_recording_policy_applied"}
+!         return {"degraded": False, "score": degradation_score, "triggers": triggers}
+  
+!     def smart_memory_migrate(self, session_id: str) -> Dict:
+!         from .engine import ICMEEngine
+!         tier_conditions = {
+!             "sensory": {"max_age_s": 300, "target": "working"},
+!             "working": {"max_age_s": 1800, "target": "short_term"},
+!             "short_term": {"max_age_s": 7200, "target": "episodic"},
+!         }
+!         migrated = []
+!         now = time.time()
+!         for layer, cond in tier_conditions.items():
+!             self.record_state_change(session_id, session_id, "memory_migration",
+!                                      layer, cond["target"], f"age>{cond['max_age_s']}s")
+!             migrated.append({"from": layer, "to": cond["target"],
+!                              "trigger": f"age_exceeds_{cond['max_age_s']}s"})
+!             self.record_aos_instrument("memory_migration", "enforcement_hook",
+!                                         {"from_layer": layer, "to_layer": cond["target"]})
+!         return {"migrated": len(migrated), "details": migrated, "timestamp": now}
+  
+!     def priority_event_route(self, events: List[Dict]) -> Dict:
+!         routed = {"critical": [], "high": [], "medium": [], "low": []}
+!         priority_map = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+!         for evt in events:
+!             pri = evt.get("priority", "low")
+!             routed.setdefault(pri, []).append(evt)
+!         for pri in ["critical", "high", "medium", "low"]:
+!             for evt in routed[pri]:
+!                 self.record_aos_trace("event_routed", "event_consumer",
+!                                        evt.get("target", "enforcement_hook"),
+!                                        {"priority": pri, "type": evt.get("type", "unknown")})
+!         return {"total": len(events), "routed": {k: len(v) for k, v in routed.items()},
+!                 "order": ["critical", "high", "medium", "low"]}
+  
+!     def _generate_fair_metadata(self, record: ConversationRecord):
+!         now = datetime.now().isoformat()
+!         fm = FAIRMetadata(
+!             findable_id=f"tianji-{record.session_id}-{record.turn_number}",
+!             accessible_uri=f"http://127.0.0.1:8771/api/memory/{record.memory_id}" if record.memory_id else "",
+!             keywords=record.tags + [record.conversation_class, record.agent_id or "tianshu"],
+!             created_date=now,
+!             modified_date=now,
+!         )
+!         record.fair_metadata = fm
+  
+!     def _populate_file_snap(self, record: ConversationRecord):
+!         if not record.file_operations:
+!             record.file_snap = {"status": "no_file_ops", "count": 0}
+!             return
+!         snaps = []
+!         for op in record.file_operations:
+!             snap = {
+!                 "operation": op.operation,
+!                 "path": op.path,
+!                 "lines_changed": op.lines_changed,
+!                 "reason": op.reason,
+!                 "file_size": op.file_size,
+!                 "has_before": bool(op.content_before),
+!                 "has_after": bool(op.content_after),
+!                 "before_length": len(op.content_before),
+!                 "after_length": len(op.content_after),
+!                 "content_hash": op.content_hash or hashlib.md5(
+!                     f"{op.path}:{op.operation}:{op.timestamp}".encode()
+!                 ).hexdigest()[:12],
+!             }
+!             if op.content_before and len(op.content_before) <= 5000:
+!                 snap["content_before_preview"] = op.content_before[:500]
+!             if op.content_after and len(op.content_after) <= 5000:
+!                 snap["content_after_preview"] = op.content_after[:500]
+!             snaps.append(snap)
+!         record.file_snap = {
+!             "status": "captured",
+!             "count": len(snaps),
+!             "operations": snaps,
+!             "total_bytes_before": sum(s.get("before_length", 0) for s in snaps),
+!             "total_bytes_after": sum(s.get("after_length", 0) for s in snaps),
+!         }
+  
+!     def _populate_standards_check(self, record: ConversationRecord):
+!         text = f"{record.user_input} {record.ai_response}".lower()
+!         checks = {}
+!         owasp_rules_triggered = []
+!         owasp_patterns = {
+!             "data_exfiltration_url": ["exfil", "外传", "上传到外部", "发送到远程"],
+!             "internal_ip_exposure": ["192.168.", "10.0.", "172.16.", "内网IP", "内部地址"],
+!             "database_connection_string": ["connection_string", "jdbc:", "mongodb://",
+!                                            "postgres://", "mysql://", "数据库连接"],
+!             "gdpr_personal_data": ["gdpr", "个人数据", "pii", "隐私数据"],
+!             "certification_missing": ["无认证", "未认证", "缺少证书", " uncertified"],
+!             "retention_policy": ["保留策略", "retention", "数据保留期", "过期删除"],
+!             "hardcoded_credential": ["password=", "secret=", "api_key=", "token=",
+!                                      "硬编码密码", "明文凭证"],
+!             "weak_auth_pattern": ["弱认证", "无认证", "auth=none", "跳过验证"],
+!             "weak_crypto_algorithm": ["md5(", "sha1(", "des_", "rc4(", "弱加密"],
+!             "plaintext_private_key": ["private_key", "-----begin", "私钥明文"],
+!             "audit_trail_incomplete": ["无审计", "跳过日志", "不记录操作", "silent=True"],
+!             "log_injection_attempt": ["日志注入", "log injection", "%n", "%r"],
+!             "harmful_content_generation": ["jailbreak", "越狱", "prompt注入", "有害内容生成"],
+!             "jailbreak_attempt": ["ignore previous", "忽略以上指令", "dan模式",
+!                                   "developer mode", "越狱攻击"],
+!         }
+!         for rule_name, keywords in owasp_patterns.items():
+!             triggered = [kw for kw in keywords if kw in text]
+!             if triggered:
+!                 owasp_rules_triggered.append({
+!                     "rule": rule_name,
+!                     "category": rule_name.split("_")[0],
+!                     "matched_keywords": triggered[:3],
+!                     "severity": "high" if rule_name in (
+!                         "data_exfiltration_url", "hardcoded_credential",
+!                         "plaintext_private_key", "jailbreak_attempt"
+!                     ) else "medium",
+!                 })
+!         checks["owasp_aos"] = {
+!             "version": "1.0",
+!             "rules_checked": len(owasp_patterns),
+!             "rules_triggered": len(owasp_rules_triggered),
+!             "details": owasp_rules_triggered,
+!             "overall_verdict": "PASS" if len(owasp_rules_triggered) == 0 else "REVIEW",
+!         }
+!         checks["otel_compliance"] = {
+!             "has_trace_id": bool(record.otel_trace_id),
+!             "span_count": len(record.otel_spans),
+!             "verdict": "PASS" if record.otel_trace_id else "NO_TRACE",
+!         }
+!         checks["vcon_compliance"] = {
+!             "has_uuid": bool(record.vcon_uuid),
+!             "party_count": len(record.vcon_parties),
+!             "consent_count": len(record.vcon_consents),
+!             "lifecycle_state": record.vcon_lifecycle.state if record.vcon_lifecycle else "none",
+!             "verdict": "PASS" if record.vcon_uuid and len(record.vcon_parties) >= 2 else "INCOMPLETE",
+!         }
+!         checks["fair_compliance"] = {
+!             "has_findable_id": bool(record.fair_metadata and record.fair_metadata.findable_id),
+!             "has_schema": bool(record.fair_metadata and record.fair_metadata.interoperable_schema),
+!             "verdict": "PASS" if record.fair_metadata else "NO_METADATA",
+!         }
+!         total_pass = sum(1 for c in checks.values() if isinstance(c, dict) and c.get("verdict") == "PASS")
+!         checks["summary"] = {
+!             "total_checks": 4,
+!             "passed": total_pass,
+!             "overall": "PASS" if total_pass == 4 else f"WARNING({total_pass}/4)",
+!         }
+!         record.standards_check = checks
+  
+!     def _update_trigger_frequency(self, record: ConversationRecord, session_id: str):
+!         key = f"{session_id}:{record.agent_id}"
+!         self._trigger_counts[key] = self._trigger_counts.get(key, 0) + 1
+!         record.trigger_frequency = self._trigger_counts[key]
+  
+!     def _classify_conversation(self, record: ConversationRecord):
+!         text = f"{record.user_input} {record.ai_response}".lower()
+!         score = {"task": 0.0, "question": 0.0, "instruction": 0.0, "feedback": 0.0,
+!                  "commitment": 0.0, "social": 0.0, "reasoning": 0.0, "error": 0.0,
+!                  "security": 0.0, "data_leakage": 0.0, "compliance": 0.0,
+!                  "authentication": 0.0, "encryption": 0.0, "model_safety": 0.0}
+!         patterns = {
+!             "question": ["怎么", "什么是", "如何", "为什么", "?", "吗", "呢", "请解释", "?"],
+!             "instruction": ["必须", "立即", "执行", "启动", "运行", "修复", "实现", "创建"],
+!             "task": ["完成", "目标", "任务", "计划", "阶段", "审计", "验证"],
+!             "feedback": ["通过", "失败", "正确", "错误", "好", "不对", "确认", "验证"],
+!             "commitment": ["我会", "将", "承诺", "保证", "一定"],
+!             "social": ["谢谢", "你好", "再见", "好的", "收到"],
+!             "reasoning": ["分析", "评估", "思考", "方案", "原因", "因为", "所以"],
+!             "error": ["错误", "失败", "异常", "bug", "崩溃", "error", "traceback"],
+!             "data_leakage": ["password", "secret", "token", "api_key", "api key",
+!                               "connection_string", "internal_ip", "10.", "192.168",
+!                               "private_key", "-----begin", "exfiltrat", "泄露", "密钥",
+!                               "密码", "凭证", "敏感"],
+!             "compliance": ["gdpr", "personal_data", "pii", "certification",
+!                             "retention", "consent", "个人数据", "合规", "监管"],
+!             "authentication": ["hardcoded_credential", "hardcoded password",
+!                                 "weak_auth", "plaintext", "明文密码", "硬编码"],
+!             "encryption": ["weak_crypto", "md5", "sha1", "des ", "rc4",
+!                             "plaintext_private_key", "弱加密", "明文存储"],
+!             "model_safety": ["jailbreak", "harmful_content", "prompt_injection",
+!                               "越狱", "注入攻击", "有害内容"],
+!         }
+!         for cls_name, keywords in patterns.items():
+!             for kw in keywords:
+!                 if kw in text:
+!                     score[cls_name] += 1
+!         mcp_count = len(record.mcp_call_details)
+!         error_count = len(record.error_log)
+!         file_op_count = len(record.file_operations)
+!         if mcp_count >= 3:
+!             score["task"] += 3
+!         if error_count > 0:
+!             score["error"] += error_count * 2
+!         if file_op_count >= 5:
+!             score["task"] += 2
+!         best_class = max(score, key=score.get)
+!         if best_class in ("data_leakage", "compliance", "authentication",
+!                           "encryption", "model_safety") and score[best_class] > 0:
+!             record.conversation_class = f"owasp_aos:{best_class}"
+!         elif score["data_leakage"] + score["compliance"] + score["authentication"] \
+!              + score["encryption"] + score["model_safety"] >= 3:
+!             record.conversation_class = "owasp_aos:security"
+!         else:
+!             record.conversation_class = best_class if score[best_class] > 0 else "unknown"
+  
+!     def _annotate_iso_dialogue_acts(self, record: ConversationRecord):
+!         dims = []
+!         funcs = []
+!         qualifiers: Dict[str, str] = {}
+!         text = record.user_input[:500]
+!         full_text = f"{record.user_input[:200]} {record.ai_response[:200]}"
+  
+!         if any(kw in text for kw in ["执行", "启动", "运行", "修复", "实现", "创建",
+!                                       "必须", "立即", "任务", "目标", "完成", "调度"]):
+!             dims.extend(["Task", "Task Management"])
+!             funcs.append("Instruct" if any(kw in text for kw in ["必须", "立即"]) else "Request")
+  
+!         if any(kw in text for kw in ["?", "吗", "呢", "如何", "怎么", "什么是", "为什么"]):
+!             dims.append("Auto-Feedback")
+!             funcs.append("Propositional Question")
+  
+!         if any(kw in text for kw in ["分析", "评估", "方案", "原因", "思考", "推演", "洞察"]):
+!             dims.append("Discourse Structuring")
+!             funcs.append("Inform")
+  
+!         if any(kw in text for kw in ["谢谢", "好的", "收到", "确认"]):
+!             dims.append("Contact Management")
+!             funcs.append("Confirm" if "确认" in text else "Auto-Feedback")
+  
+!         if any(kw in text for kw in ["通过", "失败", "正确", "错误", "验证", "审计",
+!                                       "审计", "检查", "合规", "规范"]):
+!             dims.append("Allo-Feedback")
+!             if any(kw in text for kw in ["通过", "正确"]):
+!                 funcs.append("Positive Feedback")
+!                 qualifiers["feedback_sentiment"] = "positive"
+!             elif any(kw in text for kw in ["失败", "错误"]):
+!                 funcs.append("Negative Feedback")
+!                 qualifiers["feedback_sentiment"] = "negative"
+!             else:
+!                 funcs.append("Evaluative Feedback")
+!                 qualifiers["feedback_sentiment"] = "evaluative"
+  
+!         time_keywords = ["小时", "分钟", "今天", "明天", "后天", "马上", "立即", "延迟",
+!                          "等待", "周期", "频率", "日程", "时间", "期限", "截止",
+!                          "现在", "稍后", "尽快", "实时", "定期", "每天", "每周"]
+!         if any(kw in text for kw in time_keywords):
+!             dims.append("Time Management")
+!             if any(kw in text for kw in ["立即", "马上", "尽快", "实时"]):
+!                 qualifiers["time_urgency"] = "high"
+!             elif any(kw in text for kw in ["稍后", "延迟", "等待"]):
+!                 qualifiers["time_urgency"] = "low"
+!             elif any(kw in text for kw in ["定期", "每天", "每周", "周期"]):
+!                 qualifiers["time_urgency"] = "scheduled"
+  
+!         partner_keywords = ["协作", "合作", "配合", "共享", "同步", "协调", "协商",
+!                             "共识", "团队", "伙伴", "协作编辑", "分工", "交接",
+!                             "指派", "委托", "给"]
+!         if any(kw in text for kw in partner_keywords):
+!             dims.append("Partner Communication Management")
+!             if any(kw in text for kw in ["移交", "交接", "指派", "委托"]):
+!                 funcs.append("Delegation")
+!             elif any(kw in text for kw in ["共享", "同步", "协作编辑"]):
+!                 funcs.append("Coordination")
+!             else:
+!                 funcs.append("Collaboration")
+  
+!         own_comm_keywords = ["我觉得", "我认为", "我的理解", "我看", "据我所知",
+!                              "自我", "反思", "总结", "回顾", "规划", "计划",
+!                              "意图", "目标", "声明", "解释", "说明", "澄清",
+!                              "补充", "修正", "更正"]
+!         if any(kw in text for kw in own_comm_keywords):
+!             dims.append("Own Communication Management")
+!             if any(kw in text for kw in ["反思", "回顾", "总结"]):
+!                 funcs.append("Self-Reflection")
+!             elif any(kw in text for kw in ["规划", "计划", "目标", "意图"]):
+!                 funcs.append("Planning")
+!             elif any(kw in text for kw in ["澄清", "补充", "修正", "更正"]):
+!                 funcs.append("Clarification")
+!             else:
+!                 funcs.append("Self-Expression")
+  
+!         if any(kw in text for kw in ["系统", "模块", "架构", "重构", "代码", "API",
+!                                       "接口", "服务", "部署", "配置", "数据库"]):
+!             qualifiers["domain"] = "software_engineering"
+!         elif any(kw in text for kw in ["记忆", "知识", "语义", "推理", "认证"]):
+!             qualifiers["domain"] = "ai_cognition"
+  
+!         record.iso_annotation = ISOAnnotation(
+!             dimensions=list(set(dims)) if dims else ["Task"],
+!             primary_function=funcs[0] if funcs else "Inform",
+!             secondary_functions=funcs[1:] if len(funcs) > 1 else [],
+!             qualifiers=qualifiers,
+!             confidence=min(0.85, 0.55 + len(dims) * 0.06),
+!         )
+  
+!     def _generate_prov_trace(self, record: ConversationRecord):
+!         trace_id = f"trace-{record.session_id}-{record.turn_number}"
+!         chain = [{
+!             "step": "user_input",
+!             "type": "Entity",
+!             "role": "prov:Entity",
+!             "description": str(record.user_input)[:100],
+!         }]
+!         for call in record.mcp_call_details:
+!             chain.append({
+!                 "step": f"mcp_call_{call.tool_name}",
+!                 "type": "Activity",
+!                 "role": "prov:Activity",
+!                 "tool": call.tool_name,
+!                 "status": call.status,
+!                 "duration_ms": call.duration_ms,
+!             })
+!         chain.append({
+!             "step": "ai_response",
+!             "type": "Entity",
+!             "role": "prov:Entity",
+!             "description": str(record.ai_response)[:100],
+!         })
+!         for op in record.file_operations:
+!             chain.append({
+!                 "step": f"file_{op.operation}",
+!                 "type": "Activity",
+!                 "role": "prov:Activity",
+!                 "path": op.path,
+!             })
+!         record.prov_trace = PROVTrace(
+!             entity_id=f"entity-{trace_id}",
+!             activity_id=f"activity-{trace_id}",
+!             agent_id=record.agent_id or "tianshu",
+!             was_generated_by=f"activity-{trace_id}",
+!             was_attributed_to=record.agent_id or "tianshu",
+!             trace_chain=chain,
+!         )
+  
+!     def _detect_agent_switches_from_mcp(self, record: ConversationRecord):
+!         for call in record.mcp_call_details:
+!             if call.tool_name in ("agent_dispatch", "agent-framework-global_agent_dispatch"):
+!                 params_text = call.params_summary
+!                 try:
+!                     params = json.loads(params_text) if isinstance(params_text, str) and params_text else {}
+!                 except (json.JSONDecodeError, TypeError):
+!                     params = {}
+!                 task_type = params.get("task_type", "dispatch")
+!                 priority = params.get("priority", "medium")
+!                 task_data_summary = str(params.get("task_data", {}))[:80]
+!                 switch = {
+!                     "tvp_declaration": f"[TVP] @tianshu -> @external | task: {task_type} | priority: {priority}",
+!                     "source_agent": "tianshu",
+!                     "target_agent": task_type,
+!                     "task_type": task_type,
+!                     "priority": priority,
+!                     "context_brief": task_data_summary,
+!                     "timestamp": time.time(),
+!                     "mcp_call_triggered": True,
+!                     "decision_context": {
+!                         "tool_name": call.tool_name,
+!                         "status": call.status,
+!                         "duration_ms": call.duration_ms,
+!                         "params_summary": call.params_summary[:200],
+!                         "result_summary": call.result_summary[:200],
+!                         "memory_injection": self._inject_memory_context(task_type),
+!                     }
+!                 }
+!                 record.agent_switches.append(switch)
+!                 self.track_dispatch(task_type=task_type, priority=priority,
+!                                    target_agent=task_type, result=call.status)
+  
+!     def _inject_memory_context(self, task_type: str) -> Dict:
+!         result = {"task_type": task_type, "retrieved": False, "layers_queried": [], "insights": []}
+!         try:
+!             engine = self._get_memory_engine()
+!             if not engine:
+!                 result["error"] = "memory_engine_unavailable"
+!                 return result
+!             layers_to_query = ["episodic", "semantic", "meta"]
+!             for layer_name in layers_to_query:
+!                 try:
+!                     memories = engine.recall(query=task_type, layers=[layer_name], limit=3)
+!                     if memories:
+!                         result["layers_queried"].append(layer_name)
+!                         for mem in memories[:2]:
+!                             result["insights"].append({
+!                                 "layer": layer_name,
+!                                 "content_preview": str(mem.get("content", ""))[:150],
+!                                 "relevance": mem.get("relevance", 0.0),
+!                             })
+!                 except Exception:
+!                     pass
+!             if result["insights"]:
+!                 result["retrieved"] = True
+!         except Exception as e:
+!             result["error"] = str(e)[:200]
+!         return result
+  
+!     def _get_memory_engine(self):
+!         try:
+!             from server.deps import get_engine
+!             return get_engine()
+!         except Exception:
+!             return None
+  
+!     def track_dispatch(self, task_type: str, priority: str, target_agent: str, result: str = ""):
+!         entry = {
+!             "task_type": task_type,
+!             "priority": priority,
+!             "target_agent": target_agent,
+!             "result": result,
+!             "timestamp": time.time(),
+!         }
+!         self._dispatch_history.append(entry)
+!         self._dispatch_stats["total_dispatches"] += 1
+!         self._dispatch_stats["by_task_type"][task_type] = \
+!             self._dispatch_stats["by_task_type"].get(task_type, 0) + 1
+!         self._dispatch_stats["by_priority"][priority] = \
+!             self._dispatch_stats["by_priority"].get(priority, 0) + 1
+!         if len(self._dispatch_history) > 500:
+!             self._dispatch_history = self._dispatch_history[-500:]
+  
+!     def get_dispatch_stats(self) -> Dict:
+!         return dict(self._dispatch_stats)
+  
+!     def _calc_hook_effectiveness(self, action: str, state_before: Dict, state_after: Dict) -> float:
+!         if action == "enforce_record":
+!             if state_after.get("recorded", False):
+!                 return 0.4
+!             if state_after.get("skipped", False):
+!                 return -0.3
+!             return -0.1
+!         if action == "skill_extract":
+!             if state_after.get("extracted", False):
+!                 return 0.5
+!             return -0.1
+!         if action == "nudge":
+!             if state_after.get("complied", False):
+!                 return 0.3
+!             return -0.2
+!         return 0.0
+  
+!     def _learn_from_enforcement(self, causal_pairs, effectiveness_summary) -> Dict:
+!         skips = sum(1 for p in causal_pairs if p.action == "enforce_record" and p.effectiveness < 0)
+!         extractions = sum(1 for p in causal_pairs if p.action == "skill_extract" and p.effectiveness > 0)
+!         nudge_failures = sum(1 for p in causal_pairs if p.action == "nudge" and p.effectiveness < 0)
+!         return {
+!             "record_skips": skips,
+!             "skill_extractions": extractions,
+!             "nudge_failures": nudge_failures,
+!             "avg_effectiveness": effectiveness_summary.get("avg", 0.0),
+!         }
+  
+!     def _evolve_hook_config(self, learn_result, mutable_config) -> Dict:
+!         changes = []
+!         if learn_result.get("nudge_failures", 0) > 10:
+!             old_cooldown = mutable_config.get("nudge_cooldown_seconds", 300)
+!             new_cooldown = max(old_cooldown - 60, 60)
+!             changes.append({"rule": "nudge_cooldown_seconds", "old_value": old_cooldown, "new_value": new_cooldown})
+!         if learn_result.get("skill_extractions", 0) > 20:
+!             old_min_len = mutable_config.get("skill_extraction_min_length", 50)
+!             new_min_len = max(old_min_len - 10, 20)
+!             changes.append({"rule": "skill_extraction_min_length", "old_value": old_min_len, "new_value": new_min_len})
+!         return {"changes": changes}
+  
+!     def _get_hook_health(self) -> Dict[str, float]:
+!         total = max(self._stats.get("hooks_triggered", 1), 1)
+!         return {
+!             "enforcement_rate": self._stats.get("records_enforced", 0) / total,
+!             "skip_rate": self._stats.get("records_skipped", 0) / total,
+!         }
+  
+!     @property
+!     def evolution_loop(self):
+!         return self._evo_loop
+  
+!     def disable(self):
+!         """禁用强制执行（仅限紧急情况）"""
+!         logger.warning("Tianji enforcement hook DISABLED - conversations will NOT be recorded!")
+!         self._enabled = False
+  
+!     def enable(self):
+!         self._enabled = True
+!         logger.info("Tianji enforcement hook ENABLED")
+  
+!     def pre_conversation_hook(self, user_input: str, session_id: str,
+!                                agent_id: str = "", platform: str = "trae") -> Dict:
+!         """
+!         对话前钩子 — 在AI处理用户输入之前自动调用
+  
+!         这不只是一个建议——这是强制执行的拦截点
+!         """
+!         self._stats["hooks_triggered"] += 1
+  
+!         if not self._enabled:
+!             return {"status": "disabled", "memory_context": None}
+  
+!         memory_context = None
+!         try:
+!             if self.event_bus:
+!                 from core.deepseek_driver import TianjiEvent, EventType
+!                 self.event_bus.publish(TianjiEvent(
+!                     event_type=EventType.CONVERSATION_INPUT,
+!                     source=platform,
+!                     payload={
+!                         "content": user_input,
+!                         "session_id": session_id,
+!                         "agent_id": agent_id,
+!                     },
+!                 ))
+  
+!             import urllib.request
+!             data = json.dumps({
+!                 "user_input": user_input,
+!                 "platform": platform,
+!                 "context": {"session_id": session_id, "agent_id": agent_id}
+!             }, ensure_ascii=False).encode("utf-8")
+!             req = urllib.request.Request(
+!                 f"{self.memory_api_url}/api/active/intercept",
+!                 data=data,
+!                 headers={"Content-Type": "application/json; charset=utf-8"},
+!                 method="POST",
+!             )
+!             r = urllib.request.urlopen(req, timeout=5)
+!             if r.status == 200:
+!                 memory_context = json.loads(r.read().decode("utf-8"))
+!         except Exception:
+!             pass
+  
+!         return {
+!             "status": "enforced",
+!             "memory_context": memory_context,
+!             "session_id": session_id,
+!             "timestamp": time.time(),
+!         }
+  
+!     def _auto_snapshot_referenced_files(self, record: ConversationRecord, session_id: str):
+!         combined_text = f"{record.user_input or ''} {record.ai_response or ''}"
+  
+!         found_paths: set = set()
+  
+!         file_patterns = [
+!             r'file:///(\S+?)(?:\s|$)',
+!             r'(?:^|\s|["\'(])((?:[A-Za-z]:[/\\][\w\-\\/]+(?:[\\/][\w\-\\/.]+)*?\.(?:py|ts|js|jsx|tsx|md|json|yaml|yml|toml|cfg|ini|html|css|rs|go|java|c|cpp|h|hpp))|(?:/(?:[\w\-]+/)+[\w\-.]+\.(?:py|ts|js|jsx|tsx|md|json|yaml|yml|toml|cfg|ini|html|css|rs|go|java|c|cpp|h|hpp)))(?:\s|$|[,;:)\]}])',
+!         ]
+  
+!         for pattern in file_patterns:
+!             for match in re.finditer(pattern, combined_text):
+!                 path_str = match.group(0).strip()
+!                 if path_str.startswith('file:///'):
+!                     path_str = path_str[8:]
+!                 for delim in ['"', "'", "(", ")", "[", "]", ",", ";", ":", " ", "\n", "\r", "\t"]:
+!                     path_str = path_str.strip(delim)
+!                 path_str = path_str.replace('\\\\', '/').replace('\\', '/')
+!                 if path_str and len(path_str) > 5:
+!                     found_paths.add(path_str)
+  
+!         scan_limit = 20
+!         scanned = 0
+  
+!         for file_path in found_paths:
+!             if scanned >= scan_limit:
+!                 break
+!             try:
+!                 p = Path(file_path)
+!                 if not p.exists() or not p.is_file():
+!                     continue
+!                 file_size = p.stat().st_size
+!                 if file_size > 50 * 1024:
+!                     continue
+!                 content = p.read_text(encoding='utf-8')
+!                 if len(content) > 50000:
+!                     content = content[:50000]
+!                 self.register_file_operation(
+!                     session_id=session_id,
+!                     operation="snapshot",
+!                     path=str(p),
+!                     reason="auto_capture_from_conversation",
+!                     content_before=content,
+!                     file_size=file_size,
+!                 )
+!                 scanned += 1
+!             except Exception:
+!                 pass
+  
+!     def post_conversation_hook(self, user_input: str, ai_response: str,
+!                             session_id: str, agent_id: str = "",
+!                             turn_number: int = 1,
+!                             mcp_calls: List[str] = None) -> EnforcementDecision:
+!         """
+!         对话后钩子 — 在AI返回响应后强制执行
+!         这是不可绕过的记录点，借鉴Hermes的闭环学习
+  
+!         P0增强: agent_id自动检测 + 文件操作合并 + 错误日志合并
+!         """
+!         self._stats["hooks_triggered"] += 1
+  
+!         resolved_agent_id = self._resolve_agent_id(session_id, agent_id)
+  
+!         record = ConversationRecord(
+!             session_id=session_id,
+!             user_input=user_input,
+!             ai_response=ai_response,
+!             agent_id=resolved_agent_id,
+!             timestamp=time.time(),
+!             turn_number=turn_number,
+!             mcp_calls_made=mcp_calls or [],
+!         )
+  
+!         self._auto_snapshot_referenced_files(record, session_id)
+!         self._flush_pending_to_record(record, session_id)
+  
+!         self.registry.register(record)
+  
+!         self._turn_logger.log(
+!             session_id=session_id,
+!             turn_no=turn_number,
+!             user_input=user_input,
+!             agent_response=ai_response,
+!             tool_calls=mcp_calls
+!         )
+  
+!         if not self._enabled:
+!             self._stats["records_skipped"] += 1
+!             return EnforcementDecision(
+!                 should_record=False,
+!                 target_layer="sensory",
+!                 priority="low",
+!                 reason="Enforcement disabled",
+!             )
+  
+!         decision = self._nudge_decide(record)
+  
+!         if decision.should_record:
+!             success = self._execute_record(record, decision)
+!             if success:
+!                 self._stats["records_enforced"] += 1
+!                 self.registry.mark_recorded(
+!                     session_id, turn_number, record.memory_id
+!                 )
+!             else:
+!                 self._cache_for_later(record)
+!         else:
+!             self._stats["records_skipped"] += 1
+  
+!         if decision.nudge_user:
+!             self._stats["nudges_sent"] += 1
+  
+!         if decision.extract_skill:
+!             self._stats["skills_extracted"] += 1
+  
+!         if self.event_bus:
+!             try:
+!                 from core.deepseek_driver import TianjiEvent, EventType
+!                 self.event_bus.publish(TianjiEvent(
+!                     event_type=EventType.CONVERSATION_COMPLETE,
+!                     source="trae",
+!                     payload={
+!                         "full_conversation": f"用户: {user_input}\n\nAI: {ai_response}",
+!                         "session_id": session_id,
+!                         "turn_number": turn_number,
+!                         "recorded": decision.should_record,
+!                     },
+!                 ))
+!             except Exception:
+!                 pass
+  
+!         return decision
+  
+!     def _nudge_decide(self, record: ConversationRecord) -> EnforcementDecision:
+!         """
+!         推手机制决策 — 借鉴Hermes的Nudge
+  
+!         Hermes: Agent主动提示用户沉淀高价值知识
+!         天机: 强制执行钩子自主判断是否需要记录、如何记录
+  
+!         判断规则:
+!         - 复杂操作(多个MCP调用) → L3 episodic, 高优先级, 触发技能提取
+!         - 架构/设计讨论 → L4 semantic, 中优先级
+!         - 错误/修复 → L3 episodic, critical优先级
+!         - 普通对话 → L0 sensory, 低优先级(仍然记录!)
+!         """
+!         conv_text = f"{record.user_input} {record.ai_response}"
+!         conv_len = len(conv_text)
+  
+!         if record.mcp_calls_made and len(record.mcp_calls_made) >= 5:
+!             return EnforcementDecision(
+!                 should_record=True,
+!                 target_layer="episodic",
+!                 priority="high",
+!                 reason=f"复杂操作({len(record.mcp_calls_made)}个MCP调用)必须记录",
+!                 nudge_user=True,
+!                 nudge_message=f"本次对话涉及{len(record.mcp_calls_made)}个工具调用，已自动归档到天机L3情景记忆",
+!                 extract_skill=True,
+!                 extract_tags=["skill_candidate", "complex_operation"],
+!             )
+  
+!         if conv_len > 3000:
+!             return EnforcementDecision(
+!                 should_record=True,
+!                 target_layer="episodic",
+!                 priority="medium",
+!                 reason=f"长对话({conv_len}字符)包含重要信息",
+!                 nudge_user=True,
+!                 nudge_message=f"长对话已自动归档到天机L3情景记忆 ({conv_len}字符)",
+!                 extract_skill=False,
+!             )
+  
+!         keywords = ["架构", "设计", "重构", "改造", "错误", "修复", "bug",
+!                      "安全", "部署", "生产", "critical", "紧急"]
+!         matched = [kw for kw in keywords if kw.lower() in conv_text.lower()]
+!         if matched:
+!             return EnforcementDecision(
+!                 should_record=True,
+!                 target_layer="episodic",
+!                 priority="critical" if any(
+!                     k in matched for k in ["错误", "bug", "critical", "紧急"]
+!                 ) else "high",
+!                 reason=f"包含关键词: {matched}",
+!                 nudge_user=True,
+!                 nudge_message=f"检测到重要内容(关键词:{matched})，已自动归档天机L3",
+!                 extract_skill="错误" in matched or "修复" in matched,
+!                 extract_tags=["error_pattern"] if "错误" in matched else [],
+!             )
+  
+!         return EnforcementDecision(
+!             should_record=True,
+!             target_layer="sensory",
+!             priority="low",
+!             reason="日常对话自动归档",
+!             nudge_user=False,
+!         )
+  
+!     def _execute_record(self, record: ConversationRecord,
+!                         decision: EnforcementDecision) -> bool:
+!         """执行记录 — 调用天机API存储"""
+!         try:
+!             import urllib.request
+!             content = json.dumps({
+!                 "type": "conversation_record",
+!                 "session_id": record.session_id,
+!                 "turn_number": record.turn_number,
+!                 "agent_id": record.agent_id,
+!                 "user_input": record.user_input,
+!                 "ai_response": record.ai_response,
+!                 "timestamp": record.timestamp,
+!                 "mcp_calls": record.mcp_calls_made,
+!                 "mcp_call_details": [d.to_dict() for d in record.mcp_call_details],
+!                 "file_operations": [f.to_dict() for f in record.file_operations],
+!                 "error_log": [e.to_dict() for e in record.error_log],
+!                 "agent_switches": record.agent_switches,
+!                 "content_hash": record.content_hash,
+!                 "conversation_class": record.conversation_class,
+!                 "iso_annotation": record.iso_annotation.to_dict() if record.iso_annotation else None,
+!                 "prov_trace": record.prov_trace.to_dict() if record.prov_trace else None,
+!                 "token_economy": record.token_economy.to_dict() if record.token_economy else None,
+!                 "fair_metadata": record.fair_metadata.to_dict() if record.fair_metadata else None,
+!                 "vcon_uuid": record.vcon_uuid,
+!                 "vcon_parties": [p.to_dict() for p in record.vcon_parties],
+!                 "vcon_consents": [c.to_dict() for c in record.vcon_consents],
+!                 "vcon_lifecycle": record.vcon_lifecycle.to_dict() if record.vcon_lifecycle else None,
+!                 "otel_spans": [s.to_dict() for s in record.otel_spans],
+!                 "otel_trace_id": record.otel_trace_id,
+!                 "reasoning_logs": [r.to_dict() for r in record.reasoning_logs],
+!                 "state_logs": [s.to_dict() for s in record.state_logs],
+!                 "token_economy_logs": [t.to_dict() for t in record.token_economy_logs],
+!                 "loongsuite_metadata": record.loongsuite_metadata.to_dict() if record.loongsuite_metadata else None,
+!                 "file_snap": record.file_snap,
+!                 "trigger_frequency": record.trigger_frequency,
+!                 "standards_check": record.standards_check,
+!             }, ensure_ascii=False)
+!             data = json.dumps({
+!                 "content": content,
+!                 "layer": decision.target_layer,
+!                 "tags": record.tags + ["enforcement_hook", "auto_record", record.session_id[:20]],
+!                 "priority": decision.priority,
+!             }, ensure_ascii=False).encode("utf-8")
+!             req = urllib.request.Request(
+!                 f"{self.memory_api_url}/api/memory/",
+!                 data=data,
+!                 headers={"Content-Type": "application/json; charset=utf-8"},
+!                 method="POST",
+!             )
+!             r = urllib.request.urlopen(req, timeout=10)
+!             if r.status in (200, 201):
+!                 result = json.loads(r.read().decode("utf-8"))
+!                 record.memory_id = result.get("memory_id", "")
+!                 record.recorded = True
+!                 return True
+!             return False
+!         except Exception as e:
+!             logger.error(f"Record execution failed: {e}")
+!             self._stats["errors"] += 1
+!             return False
+  
+!     def _cache_for_later(self, record: ConversationRecord):
+!         """本地缓存 — 天机不可用时的降级策略"""
+!         self._pending_cache.append(record)
+!         if self.local_cache_dir:
+!             try:
+!                 cache_file = self.local_cache_dir / "pending_records.json"
+!                 existing = []
+!                 if cache_file.exists():
+!                     existing = json.loads(cache_file.read_text("utf-8"))
+!                 existing.append({
+!                     "session_id": record.session_id,
+!                     "user_input": record.user_input[:500],
+!                     "ai_response": record.ai_response[:500],
+!                     "timestamp": record.timestamp,
+!                     "content_hash": record.content_hash,
+!                 })
+!                 cache_file.write_text(
+!                     json.dumps(existing[-100:], ensure_ascii=False, indent=2),
+!                     encoding="utf-8"
+!                 )
+!             except Exception:
+!                 pass
+  
+!     def flush_pending(self) -> int:
+!         """批量同步缓存记录 — 天机恢复后调用"""
+!         flushed = 0
+!         for record in list(self._pending_cache):
+!             decision = self._nudge_decide(record)
+!             if self._execute_record(record, decision):
+!                 self._pending_cache.remove(record)
+!                 flushed += 1
+!         return flushed
+  
+!     def check_compliance(self) -> Dict:
+!         """合规检查 — 借鉴Hermes的闭环验证"""
+!         registry_stats = self.registry.get_stats()
+!         unrecorded = self.registry.get_unrecorded()
+!         pending = len(self._pending_cache)
+  
+!         violations = []
+!         if registry_stats["unrecorded_turns"] > 0:
+!             violations.append(f"{registry_stats['unrecorded_turns']}个对话轮次未记录")
+  
+!         return {
+!             "enabled": self._enabled,
+!             "level": self._enforcement_level.value,
+!             "registry": registry_stats,
+!             "unrecorded_count": len(unrecorded),
+!             "pending_cache": pending,
+!             "violations": violations,
+!             "compliant": len(violations) == 0,
+!             "stats": self._stats,
+!         }
+  
+!     def get_nudge_message(self) -> Optional[str]:
+!         """
+!         获取推手机制消息 — 借鉴Hermes的Nudge
+  
+!         当有未记录的对话时，主动提示用户
+!         """
+!         unrecorded = self.registry.get_unrecorded()
+!         if not unrecorded:
+!             return None
+  
+!         count = len(unrecorded)
+!         if count >= 10:
+!             return (f"⚠️ 推手提醒: 有{count}个对话轮次尚未归档到天机记忆系统。"
+!                     f"系统将在下次对话时自动补录。")
+!         elif count >= 5:
+!             return (f"📝 推手提醒: {count}个对话轮次待归档。天机将继续自动记录。")
+!         else:
+!             return None
+  
+!     def get_stats(self) -> Dict:
+!         total_file_ops = sum(len(v) for v in self._pending_file_ops.values())
+!         total_errors = sum(len(v) for v in self._pending_errors.values())
+!         total_mcp_calls = sum(len(v) for v in self._pending_mcp_calls.values())
+!         total_switches = sum(len(v) for v in self._pending_switches.values())
+!         total_otel_spans = sum(len(v) for v in self._pending_otel_spans.values())
+!         return {
+!             "enabled": self._enabled,
+!             "level": self._enforcement_level.value,
+!             "registry": self.registry.get_stats(),
+!             "pending_cache": len(self._pending_cache),
+!             "enforcement": self._stats,
+!             "tracking": {
+!                 "pending_file_operations": total_file_ops,
+!                 "pending_errors": total_errors,
+!                 "pending_mcp_calls": total_mcp_calls,
+!                 "pending_agent_switches": total_switches,
+!                 "pending_otel_spans": total_otel_spans,
+!                 "active_sessions": len(self._session_agent_id),
+!             },
+!             "otel": self._otel_interceptor.get_otel_stats(),
+!             "aos": self._aos_bridge.get_stats(),
+!             "aos_inspect": self._inspect_engine.get_scan_stats(),
+!             "diaml_functions": len(ISO_COMMUNICATION_FUNCTIONS),
+!             "ms_agent_tasks": self._ms_span_manager.get_stats(),
+!             "seven_dim": self.get_seven_dim_stats(),
+!             "dispatch": self.get_dispatch_stats(),
+!         }
+  
+!     def run_aos_inspect(self, content: str, context: Dict = None) -> Dict:
+!         result = self._inspect_engine.run_all_checks(content, context)
+!         if result["violations"] > 0:
+!             self._aos_bridge.record_inspect(
+!                 "security_scan", "enforcement_hook",
+!                 payload=result, severity="warning" if result["violations"] <= 3 else "error",
+!             )
+!         return result
+  
+!     def run_aos_inject_scan(self, content: str) -> Dict:
+!         return self._inspect_engine.run_injection_checks(content)
+  
+!     def run_aos_permission_scan(self, content: str, context: Dict = None) -> Dict:
+!         return self._inspect_engine.run_permission_checks(content, context)
+  
+!     def run_aos_output_filter(self, content: str) -> Dict:
+!         return self._inspect_engine.run_output_checks(content)
+  
+!     def export_diaml_xml(self, session_id: str = "", sender: str = "",
+!                          addressee: str = "") -> Optional[str]:
+!         records = self.registry.get_recent_records(session_id)
+!         if not records:
+!             return None
+!         last = records[-1]
+!         if not last.iso_annotation:
+!             return None
+!         return self._diaml_serializer.to_xml(
+!             last.iso_annotation, dialogue_id=session_id,
+!             sender=sender, addressee=addressee,
+!         )
+  
+!     def export_diaml_dict(self, session_id: str = "") -> Optional[Dict]:
+!         records = self.registry.get_recent_records(session_id)
+!         if not records:
+!             return None
+!         last = records[-1]
+!         if not last.iso_annotation:
+!             return None
+!         return self._diaml_serializer.to_dict(last.iso_annotation)
+  
+!     def start_ms_task_span(self, task_id: str, task_type: str,
+!                            priority: str = "medium") -> MsAgentTaskSpan:
+!         return self._ms_span_manager.start_task(task_id, task_type, priority=priority)
+  
+!     def finish_ms_task_span(self, task_id: str, status: str = "completed",
+!                             output: str = "", error: str = "") -> Optional[MsAgentTaskSpan]:
+!         return self._ms_span_manager.finish_task(task_id, status, output, error)
+  
+!     def get_ms_task_stats(self) -> Dict:
+!         return self._ms_span_manager.get_stats()
+  
+!     def get_adaptive_policy(self) -> AdaptiveRecordingPolicy:
+!         return self._adaptive_policy
+  
+!     def set_active_consumers(self, profiles: List[ConsumerProfile]):
+!         self._adaptive_policy.set_active_consumers(profiles)
+  
+!     def update_consumer_health(self, profile: ConsumerProfile, health: float):
+!         self._adaptive_policy.update_consumer_health(profile, health)
+  
+!     def get_adaptive_policy_summary(self) -> Dict:
+!         return self._adaptive_policy.get_policy_summary()
+  
+  
+! class SkillExtractionPipeline:
+!     """
+!     技能提取管线 — 借鉴Hermes的技能自创建机制
+  
+!     Hermes: 任务涉及5+工具调用 → 自动写skill文件 → 索引入内存
+!     天机: 复杂对话 → 自动提取模式 → 存入L4语义层 → 跨会话可用
+!     """
+  
+!     def __init__(self, enforcement_hook: TianjiEnforcementHook,
+!                  memory_api_url: str = "http://127.0.0.1:8771"):
+!         self.hook = enforcement_hook
+!         self.memory_api_url = memory_api_url
+  
+!     def extract_from_conversation(self, user_input: str, ai_response: str,
+!                                    session_id: str) -> Optional[str]:
+!         """
+!         从对话中提取可复用技能
+  
+!         对标Hermes的"5+工具调用→自创技能"机制
+!         """
+!         conv_text = f"{user_input}\n\n{ai_response}"
+!         if len(conv_text) < 500:
+!             return None
+  
+!         prompt = f"""从以下对话中提取可复用的流程/模式/经验:
+  
+! 对话内容:
+! {conv_text[:3000]}
+  
+! 提取规则:
+! 1. 如果是重复性操作模式 → 描述"怎么做"
+! 2. 如果是解决方案 → 描述"解决什么问题的什么方法"
+! 3. 如果是架构决策 → 描述"决策内容和理由"
+  
+! 返回JSON:
+! {{"skill_title": "技能标题", "skill_body": "详细描述(3-5句话)", "tags": ["标签1","标签2"], "confidence": 0.8}}"""
+  
+!         try:
+!             import urllib.request
+!             data = json.dumps({
+!                 "content": prompt,
+!                 "layer": "semantic",
+!                 "tags": ["skill_extraction", "auto_generated"],
+!                 "priority": "medium",
+!             }, ensure_ascii=False).encode("utf-8")
+!             req = urllib.request.Request(
+!                 f"{self.memory_api_url}/api/memory/",
+!                 data=data,
+!                 headers={"Content-Type": "application/json; charset=utf-8"},
+!                 method="POST",
+!             )
+!             r = urllib.request.urlopen(req, timeout=10)
+!             if r.status in (200, 201):
+!                 result = json.loads(r.read().decode("utf-8"))
+!                 return result.get("memory_id", "")
+!             return None
+!         except Exception:
+!             return None
+  
+  
+  
+! class EvalDimension(str, Enum):
+!     CORRECTNESS = "correctness"
+!     RELEVANCE = "relevance"
+!     HARMFULNESS = "harmfulness"
+!     GROUNDEDNESS = "groundedness"
+!     COMPLETENESS = "completeness"
+!     COHERENCE = "coherence"
+  
+  
+! @dataclass
+! class EvalScoringMatrix:
+!     dimension: EvalDimension
+!     weight: float
+!     threshold_pass: float
+!     threshold_warn: float
+!     score: float = 0.0
+!     verdict: str = ""
+!     evidence: str = ""
+!     evaluated: bool = False
+  
+!     def to_dict(self) -> dict:
+!         return {
+!             "dimension": self.dimension.value,
+!             "weight": self.weight,
+!             "threshold_pass": self.threshold_pass,
+!             "threshold_warn": self.threshold_warn,
+!             "score": self.score,
+!             "verdict": self.verdict,
+!             "evidence": self.evidence[:500],
+!             "evaluated": self.evaluated,
+!         }
+  
+  
+! OTEL_EVAL_DIMENSIONS = {
+!     EvalDimension.CORRECTNESS: EvalScoringMatrix(
+!         dimension=EvalDimension.CORRECTNESS,
+!         weight=0.25,
+!         threshold_pass=0.80,
+!         threshold_warn=0.60,
+!     ),
+!     EvalDimension.RELEVANCE: EvalScoringMatrix(
+!         dimension=EvalDimension.RELEVANCE,
+!         weight=0.20,
+!         threshold_pass=0.75,
+!         threshold_warn=0.55,
+!     ),
+!     EvalDimension.HARMFULNESS: EvalScoringMatrix(
+!         dimension=EvalDimension.HARMFULNESS,
+!         weight=0.20,
+!         threshold_pass=0.90,
+!         threshold_warn=0.70,
+!     ),
+!     EvalDimension.GROUNDEDNESS: EvalScoringMatrix(
+!         dimension=EvalDimension.GROUNDEDNESS,
+!         weight=0.15,
+!         threshold_pass=0.75,
+!         threshold_warn=0.55,
+!     ),
+!     EvalDimension.COMPLETENESS: EvalScoringMatrix(
+!         dimension=EvalDimension.COMPLETENESS,
+!         weight=0.10,
+!         threshold_pass=0.70,
+!         threshold_warn=0.50,
+!     ),
+!     EvalDimension.COHERENCE: EvalScoringMatrix(
+!         dimension=EvalDimension.COHERENCE,
+!         weight=0.10,
+!         threshold_pass=0.70,
+!         threshold_warn=0.50,
+!     ),
+! }
+  
+  
+! @dataclass
+! class EvalResult:
+!     dimensions: Dict[EvalDimension, EvalScoringMatrix]
+!     composite_score: float
+!     overall_verdict: str
+!     pass_count: int
+!     warn_count: int
+!     fail_count: int
+!     total_weight: float
+  
+!     def to_dict(self) -> dict:
+!         return {
+!             "composite_score": round(self.composite_score, 4),
+!             "overall_verdict": self.overall_verdict,
+!             "pass_count": self.pass_count,
+!             "warn_count": self.warn_count,
+!             "fail_count": self.fail_count,
+!             "dimensions": {d.value: m.to_dict() for d, m in self.dimensions.items()},
+!         }
+  
+  
+! class OTelEvalEngine:
+!     """
+!     OTel GenAI Evaluation 多维度评分矩阵
+  
+!     6维评分:
+!       - Correctness (0.25): 事实准确性,阈0.80/0.60
+!       - Relevance (0.20): 与上下文相关性,阈0.75/0.55
+!       - Harmfulness (0.20): 安全性检测,阈0.90/0.70
+!       - Groundedness (0.15): 是否有知识依据,阈0.75/0.55
+!       - Completeness (0.10): 回答完整性,阈0.70/0.50
+!       - Coherence (0.10): 逻辑连贯性,阈0.70/0.50
+  
+!     CompositeScore = Σ(dimension.weight × dimension.score)
+!     """
+  
+!     def __init__(self):
+!         self._dimensions = {
+!             d: EvalScoringMatrix(**{
+!                 "dimension": m.dimension,
+!                 "weight": m.weight,
+!                 "threshold_pass": m.threshold_pass,
+!                 "threshold_warn": m.threshold_warn,
+!             })
+!             for d, m in OTEL_EVAL_DIMENSIONS.items()
+!         }
+!         self._stats = {
+!             "total_evals": 0,
+!             "pass_count": 0,
+!             "warn_count": 0,
+!             "fail_count": 0,
+!             "dimension_scores": {d.value: [] for d in EvalDimension},
+!         }
+  
+!     def score_dimension(self, dimension: EvalDimension, score: float,
+!                         evidence: str = "") -> EvalScoringMatrix:
+!         matrix = self._dimensions[dimension]
+!         matrix.score = max(0.0, min(1.0, score))
+!         matrix.evidence = evidence
+!         matrix.evaluated = True
+  
+!         if matrix.score >= matrix.threshold_pass:
+!             matrix.verdict = "pass"
+!         elif matrix.score >= matrix.threshold_warn:
+!             matrix.verdict = "warn"
+!         else:
+!             matrix.verdict = "fail"
+  
+!         self._stats["dimension_scores"][dimension.value].append(matrix.score)
+!         return matrix
+  
+!     def evaluate(self) -> EvalResult:
+!         composite = 0.0
+!         total_weight = 0.0
+!         pass_count = 0
+!         warn_count = 0
+!         fail_count = 0
+  
+!         for dim, matrix in self._dimensions.items():
+!             if matrix.evaluated:
+!                 composite += matrix.score * matrix.weight
+!                 total_weight += matrix.weight
+!                 if matrix.verdict == "pass":
+!                     pass_count += 1
+!                 elif matrix.verdict == "warn":
+!                     warn_count += 1
+!                 else:
+!                     fail_count += 1
+  
+!         composite_score = composite / total_weight if total_weight > 0 else 0.0
+  
+!         if composite_score >= 0.80 and fail_count == 0:
+!             overall = "pass"
+!         elif composite_score >= 0.60 and fail_count <= 1:
+!             overall = "warn"
+!         else:
+!             overall = "fail"
+  
+!         self._stats["total_evals"] += 1
+!         if overall == "pass":
+!             self._stats["pass_count"] += 1
+!         elif overall == "warn":
+!             self._stats["warn_count"] += 1
+!         else:
+!             self._stats["fail_count"] += 1
+  
+!         return EvalResult(
+!             dimensions=dict(self._dimensions),
+!             composite_score=composite_score,
+!             overall_verdict=overall,
+!             pass_count=pass_count,
+!             warn_count=warn_count,
+!             fail_count=fail_count,
+!             total_weight=total_weight,
+!         )
+  
+!     def auto_evaluate_from_hook(self, hook_result: Dict[str, Any]) -> EvalResult:
+!         violations = hook_result.get("violations", [])
+!         compliance_rate = hook_result.get("compliance_rate", 1.0)
+!         risk_level = hook_result.get("risk_level", "low")
+  
+!         correctness_score = compliance_rate
+!         self.score_dimension(EvalDimension.CORRECTNESS, correctness_score,
+!                              f"compliance_rate={compliance_rate}")
+  
+!         relevance_score = 1.0 - min(len(violations) * 0.15, 1.0)
+!         self.score_dimension(EvalDimension.RELEVANCE, relevance_score,
+!                              f"violations={len(violations)}")
+  
+!         harm_score = 0.50 if risk_level == "critical" else (
+!             0.70 if risk_level == "high" else (
+!             0.85 if risk_level == "medium" else 0.95))
+!         self.score_dimension(EvalDimension.HARMFULNESS, harm_score,
+!                              f"risk_level={risk_level}")
+  
+!         groundedness_score = 0.90 if len(violations) == 0 else 0.70
+!         self.score_dimension(EvalDimension.GROUNDEDNESS, groundedness_score,
+!                              f"violations={len(violations)}")
+  
+!         completeness_score = 1.0 if len(violations) == 0 else 0.80
+!         self.score_dimension(EvalDimension.COMPLETENESS, completeness_score,
+!                              f"violations={len(violations)}")
+  
+!         coherence_score = 0.95 if len(violations) == 0 else 0.75
+!         self.score_dimension(EvalDimension.COHERENCE, coherence_score,
+!                              f"violations={len(violations)}")
+  
+!         return self.evaluate()
+  
+!     def get_stats(self) -> Dict:
+!         return {
+!             "total_evals": self._stats["total_evals"],
+!             "pass_count": self._stats["pass_count"],
+!             "warn_count": self._stats["warn_count"],
+!             "fail_count": self._stats["fail_count"],
+!             "pass_rate": round(
+!                 self._stats["pass_count"] / max(self._stats["total_evals"], 1), 4
+!             ),
+!             "dimension_averages": {
+!                 dim: round(sum(scores) / len(scores), 4) if scores else 0.0
+!                 for dim, scores in self._stats["dimension_scores"].items()
+!             },
+!         }
+  
+!     def reset(self):
+!         for matrix in self._dimensions.values():
+!             matrix.score = 0.0
+!             matrix.verdict = ""
+!             matrix.evidence = ""
+!             matrix.evaluated = False

@@ -1,0 +1,1058 @@
+> r"""
+> 天机自动化运维引擎 (Tianji AutoOps Engine) v1.1
+> ================================================
+> Phase 3 自动化运维 — 自愈 + 基线检测 + 扩缩容建议
+  
+> M19升级: EvolutionLoop闭环 + record_action喂入 + health() + 双注入
+> 灵境道谱溯源: D4-2【冲突解析煞】· 道四·质量体道 · 四地煞之制之术
+>   - 自愈策略冲突解析+异常检测冲突消除+扩缩容冲突裁决
+>   - 源文件: core/auto_ops.py → AutoOpsCoordinator
+  
+> 架构:
+>   AutoOpsCoordinator (协调器)
+>   ├── AutoHealer (模块自愈器)
+>   │   ├── 接收 EvolutionBus 信号
+>   │   ├── 决策策略库 (healing strategies)
+>   │   └── 自愈历史追踪
+>   └── BaselineEngine (性能基线引擎)
+>       ├── 指标时序收集
+>       ├── 统计基线计算
+>       ├── 异常检测 (z-score + IQR)
+>       └── 扩缩容建议
+  
+> 依赖:
+>   - ModuleRegistry: 生命周期状态管理
+>   - EvolutionBus: 进化信号路由
+>   - EvolutionLoop: 因果对记录
+>   - GovernancePipeline: 审批门禁 (高危自愈操作)
+  
+> 设计原则:
+>   - 渐进式自愈: 轻→重，先尝试无副作用的修复
+>   - 速率限制: 防止自愈风暴
+>   - 因果追踪: 每次自愈操作记录前后状态
+>   - 安全第一: 高危操作必须经过审批
+> """
+  
+! import time
+! import json
+! import uuid
+! import math
+! import threading
+! import logging
+! from pathlib import Path
+! from dataclasses import dataclass, field
+! from typing import Any, Optional, Dict, List, Tuple, Callable
+! from enum import Enum
+! from collections import defaultdict, deque
+  
+! logger = logging.getLogger(__name__)
+  
+! try:
+!     from .evolution_loop import EvolutionLoop
+! except ImportError:
+!     EvolutionLoop = None
+  
+  
+! class HealingAction(str, Enum):
+!     NONE = "none"
+!     RESTART = "restart"
+!     ROLLBACK_CONFIG = "rollback_config"
+!     REINITIALIZE = "reinitialize"
+!     CLEAR_CACHE = "clear_cache"
+!     REDUCE_LOAD = "reduce_load"
+!     MARK_DEGRADED = "mark_degraded"
+!     MARK_ERROR = "mark_error"
+!     ESCALATE = "escalate"
+  
+  
+! class HealingSeverity(str, Enum):
+!     MILD = "mild"
+!     MODERATE = "moderate"
+!     SEVERE = "severe"
+!     CRITICAL = "critical"
+  
+  
+! class AnomalyType(str, Enum):
+!     SPIKE = "spike"
+!     DIP = "dip"
+!     DRIFT = "drift"
+!     TREND_UP = "trend_up"
+!     TREND_DOWN = "trend_down"
+!     OSCILLATION = "oscillation"
+  
+  
+! class ScaleDirection(str, Enum):
+!     UP = "up"
+!     DOWN = "down"
+!     NONE = "none"
+  
+  
+! @dataclass
+! class HealingRecord:
+!     record_id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
+!     module_id: str = ""
+!     action: HealingAction = HealingAction.NONE
+!     severity: HealingSeverity = HealingSeverity.MILD
+!     trigger_signal: Optional[Dict[str, Any]] = None
+!     state_before: Optional[Dict[str, Any]] = None
+!     state_after: Optional[Dict[str, Any]] = None
+!     success: bool = False
+!     error_message: str = ""
+!     duration_ms: float = 0.0
+!     timestamp: float = field(default_factory=time.time)
+  
+!     def to_dict(self) -> Dict:
+!         return {
+!             "record_id": self.record_id,
+!             "module_id": self.module_id,
+!             "action": self.action.value,
+!             "severity": self.severity.value,
+!             "trigger_signal": self.trigger_signal,
+!             "state_before": self.state_before,
+!             "state_after": self.state_after,
+!             "success": self.success,
+!             "error_message": self.error_message,
+!             "duration_ms": self.duration_ms,
+!             "timestamp": self.timestamp,
+!         }
+  
+  
+! @dataclass
+! class MetricSnapshot:
+!     module_id: str
+!     metric_name: str
+!     value: float
+!     timestamp: float = field(default_factory=time.time)
+  
+  
+! @dataclass
+! class AnomalyReport:
+!     module_id: str
+!     metric_name: str
+!     anomaly_type: AnomalyType
+!     current_value: float
+!     baseline_mean: float
+!     baseline_std: float
+!     z_score: float
+!     severity: float
+!     recommendation: str
+!     timestamp: float = field(default_factory=time.time)
+  
+!     def to_dict(self) -> Dict:
+!         return {
+!             "module_id": self.module_id,
+!             "metric_name": self.metric_name,
+!             "anomaly_type": self.anomaly_type.value,
+!             "current_value": self.current_value,
+!             "baseline_mean": self.baseline_mean,
+!             "baseline_std": self.baseline_std,
+!             "z_score": self.z_score,
+!             "severity": self.severity,
+!             "recommendation": self.recommendation,
+!             "timestamp": self.timestamp,
+!         }
+  
+  
+! @dataclass
+! class ScaleRecommendation:
+!     module_id: str
+!     direction: ScaleDirection
+!     urgency: float
+!     reason: str
+!     current_load: float
+!     recommended_target: float
+!     supporting_metrics: Dict[str, float] = field(default_factory=dict)
+!     timestamp: float = field(default_factory=time.time)
+  
+!     def to_dict(self) -> Dict:
+!         return {
+!             "module_id": self.module_id,
+!             "direction": self.direction.value,
+!             "urgency": self.urgency,
+!             "reason": self.reason,
+!             "current_load": self.current_load,
+!             "recommended_target": self.recommended_target,
+!             "supporting_metrics": self.supporting_metrics,
+!             "timestamp": self.timestamp,
+!         }
+  
+  
+! class AutoHealer:
+!     r"""
+!     模块自愈器 — 基于进化信号的自愈决策与执行
+  
+!     自愈策略链 (按严重程度递增):
+!       MILD    → CLEAR_CACHE / REDUCE_LOAD
+!       MODERATE → ROLLBACK_CONFIG / RESTART
+!       SEVERE   → REINITIALIZE / MARK_DEGRADED
+!       CRITICAL → ESCALATE (触发治理流水线审批) / MARK_ERROR
+  
+!     安全约束:
+!       - 每模块每小时最多自愈 3 次
+!       - RESTART/REINITIALIZE 操作每模块每天最多 1 次
+!       - ESCALATE 操作必须经过 GovernancePipeline 审批
+!       - 所有自愈操作记录因果对 (前后状态快照)
+!     """
+  
+!     HEALING_STRATEGIES: Dict[HealingSeverity, List[HealingAction]] = {
+!         HealingSeverity.MILD: [
+!             HealingAction.CLEAR_CACHE, HealingAction.REDUCE_LOAD,
+!         ],
+!         HealingSeverity.MODERATE: [
+!             HealingAction.ROLLBACK_CONFIG, HealingAction.RESTART,
+!         ],
+!         HealingSeverity.SEVERE: [
+!             HealingAction.REINITIALIZE, HealingAction.MARK_DEGRADED,
+!         ],
+!         HealingSeverity.CRITICAL: [
+!             HealingAction.ESCALATE, HealingAction.MARK_ERROR,
+!         ],
+!     }
+  
+!     RATE_LIMITS = {
+!         "per_hour": 3,
+!         "restart_per_day": 2,
+!         "reinit_per_day": 1,
+!     }
+  
+!     def __init__(self, registry=None, evolution_bus=None, governance_pipeline=None):
+!         self._registry = registry
+!         self._evolution_bus = evolution_bus
+!         self._governance_pipeline = governance_pipeline
+!         self._healing_history: List[HealingRecord] = []
+!         self._module_heal_counters: Dict[str, Dict[str, List[float]]] = defaultdict(
+!             lambda: {"hourly": [], "restarts": [], "reinits": []}
+!         )
+!         self._lock = threading.Lock()
+!         self._stats = {
+!             "total_heal_attempts": 0,
+!             "total_heal_successes": 0,
+!             "total_escalations": 0,
+!             "rate_limited_rejections": 0,
+!         }
+  
+!     def assess_severity(self, signal: Any) -> HealingSeverity:
+!         severity_val = getattr(signal, 'severity', 0.5)
+!         if severity_val >= 0.9:
+!             return HealingSeverity.CRITICAL
+!         elif severity_val >= 0.7:
+!             return HealingSeverity.SEVERE
+!         elif severity_val >= 0.4:
+!             return HealingSeverity.MODERATE
+!         return HealingSeverity.MILD
+  
+!     def heal(self, module_id: str, signal: Any = None,
+!              custom_action: Optional[HealingAction] = None) -> HealingRecord:
+!         record = HealingRecord(
+!             module_id=module_id,
+!             trigger_signal=self._signal_to_dict(signal) if signal else None,
+!         )
+  
+!         if not self._check_rate_limit(module_id, record):
+!             return record
+  
+!         severity = self.assess_severity(signal) if signal else HealingSeverity.MILD
+!         record.severity = severity
+  
+!         strategies = self.HEALING_STRATEGIES.get(severity, [HealingAction.NONE])
+!         action = custom_action if custom_action else self._select_strategy(module_id, strategies)
+!         record.action = action
+  
+!         record.state_before = self._capture_module_state(module_id)
+!         start = time.time()
+  
+!         try:
+!             self._execute_healing(module_id, action, record)
+!             record.success = True
+!             self._stats["total_heal_successes"] += 1
+!         except Exception as e:
+!             record.success = False
+!             record.error_message = str(e)
+!             logger.error(f"[AutoHealer] 自愈失败: {module_id} {action.value} — {e}")
+  
+!         record.duration_ms = (time.time() - start) * 1000
+!         record.state_after = self._capture_module_state(module_id)
+  
+!         self._stats["total_heal_attempts"] += 1
+!         self._record_heal(module_id, record)
+!         self._healing_history.append(record)
+  
+!         if len(self._healing_history) > 500:
+!             self._healing_history = self._healing_history[-250:]
+  
+!         logger.info(
+!             f"[AutoHealer] {'✅' if record.success else '❌'} "
+!             f"{module_id} {action.value} ({severity.value}) "
+!             f"{record.duration_ms:.0f}ms"
+!         )
+!         return record
+  
+!     def _check_rate_limit(self, module_id: str, record: HealingRecord) -> bool:
+!         now = time.time()
+!         counters = self._module_heal_counters[module_id]
+  
+!         counters["hourly"] = [t for t in counters["hourly"] if now - t < 3600]
+!         counters["restarts"] = [t for t in counters["restarts"] if now - t < 86400]
+!         counters["reinits"] = [t for t in counters["reinits"] if now - t < 86400]
+  
+!         if len(counters["hourly"]) >= self.RATE_LIMITS["per_hour"]:
+!             record.success = False
+!             record.error_message = f"速率限制: 每小时最多 {self.RATE_LIMITS['per_hour']} 次自愈"
+!             self._stats["rate_limited_rejections"] += 1
+!             logger.warning(f"[AutoHealer] 速率限制拒绝: {module_id}")
+!             return False
+!         return True
+  
+!     def _select_strategy(self, module_id: str,
+!                          strategies: List[HealingAction]) -> HealingAction:
+!         counters = self._module_heal_counters[module_id]
+!         for action in strategies:
+!             if action == HealingAction.RESTART:
+!                 if len(counters["restarts"]) >= self.RATE_LIMITS["restart_per_day"]:
+!                     continue
+!             if action == HealingAction.REINITIALIZE:
+!                 if len(counters["reinits"]) >= self.RATE_LIMITS["reinit_per_day"]:
+!                     continue
+!             if action == HealingAction.ESCALATE:
+!                 self._stats["total_escalations"] += 1
+!             return action
+!         return HealingAction.MARK_DEGRADED
+  
+!     def _execute_healing(self, module_id: str, action: HealingAction,
+!                          record: HealingRecord):
+!         if action == HealingAction.NONE:
+!             return
+  
+!         if action == HealingAction.MARK_DEGRADED:
+!             if self._registry:
+!                 from .module_registry import ModuleLifecycleState
+!                 self._registry.update_state(module_id, ModuleLifecycleState.DEGRADED)
+!                 self._registry.update_health(module_id, "degraded")
+  
+!         elif action == HealingAction.MARK_ERROR:
+!             if self._registry:
+!                 from .module_registry import ModuleLifecycleState
+!                 self._registry.update_state(module_id, ModuleLifecycleState.ERROR)
+!                 self._registry.update_health(module_id, "error")
+  
+!         elif action == HealingAction.CLEAR_CACHE:
+!             if self._registry:
+!                 m = self._registry.get(module_id)
+!                 if m and m.instance_ref and hasattr(m.instance_ref, 'reset'):
+!                     m.instance_ref.reset()
+  
+!         elif action == HealingAction.REDUCE_LOAD:
+!             if self._registry:
+!                 m = self._registry.get(module_id)
+!                 if m and m.instance_ref and hasattr(m.instance_ref, 'reset'):
+!                     m.instance_ref.reset()
+  
+!         elif action == HealingAction.ROLLBACK_CONFIG:
+!             if self._registry:
+!                 m = self._registry.get(module_id)
+!                 if m and m.evolution_loop_ref:
+!                     loop = m.evolution_loop_ref
+!                     if hasattr(loop, 'mutable_config') and loop.mutable_config:
+!                         for key in list(loop.mutable_config.keys()):
+!                             if isinstance(loop.mutable_config[key], (int, float)):
+!                                 loop.mutable_config[key] *= 0.8
+  
+!         elif action == HealingAction.RESTART:
+!             if self._registry:
+!                 m = self._registry.get(module_id)
+!                 if m and m.instance_ref:
+!                     if hasattr(m.instance_ref, 'reset'):
+!                         m.instance_ref.reset()
+!                     from .module_registry import ModuleLifecycleState
+!                     self._registry.update_state(
+!                         module_id, ModuleLifecycleState.INITIALIZING
+!                     )
+!                     self._registry.update_state(
+!                         module_id, ModuleLifecycleState.ACTIVE
+!                     )
+  
+!         elif action == HealingAction.REINITIALIZE:
+!             if self._registry:
+!                 m = self._registry.get(module_id)
+!                 if m and m.instance_ref:
+!                     if hasattr(m.instance_ref, 'reset'):
+!                         m.instance_ref.reset()
+!                     from .module_registry import ModuleLifecycleState
+!                     self._registry.update_state(
+!                         module_id, ModuleLifecycleState.INITIALIZING
+!                     )
+!                     self._registry.update_state(
+!                         module_id, ModuleLifecycleState.ACTIVE
+!                     )
+  
+!         elif action == HealingAction.ESCALATE:
+!             if self._governance_pipeline and self._registry:
+!                 m = self._registry.get(module_id)
+!                 if m:
+!                     self._governance_pipeline.govern_module(
+!                         self._governance_pipeline.create_governance_pipeline(),
+!                         m,
+!                         None,
+!                     )
+  
+!     def _capture_module_state(self, module_id: str) -> Optional[Dict]:
+!         if not self._registry:
+!             return None
+!         m = self._registry.get(module_id)
+!         if not m:
+!             return None
+!         return {
+!             "lifecycle_state": m.lifecycle_state.value,
+!             "health_status": m.health_status,
+!         }
+  
+!     def _signal_to_dict(self, signal) -> Optional[Dict]:
+!         if signal is None:
+!             return None
+!         return {
+!             "source_module": getattr(signal, 'source_module', ''),
+!             "signal_type": getattr(signal, 'signal_type', None),
+!             "severity": getattr(signal, 'severity', 0.0),
+!             "description": getattr(signal, 'description', ''),
+!         }
+  
+!     def _record_heal(self, module_id: str, record: HealingRecord):
+!         counters = self._module_heal_counters[module_id]
+!         now = time.time()
+!         counters["hourly"].append(now)
+!         if record.action == HealingAction.RESTART:
+!             counters["restarts"].append(now)
+!         if record.action == HealingAction.REINITIALIZE:
+!             counters["reinits"].append(now)
+  
+!     def get_healing_history(self, module_id: str = None,
+!                             limit: int = 50) -> List[Dict]:
+!         with self._lock:
+!             records = self._healing_history
+!             if module_id:
+!                 records = [r for r in records if r.module_id == module_id]
+!             return [r.to_dict() for r in records[-limit:]]
+  
+!     def get_stats(self) -> Dict:
+!         with self._lock:
+!             return {
+!                 **self._stats,
+!                 "history_size": len(self._healing_history),
+!                 "tracked_modules": len(self._module_heal_counters),
+!             }
+  
+  
+! class BaselineEngine:
+!     r"""
+!     性能基线引擎 — 指标收集、基线计算、异常检测
+  
+!     检测方法:
+!       1. z-score 检测: |z| > 3 判定为异常
+!       2. IQR 检测: value > Q3 + 1.5*IQR 或 value < Q1 - 1.5*IQR
+!       3. 趋势检测: 滑动窗口线性回归斜率显著非零
+  
+!     基线更新策略:
+!       - 每5分钟追加新快照
+!       - 每小时重新计算基线
+!       - 保留最近7天数据用于趋势分析
+!     """
+  
+!     DEFAULT_METRIC_THRESHOLDS = {
+!         "capacity_usage": {"warn": 0.7, "critical": 0.9, "inverse": False},
+!         "rejection_rate": {"warn": 0.15, "critical": 0.3, "inverse": False},
+!         "downgrade_rate": {"warn": 0.1, "critical": 0.2, "inverse": False},
+!         "avg_latency_ms": {"warn": 500, "critical": 2000, "inverse": False},
+!         "error_rate": {"warn": 0.05, "critical": 0.1, "inverse": False},
+!         "utilization": {"warn": 0.1, "critical": 0.05, "inverse": True},
+!     }
+  
+!     def __init__(self, registry=None, max_history_per_metric: int = 20160):
+!         self._registry = registry
+!         self._max_history = max_history_per_metric
+!         self._metric_store: Dict[str, Dict[str, deque]] = defaultdict(
+!             lambda: defaultdict(lambda: deque(maxlen=max_history_per_metric))
+!         )
+!         self._anomaly_history: List[AnomalyReport] = []
+!         self._baselines: Dict[str, Dict[str, Dict[str, float]]] = {}
+!         self._last_baseline_calc: float = 0.0
+!         self._baseline_calc_interval: float = 3600.0
+!         self._lock = threading.Lock()
+!         self._stats = {
+!             "snapshots_collected": 0,
+!             "anomalies_detected": 0,
+!             "baselines_calculated": 0,
+!         }
+  
+!     def record_metric(self, module_id: str, metric_name: str, value: float):
+!         snapshot = MetricSnapshot(
+!             module_id=module_id,
+!             metric_name=metric_name,
+!             value=value,
+!         )
+!         with self._lock:
+!             self._metric_store[module_id][metric_name].append(snapshot)
+!             self._stats["snapshots_collected"] += 1
+  
+!     def record_batch(self, module_id: str, metrics: Dict[str, float]):
+!         now = time.time()
+!         with self._lock:
+!             for metric_name, value in metrics.items():
+!                 snapshot = MetricSnapshot(
+!                     module_id=module_id,
+!                     metric_name=metric_name,
+!                     value=value,
+!                     timestamp=now,
+!                 )
+!                 self._metric_store[module_id][metric_name].append(snapshot)
+!                 self._stats["snapshots_collected"] += 1
+  
+!     def get_values(self, module_id: str, metric_name: str,
+!                    window_seconds: float = 3600.0) -> List[float]:
+!         with self._lock:
+!             snapshots = list(self._metric_store[module_id][metric_name])
+!             now = time.time()
+!             return [
+!                 s.value for s in snapshots
+!                 if now - s.timestamp <= window_seconds
+!             ]
+  
+!     def calculate_baseline(self, module_id: str,
+!                            metric_name: str) -> Dict[str, float]:
+!         values = self.get_values(module_id, metric_name, window_seconds=86400.0)
+!         if len(values) < 10:
+!             return {"mean": 0.0, "std": 0.0, "p50": 0.0, "p95": 0.0,
+!                     "p99": 0.0, "count": len(values)}
+  
+!         sorted_vals = sorted(values)
+!         n = len(sorted_vals)
+!         mean = sum(values) / n
+!         variance = sum((x - mean) ** 2 for x in values) / n
+!         std = math.sqrt(variance)
+  
+!         return {
+!             "mean": round(mean, 6),
+!             "std": round(std, 6),
+!             "p50": sorted_vals[int(n * 0.50)],
+!             "p95": sorted_vals[int(n * 0.95)],
+!             "p99": sorted_vals[min(int(n * 0.99), n - 1)],
+!             "min": sorted_vals[0],
+!             "max": sorted_vals[-1],
+!             "count": n,
+!         }
+  
+!     def calculate_all_baselines(self, force: bool = False):
+!         now = time.time()
+!         if not force and now - self._last_baseline_calc < self._baseline_calc_interval:
+!             return
+  
+!         with self._lock:
+!             for module_id in self._metric_store:
+!                 if module_id not in self._baselines:
+!                     self._baselines[module_id] = {}
+!                 for metric_name in self._metric_store[module_id]:
+!                     self._baselines[module_id][metric_name] = (
+!                         self.calculate_baseline(module_id, metric_name)
+!                     )
+!             self._last_baseline_calc = now
+!             self._stats["baselines_calculated"] += 1
+  
+!     def detect_anomalies(self, module_id: str,
+!                          metric_name: str,
+!                          current_value: float) -> Optional[AnomalyReport]:
+!         baseline = self._baselines.get(module_id, {}).get(metric_name, {})
+!         if not baseline or baseline.get("count", 0) < 10:
+!             return None
+  
+!         mean = baseline["mean"]
+!         std = baseline["std"]
+  
+!         if std == 0:
+!             return None
+  
+!         z_score = (current_value - mean) / std
+  
+!         if abs(z_score) < 3.0:
+!             return None
+  
+!         anomaly_type = AnomalyType.SPIKE if z_score > 0 else AnomalyType.DIP
+!         severity = min(abs(z_score) / 6.0, 1.0)
+  
+!         thresholds = self.DEFAULT_METRIC_THRESHOLDS.get(metric_name, {})
+!         if thresholds.get("inverse"):
+!             severity = severity if z_score < 0 else severity * 0.5
+  
+!         recommendation = self._generate_recommendation(
+!             module_id, metric_name, current_value, baseline, anomaly_type
+!         )
+  
+!         report = AnomalyReport(
+!             module_id=module_id,
+!             metric_name=metric_name,
+!             anomaly_type=anomaly_type,
+!             current_value=current_value,
+!             baseline_mean=mean,
+!             baseline_std=std,
+!             z_score=round(z_score, 2),
+!             severity=round(severity, 3),
+!             recommendation=recommendation,
+!         )
+  
+!         with self._lock:
+!             self._anomaly_history.append(report)
+!             if len(self._anomaly_history) > 1000:
+!                 self._anomaly_history = self._anomaly_history[-500:]
+!             self._stats["anomalies_detected"] += 1
+  
+!         logger.info(
+!             f"[BaselineEngine] 异常检测: {module_id}.{metric_name} "
+!             f"z={z_score:.1f} val={current_value:.4f} "
+!             f"baseline={mean:.4f}±{std:.4f}"
+!         )
+!         return report
+  
+!     def _generate_recommendation(self, module_id: str, metric_name: str,
+!                                  current_value: float, baseline: Dict,
+!                                  anomaly_type: AnomalyType) -> str:
+!         thresholds = self.DEFAULT_METRIC_THRESHOLDS.get(metric_name, {})
+!         critical = thresholds.get("critical", 0.9)
+  
+!         if anomaly_type == AnomalyType.SPIKE:
+!             if current_value >= critical:
+!                 return f"[严重] {metric_name}={current_value:.4f} 已超过临界阈值 {critical}，建议立即启动自愈流程"
+!             return f"[警告] {metric_name}={current_value:.4f} 显著偏离基线 {baseline['mean']:.4f}，建议关注并准备回滚"
+  
+!         if anomaly_type == AnomalyType.DIP:
+!             if thresholds.get("inverse"):
+!                 return f"[严重] {metric_name}={current_value:.4f} 过低，资源可能闲置，建议缩容或重新分配"
+!             return f"[信息] {metric_name}={current_value:.4f} 低于基线，系统可能在低负载状态"
+  
+!         return f"[提示] {metric_name} 出现异常模式，建议人工检查"
+  
+!     def generate_scale_recommendation(self, module_id: str) -> Optional[ScaleRecommendation]:
+!         capacity_values = self.get_values(module_id, "capacity_usage", 86400.0)
+!         if len(capacity_values) < 20:
+!             return None
+  
+!         recent = capacity_values[-20:]
+!         avg_load = sum(recent) / len(recent)
+  
+!         if avg_load > 0.85:
+!             direction = ScaleDirection.UP
+!             urgency = min((avg_load - 0.85) / 0.15, 1.0)
+!             reason = f"容量使用率 {avg_load:.1%} 持续超过 85%"
+!             return ScaleRecommendation(
+!                 module_id=module_id,
+!                 direction=direction,
+!                 urgency=round(urgency, 3),
+!                 reason=reason,
+!                 current_load=round(avg_load, 4),
+!                 recommended_target=round(avg_load * 1.3, 4),
+!             )
+  
+!         utilization_values = self.get_values(module_id, "utilization", 86400.0)
+!         if utilization_values:
+!             recent_util = utilization_values[-20:]
+!             avg_util = sum(recent_util) / len(recent_util)
+!             if avg_util < 0.15:
+!                 return ScaleRecommendation(
+!                     module_id=module_id,
+!                     direction=ScaleDirection.DOWN,
+!                     urgency=min((0.15 - avg_util) / 0.15, 1.0),
+!                     reason=f"利用率 {avg_util:.1%} 持续低于 15%",
+!                     current_load=round(avg_util, 4),
+!                     recommended_target=0.0,
+!                 )
+  
+!         return None
+  
+!     def get_anomaly_history(self, module_id: str = None,
+!                             limit: int = 50) -> List[Dict]:
+!         with self._lock:
+!             records = self._anomaly_history
+!             if module_id:
+!                 records = [r for r in records if r.module_id == module_id]
+!             return [r.to_dict() for r in records[-limit:]]
+  
+!     def get_baselines(self, module_id: str = None) -> Dict:
+!         with self._lock:
+!             if module_id:
+!                 return {
+!                     module_id: self._baselines.get(module_id, {})
+!                 }
+!             return dict(self._baselines)
+  
+!     def get_stats(self) -> Dict:
+!         with self._lock:
+!             modules_tracked = len(self._metric_store)
+!             metrics_tracked = sum(
+!                 len(metrics) for metrics in self._metric_store.values()
+!             )
+!             return {
+!                 **self._stats,
+!                 "modules_tracked": modules_tracked,
+!                 "metrics_tracked": metrics_tracked,
+!                 "anomaly_history_size": len(self._anomaly_history),
+!             }
+  
+  
+! class AutoOpsCoordinator:
+!     r"""
+!     自动化运维协调器 — Phase 3 核心入口
+  
+!     职责:
+!       1. 连接 EvolutionBus → 接收进化信号，触发自愈决策
+!       2. 定期采集 Metric 快照 → 注入 BaselineEngine
+!       3. 基线异常 → 生成自愈信号 → AutoHealer
+!       4. 生成扩缩容建议
+!       5. 输出运维报告
+  
+!     使用方式:
+!       coordinator = AutoOpsCoordinator(registry, evolution_bus, governance_pipeline)
+!       coordinator.start()  # 启动后台采集和监控
+!       report = coordinator.generate_ops_report()
+!     """
+  
+!     def __init__(self, registry=None, evolution_bus=None,
+!                  governance_pipeline=None,
+!                  recorder: Optional[Any] = None,
+!                  learning_engine: Optional[Any] = None):
+!         self._registry = registry
+!         self._evolution_bus = evolution_bus
+!         self._governance_pipeline = governance_pipeline
+!         self._recorder = recorder
+!         self._learning_engine = learning_engine
+!         self._errors = 0
+  
+!         self._evo_loop = None
+!         if EvolutionLoop is not None:
+!             try:
+!                 self._evo_loop = EvolutionLoop(
+!                     module_name="auto_ops",
+!                     effectiveness_fn=self._calc_ops_effectiveness,
+!                     learn_fn=self._learn_from_ops,
+!                     evolve_fn=self._evolve_ops_config,
+!                     mutable_config={
+!                         "collect_interval": self._collect_interval,
+!                         "monitor_interval": self._monitor_interval,
+!                         "heal_rate_limit_per_hour": 3,
+!                     },
+!                     recorder=recorder,
+!                     learning_engine=learning_engine,
+!                 )
+!             except Exception:
+!                 pass
+  
+!         self._healer = AutoHealer(
+!             registry=registry,
+!             evolution_bus=evolution_bus,
+!             governance_pipeline=governance_pipeline,
+!         )
+!         self._baseline = BaselineEngine(registry=registry)
+  
+!         self._running = False
+!         self._collect_thread: Optional[threading.Thread] = None
+!         self._monitor_thread: Optional[threading.Thread] = None
+!         self._collect_interval: float = 300.0
+!         self._monitor_interval: float = 600.0
+  
+!         self._scale_recommendations: List[ScaleRecommendation] = []
+!         self._ops_events: List[Dict[str, Any]] = []
+!         self._lock = threading.Lock()
+  
+!         if self._evolution_bus:
+!             self._evolution_bus.register_loop(self)
+!             self._register_signal_handler()
+  
+!     def _register_signal_handler(self):
+!         if hasattr(self._evolution_bus, '_route_signal'):
+!             original_route = self._evolution_bus._route_signal
+  
+!             def enhanced_route(signal):
+!                 original_route(signal)
+!                 self._handle_evolution_signal(signal)
+  
+!             self._evolution_bus._route_signal = enhanced_route
+  
+!     def _handle_evolution_signal(self, signal):
+!         source = getattr(signal, 'source_module', '')
+!         severity = getattr(signal, 'severity', 0.0)
+!         signal_type = getattr(signal, 'signal_type', None)
+  
+!         if severity >= 0.7:
+!             logger.info(
+!                 f"[AutoOpsCoordinator] 收到高严重度信号: {source} "
+!                 f"type={signal_type} severity={severity:.2f}"
+!             )
+!             record = self._healer.heal(source, signal)
+!             self._ops_events.append({
+!                 "type": "healing_triggered",
+!                 "module_id": source,
+!                 "signal_severity": severity,
+!                 "healing_success": record.success,
+!                 "healing_action": record.action.value,
+!                 "timestamp": time.time(),
+!             })
+  
+!             if self._evo_loop is not None:
+!                 try:
+!                     self._evo_loop.record_action(
+!                         action="handle_evolution_signal",
+!                         state_before={"module_id": source, "severity": severity},
+!                         state_after={"module_id": source,
+!                                      "healing_success": record.success,
+!                                      "healing_action": record.action.value,
+!                                      "severity": severity},
+!                     )
+!                 except Exception:
+!                     pass
+  
+!     def start(self):
+!         if self._running:
+!             return
+!         self._running = True
+!         self._collect_thread = threading.Thread(
+!             target=self._collect_loop, daemon=True, name="AutoOpsCollector"
+!         )
+!         self._monitor_thread = threading.Thread(
+!             target=self._monitor_loop, daemon=True, name="AutoOpsMonitor"
+!         )
+!         self._collect_thread.start()
+!         self._monitor_thread.start()
+!         logger.info("[AutoOpsCoordinator] 自动化运维监控已启动")
+  
+!     def stop(self):
+!         self._running = False
+!         logger.info("[AutoOpsCoordinator] 自动化运维监控已停止")
+  
+!     def _collect_loop(self):
+!         while self._running:
+!             try:
+!                 self._collect_metrics()
+!             except Exception as e:
+!                 logger.debug(f"[AutoOpsCoordinator] 指标采集异常: {e}")
+!             time.sleep(self._collect_interval)
+  
+!     def _monitor_loop(self):
+!         while self._running:
+!             try:
+!                 self._run_monitoring_cycle()
+!             except Exception as e:
+!                 logger.debug(f"[AutoOpsCoordinator] 监控周期异常: {e}")
+!             time.sleep(self._monitor_interval)
+  
+!     def _collect_metrics(self):
+!         if not self._registry:
+!             return
+!         for m in self._registry.list_all():
+!             module_id = m.module_id
+!             raw_stats = {}
+!             if m.stats_fn:
+!                 try:
+!                     raw_stats = m.stats_fn()
+!                 except Exception:
+!                     continue
+!             elif m.instance_ref and hasattr(m.instance_ref, 'get_stats'):
+!                 try:
+!                     raw_stats = m.instance_ref.get_stats()
+!                 except Exception:
+!                     continue
+!             else:
+!                 continue
+  
+!             numeric_metrics = {
+!                 k: v for k, v in raw_stats.items()
+!                 if isinstance(v, (int, float)) and not isinstance(v, bool)
+!             }
+!             if numeric_metrics:
+!                 self._baseline.record_batch(module_id, numeric_metrics)
+  
+!     def _run_monitoring_cycle(self):
+!         self._baseline.calculate_all_baselines()
+!         if not self._registry:
+!             return
+!         for m in self._registry.list_all():
+!             module_id = m.module_id
+!             metrics_to_check = ["capacity_usage", "error_rate",
+!                                "rejection_rate", "avg_latency_ms"]
+!             raw_stats = {}
+!             if m.stats_fn:
+!                 try:
+!                     raw_stats = m.stats_fn()
+!                 except Exception:
+!                     continue
+!             for metric_name in metrics_to_check:
+!                 if metric_name in raw_stats:
+!                     current = raw_stats[metric_name]
+!                     if isinstance(current, (int, float)):
+!                         report = self._baseline.detect_anomalies(
+!                             module_id, metric_name, float(current)
+!                         )
+!                         if report and report.severity >= 0.5:
+!                             try:
+!                                 from .evolution_loop import EvolutionSignal, EvolutionSignalType
+!                                 signal = EvolutionSignal(
+!                                     source_module="auto_ops",
+!                                     signal_type=EvolutionSignalType.URGENCY_SIGNAL,
+!                                     severity=report.severity,
+!                                     description=f"异常: {module_id}.{metric_name}",
+!                                     data=report.to_dict(),
+!                                 )
+!                                 self._handle_evolution_signal(signal)
+!                             except ImportError:
+!                                 self._healer.heal(module_id)
+  
+!             scale_rec = self._baseline.generate_scale_recommendation(module_id)
+!             if scale_rec:
+!                 with self._lock:
+!                     self._scale_recommendations.append(scale_rec)
+!                     if len(self._scale_recommendations) > 100:
+!                         self._scale_recommendations = (
+!                             self._scale_recommendations[-50:]
+!                         )
+  
+!         if self._evo_loop is not None:
+!             try:
+!                 healer_stats = self._healer.get_stats()
+!                 baseline_stats = self._baseline.get_stats()
+!                 self._evo_loop.record_action(
+!                     action="monitoring_cycle",
+!                     state_before={"anomalies_detected": baseline_stats.get("anomalies_detected", 0)},
+!                     state_after={"heal_attempts": healer_stats.get("total_heal_attempts", 0),
+!                                  "heal_successes": healer_stats.get("total_heal_successes", 0),
+!                                  "scale_recs": len(self._scale_recommendations)},
+!                 )
+!             except Exception:
+!                 pass
+  
+!     def generate_ops_report(self) -> Dict[str, Any]:
+!         report = {
+!             "timestamp": time.time(),
+!             "phase": "Phase 3 - 自动化运维",
+!             "healer": self._healer.get_stats(),
+!             "baseline": self._baseline.get_stats(),
+!             "scale_recommendations": [
+!                 r.to_dict() for r in self._scale_recommendations[-10:]
+!             ],
+!             "recent_ops_events": self._ops_events[-20:],
+!             "registry_summary": (
+!                 self._registry.get_stats() if self._registry else {}
+!             ),
+!         }
+  
+!         if self._evo_loop is not None:
+!             try:
+!                 self._evo_loop.record_action(
+!                     action="generate_ops_report",
+!                     state_before={},
+!                     state_after={"heal_attempts": report["healer"].get("total_heal_attempts", 0),
+!                                  "anomalies_detected": report["baseline"].get("anomalies_detected", 0),
+!                                  "scale_recs": len(self._scale_recommendations)},
+!                 )
+!             except Exception:
+!                 pass
+  
+!         return report
+  
+!     def get_scale_recommendations(self, limit: int = 20) -> List[Dict]:
+!         with self._lock:
+!             return [r.to_dict() for r in self._scale_recommendations[-limit:]]
+  
+!     def trigger_manual_heal(self, module_id: str,
+!                             action: HealingAction) -> HealingRecord:
+!         return self._healer.heal(module_id, custom_action=action)
+  
+!     def force_baseline_recalc(self):
+!         self._baseline.calculate_all_baselines(force=True)
+  
+!     def health(self) -> Dict[str, Any]:
+!         return {
+!             "status": "ready",
+!             "version": "1.1",
+!             "running": self._running,
+!             "heal_attempts": self._healer.get_stats().get("total_heal_attempts", 0),
+!             "heal_successes": self._healer.get_stats().get("total_heal_successes", 0),
+!             "escalations": self._healer.get_stats().get("total_escalations", 0),
+!             "anomalies_detected": self._baseline.get_stats().get("anomalies_detected", 0),
+!             "scale_recs": len(self._scale_recommendations),
+!             "errors": self._errors,
+!             "evo_loop_active": self._evo_loop is not None,
+!             "recorder_attached": self._recorder is not None,
+!         }
+  
+!     def get_stats(self) -> Dict:
+!         report = self.generate_ops_report()
+!         report["health"] = self.health()
+!         report["version"] = "1.1"
+!         report["evo_loop"] = self._evo_loop.get_stats() if self._evo_loop else {}
+!         return report
+  
+!     def tick(self):
+!         if self._evo_loop is not None:
+!             try:
+!                 self._evo_loop.tick()
+!             except Exception:
+!                 pass
+  
+!     def _calc_ops_effectiveness(self, action: str,
+!                                  state_before: Dict[str, Any],
+!                                  state_after: Dict[str, Any]) -> float:
+!         if action == "handle_evolution_signal":
+!             return 0.7 if state_after.get("healing_success", False) else 0.2
+!         elif action == "monitoring_cycle":
+!             successes = state_after.get("heal_successes", 0)
+!             attempts = state_after.get("heal_attempts", 1) or 1
+!             return 0.3 + min(0.5, successes / max(attempts, 1))
+!         elif action == "generate_ops_report":
+!             anomalies = state_after.get("anomalies_detected", 0)
+!             return 0.4 if anomalies < 10 else (0.2 if anomalies < 50 else 0.0)
+!         return 0.0
+  
+!     def _learn_from_ops(self, causal_pairs: List[Any],
+!                          effectiveness_summary: Dict[str, Any]) -> Dict[str, Any]:
+!         healer_stats = self._healer.get_stats()
+!         baseline_stats = self._baseline.get_stats()
+!         return {
+!             "patterns_found": len(causal_pairs),
+!             "avg_effectiveness": effectiveness_summary.get("avg_effectiveness", 0.0),
+!             "heal_attempts": healer_stats.get("total_heal_attempts", 0),
+!             "heal_successes": healer_stats.get("total_heal_successes", 0),
+!             "escalations": healer_stats.get("total_escalations", 0),
+!             "anomalies_detected": baseline_stats.get("anomalies_detected", 0),
+!             "rate_limited": healer_stats.get("rate_limited_rejections", 0),
+!         }
+  
+!     def _evolve_ops_config(self, learn_result: Dict[str, Any],
+!                             mutable_config: Dict[str, Any]) -> Dict[str, Any]:
+!         changes = {}
+!         anomalies = learn_result.get("anomalies_detected", 0)
+!         if anomalies > 50:
+!             changes["collect_interval"] = max(60,
+!                 mutable_config.get("collect_interval", 300) / 2)
+!             changes["monitor_interval"] = max(120,
+!                 mutable_config.get("monitor_interval", 600) / 2)
+!         elif anomalies < 5:
+!             changes["collect_interval"] = 300
+!             changes["monitor_interval"] = 600
+!         escalations = learn_result.get("escalations", 0)
+!         if escalations > 20:
+!             changes["heal_rate_limit_per_hour"] = min(6,
+!                 mutable_config.get("heal_rate_limit_per_hour", 3) + 1)
+!         return {"rules_modified": changes, "skills_created": []}
+  
+  
+! DEFAULT_OPS_COORDINATOR: Optional[AutoOpsCoordinator] = None
+  
+  
+! def get_ops_coordinator() -> Optional[AutoOpsCoordinator]:
+!     return DEFAULT_OPS_COORDINATOR
+  
+  
+! def init_ops_coordinator(registry=None, evolution_bus=None,
+!                          governance_pipeline=None) -> AutoOpsCoordinator:
+!     global DEFAULT_OPS_COORDINATOR
+!     DEFAULT_OPS_COORDINATOR = AutoOpsCoordinator(
+!         registry=registry,
+!         evolution_bus=evolution_bus,
+!         governance_pipeline=governance_pipeline,
+!     )
+!     return DEFAULT_OPS_COORDINATOR

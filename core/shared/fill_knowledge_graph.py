@@ -1,0 +1,453 @@
+"""
+P0: KnowledgeGraph 填充工具 — 实体抽取+关系构建
+============================================
+功能:
+1. 从L4 semantic层提取实体和关系
+2. 构建KnowledgeGraph和knowledge_edges
+3. 支持规则提取 + LLM增强提取
+4. 可视化统计
+
+使用方法:
+  python fill_knowledge_graph.py --extract    # 从L4提取
+  python fill_knowledge_graph.py --stats      # 查看统计
+  python fill_knowledge_graph.py --visualize  # 输出Graphviz格式
+"""
+
+import sqlite3
+import json
+import re
+import time
+import uuid
+from pathlib import Path
+from datetime import datetime
+from typing import Optional, List, Dict, Any, Tuple
+from collections import defaultdict
+
+DB_PATH = Path(__file__).resolve().parent.parent / "data" / ".memory" / "icme.db"
+
+
+# ===== 天罡-17 记忆三元组提取 =====  [v10-ready]
+
+def extract_triples_from_memory(
+    content: str, tags: Optional[List[str]] = None
+) -> List[Tuple[str, str, str]]:
+    """从记忆内容中提取知识三元组 (subject, predicate, object)  [v10-ready]
+
+    使用简单规则提取（不依赖LLM，保证性能）：
+    1. 从tags中提取实体
+    2. 从content中提取"A是B"、"A包含B"等模式
+
+    注意: 失败时返回已提取部分，不抛异常（降级模式）
+    """
+    triples: List[Tuple[str, str, str]] = []
+    tags = tags or []
+
+    try:
+        # 规则1: tags间的关联
+        for i, t1 in enumerate(tags):
+            for t2 in tags[i + 1:]:
+                if t1 and t2 and t1 != t2:
+                    triples.append((str(t1), "relates_to", str(t2)))
+
+        # 规则2: 简单模式匹配
+        patterns = [
+            (r"(.{2,10})是(.{2,20})", "is_a"),
+            (r"(.{2,10})包含(.{2,20})", "has_part"),
+            (r"(.{2,10})依赖(.{2,20})", "depends_on"),
+            (r"(.{2,10})使用(.{2,20})", "uses"),
+        ]
+        for pattern, relation in patterns:
+            matches = re.findall(pattern, (content or "")[:500])  # 只扫描前500字符
+            for subj, obj in matches[:5]:  # 每种模式最多5个
+                triples.append((subj.strip(), relation, obj.strip()))
+    except Exception:
+        pass  # 提取失败返回已有部分
+
+    return triples[:20]  # 单条最多20个三元组
+
+class KnowledgeGraphBuilder:
+    def __init__(self, db_path: Path = DB_PATH):
+        self.db_path = db_path
+        self.conn = None
+
+        # 实体识别模式（基于规则的简单NER）
+        self.entity_patterns = {
+            "system": [
+                r"天机(?:记忆系统|v8\.?1|AI平台)",
+                r"ICME",
+                r"DeepSeek",
+                r"TVP",
+                r"MCP",
+                r"Trae\s*IDE",
+            ],
+            "agent": [
+                r"@?\w+(?:天枢|忆库|洞察|律令|灵犀|文宗|妙笔|明镜|天算|经纬|矿师|百巧|史官|锦书|千里|工造|镇山|追光|铁卫)",
+                r"(?:tianshu|yiku|dongcha|luling|lingxi|wenzong|miaobi|mingjing|tiansuan|jingwei|kuangshi|baiqiao|shiguan|jinshu|qianli|gongzao|zhenshan|zhuiguang|tiewei)",
+            ],
+            "concept": [
+                r"(?:六层|五层)记忆",
+                r"L[0-5](?:_\w+)?",
+                r"(?:semantic|episodic|meta|working|sensory|short_term)",
+                r"(?:知识图谱|KnowledgeGraph)",
+                r"(?:质量门禁|QualityGate)",
+                r"(?:透明调度|TVP协议)",
+                r"(?:进化闭环|EvolutionLoop)",
+                r"(?:驾驶者|Driver)",
+            ],
+            "technology": [
+                r"FastAPI",
+                r"React",
+                r"TypeScript",
+                r"Python\s*3\.?\d?",
+                r"SQLite",
+                r"WebSocket",
+                r"SSE",
+                r"REST\s*API",
+                r"JSON-RPC",
+            ],
+            "process": [
+                r"(?:自动)?晋升",
+                r"(?:自动)?固结",
+                r"(?:实体)?关系抽取",
+                r"(?:语义)?搜索",
+                r"(?:冲突)?解决",
+                r"(?:偏好)?漂移检测",
+            ],
+        }
+
+    def connect(self):
+        if self.conn is None:
+            self.conn = sqlite3.connect(str(self.db_path))
+            self.conn.row_factory = sqlite3.Row
+        return self.conn
+
+    def close(self):
+        if self.conn:
+            self.conn.close()
+            self.conn = None
+
+    def extract_entities_rule_based(self, text: str) -> List[Tuple[str, str]]:
+        """基于规则的实体抽取"""
+        entities = []
+
+        for entity_type, patterns in self.entity_patterns.items():
+            for pattern in patterns:
+                matches = re.findall(pattern, text, re.IGNORECASE)
+                for match in matches:
+                    entity_name = match.strip()
+                    if len(entity_name) > 1:  # 过滤单字符
+                        entities.append((entity_name, entity_type))
+
+        return entities
+
+    def extract_relations_rule_based(self, text: str, entities: List[Tuple[str, str]]) -> List[Tuple[str, str, str, float]]:
+        """基于规则的关系抽取"""
+        relations = []
+        entity_names = [e[0] for e in entities]
+
+        # 关系模式：A -> relation -> B
+        relation_patterns = [
+            (r"(\w+)\s*(?:是|为|作为)\s*(\w+)\s*(?:的|之)?(?:子系统|组件|部分|模块)", "part_of", 0.9),
+            (r"(\w+)\s*(?:调用|使用|依赖|集成)\s*(\w+)", "uses", 0.85),
+            (r"(\w+)\s*(?:继承|扩展|实现)\s*(\w+)", "extends", 0.9),
+            (r"(\w+)\s*(?:管理|调度|控制|协调)\s*(\w+)", "manages", 0.85),
+            (r"(\w+)\s*(?:存储|写入|记录)\s*(?:到|至)\s*(\w+)", "stores_to", 0.8),
+            (r"(\w+)\s*(?:从|自)\s*(\w+)\s*(?:检索|读取|获取|查询)", "retrieves_from", 0.8),
+            (r"(\w+)\s*(?:触发|启动|激活)\s*(\w+)", "triggers", 0.85),
+            (r"(\w+)\s*(?:优化|改进|增强)\s*(\w+)", "optimizes", 0.75),
+            (r"(\w+)\s*(?:遵循|符合|按照)\s*(\w+)", "follows", 0.8),
+            (r"(\w+)\s*(?:包含|包括|有)\s*(\w+)", "contains", 0.7),
+        ]
+
+        for pattern, relation, confidence in relation_patterns:
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            for source, target in matches:
+                source = source.strip()
+                target = target.strip()
+                if source in entity_names and target in entity_names and source != target:
+                    relations.append((source, target, relation, confidence))
+
+        return relations
+
+    def extract_from_l4_memories(self, limit: int = 50) -> Dict[str, Any]:
+        """从L4 semantic层提取知识"""
+        conn = self.connect()
+        cur = conn.cursor()
+
+        # 获取L4层记忆
+        memories = cur.execute("""
+            SELECT id, content, tags, metadata
+            FROM memories
+            WHERE layer='semantic'
+            ORDER BY created_at DESC
+            LIMIT ?
+        """, (limit,)).fetchall()
+
+        result = {
+            "processed_memories": len(memories),
+            "entities_extracted": 0,
+            "relations_extracted": 0,
+            "entities_by_type": defaultdict(int),
+            "relations_by_type": defaultdict(int),
+            "sample_entities": [],
+            "sample_relations": [],
+        }
+
+        all_entities = {}  # name -> {type, frequency, properties}
+        all_relations = []  # (source, target, relation, weight)
+
+        for mem in memories:
+            content = mem["content"]
+            metadata = json.loads(mem["metadata"]) if mem["metadata"] else {}
+
+            # 提取实体
+            entities = self.extract_entities_rule_based(content)
+
+            # 去重并聚合
+            seen_entities = set()
+            for entity_name, entity_type in entities:
+                if entity_name not in seen_entities:
+                    seen_entities.add(entity_name)
+
+                    if entity_name not in all_entities:
+                        all_entities[entity_name] = {
+                            "type": entity_type,
+                            "frequency": 0,
+                            "properties": {},
+                            "first_seen": time.time(),
+                            "last_seen": time.time(),
+                            "source_memories": []
+                        }
+
+                    all_entities[entity_name]["frequency"] += 1
+                    all_entities[entity_name]["last_seen"] = time.time()
+                    all_entities[entity_name]["source_memories"].append(mem["id"][:8])
+
+                    result["entities_extracted"] += 1
+                    result["entities_by_type"][entity_type] += 1
+
+            # 提取关系
+            entity_list = list(seen_entities)
+            relations = self.extract_relations_rule_based(content, [(e, all_entities[e]["type"]) for e in entity_list])
+
+            for source, target, relation, confidence in relations:
+                relation_key = (source, target, relation)
+
+                # 检查是否已存在类似关系（避免重复）
+                exists = False
+                for i, (s, t, r, w) in enumerate(all_relations):
+                    if s == source and t == target and r == relation:
+                        # 更新权重（取最高置信度）
+                        all_relations[i] = (s, t, r, max(w, confidence))
+                        exists = True
+                        break
+
+                if not exists:
+                    all_relations.append((source, target, relation, confidence))
+                    result["relations_extracted"] += 1
+                    result["relations_by_type"][relation] += 1
+
+        # 写入数据库
+        now = time.time()
+
+        # 清空旧数据（可选，这里选择追加）
+        # cur.execute("DELETE FROM knowledge_graph")
+        # cur.execute("DELETE FROM knowledge_edges")
+
+        # 插入实体
+        for entity_name, entity_data in all_entities.items():
+            try:
+                cur.execute("""
+                    INSERT OR REPLACE INTO knowledge_graph
+                    (entity_name, entity_type, properties, first_seen, last_seen, frequency)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (
+                    entity_name,
+                    entity_data["type"],
+                    json.dumps({
+                        "source_count": len(entity_data["source_memories"]),
+                        "sample_sources": entity_data["source_memories"][:5],
+                    }, ensure_ascii=False),
+                    entity_data["first_seen"],
+                    entity_data["last_seen"],
+                    entity_data["frequency"]
+                ))
+            except Exception as e:
+                print(f"插入实体失败 {entity_name}: {e}")
+
+        # 插入关系
+        for source, target, relation, weight in all_relations:
+            try:
+                cur.execute("""
+                    INSERT OR REPLACE INTO knowledge_edges
+                    (source, target, relation, weight, timestamp)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (source, target, relation, weight, now))
+            except Exception as e:
+                print(f"插入关系失败 {source}->{target}: {e}")
+
+        conn.commit()
+
+        # 统计最终结果
+        final_entity_count = cur.execute("SELECT COUNT(*) FROM knowledge_graph").fetchone()[0]
+        final_edge_count = cur.execute("SELECT COUNT(*) FROM knowledge_edges").fetchone()[0]
+
+        result["total_entities_in_db"] = final_entity_count
+        result["total_edges_in_db"] = final_edge_count
+        result["sample_entities"] = list(all_entities.items())[:10]
+        result["sample_relations"] = all_relations[:10]
+
+        self.close()
+        return result
+
+    def get_stats(self) -> Dict[str, Any]:
+        """获取知识图谱统计"""
+        conn = self.connect()
+        cur = conn.cursor()
+
+        stats = {
+            "timestamp": datetime.now().isoformat(),
+            "entities": {"total": 0, "by_type": defaultdict(int)},
+            "edges": {"total": 0, "by_relation": defaultdict(int)},
+            "top_entities": [],
+            "top_relations": [],
+        }
+
+        # 实体统计
+        stats["entities"]["total"] = cur.execute("SELECT COUNT(*) FROM knowledge_graph").fetchone()[0]
+
+        entity_types = cur.execute("""
+            SELECT entity_type, COUNT(*) as cnt
+            FROM knowledge_graph
+            GROUP BY entity_type
+            ORDER BY cnt DESC
+        """).fetchall()
+
+        for et in entity_types:
+            stats["entities"]["by_type"][et[0]] = et[1]
+
+        # Top实体
+        top_entities = cur.execute("""
+            SELECT entity_name, entity_type, frequency
+            FROM knowledge_graph
+            ORDER BY frequency DESC
+            LIMIT 10
+        """).fetchall()
+
+        stats["top_entities"] = [
+            {"name": e[0], "type": e[1], "freq": e[2]}
+            for e in top_entities
+        ]
+
+        # 边统计
+        stats["edges"]["total"] = cur.execute("SELECT COUNT(*) FROM knowledge_edges").fetchone()[0]
+
+        relation_types = cur.execute("""
+            SELECT relation, COUNT(*) as cnt
+            FROM knowledge_edges
+            GROUP BY relation
+            ORDER BY cnt DESC
+        """).fetchall()
+
+        for rt in relation_types:
+            stats["edges"]["by_relation"][rt[0]] = rt[1]
+
+        # Top关系
+        top_relations = cur.execute("""
+            SELECT source, target, relation, weight
+            FROM knowledge_edges
+            ORDER BY weight DESC
+            LIMIT 10
+        """).fetchall()
+
+        stats["top_relations"] = [
+            {"source": r[0], "target": r[1], "relation": r[2], "weight": round(r[3], 2)}
+            for r in top_relations
+        ]
+
+        self.close()
+        return stats
+
+    def generate_graphviz(self) -> str:
+        """生成Graphviz DOT格式"""
+        conn = self.connect()
+        cur = conn.cursor()
+
+        dot_lines = [
+            'digraph KnowledgeGraph {',
+            '    rankdir=LR;',
+            '    node [shape=box, style=filled];',
+            '    edge [len=2];',
+            '',
+            '    // 实体节点',
+        ]
+
+        # 颜色映射
+        type_colors = {
+            "system": "#FF6B6B",
+            "agent": "#4ECDC4",
+            "concept": "#45B7D1",
+            "technology": "#96CEB4",
+            "process": "#FFEAA7",
+        }
+
+        entities = cur.execute("SELECT * FROM knowledge_graph").fetchall()
+        for entity in entities:
+            color = type_colors.get(entity[1], "#DDDDDD")
+            label = entity[0].replace('"', '\\"')
+            dot_lines.append(f'    "{label}" [fillcolor="{color}", label="{label}"];')
+
+        dot_lines.append('')
+        dot_lines.append('    // 关系边')
+
+        edges = cur.execute("SELECT * FROM knowledge_edges").fetchall()
+        for edge in edges:
+            source = edge[0].replace('"', '\\"')
+            target = edge[1].replace('"', '\\"')
+            relation = edge[2]
+            weight = round(edge[3], 2)
+            dot_lines.append(f'    "{source}" -> "{target}" [label="{relation} ({weight})"];')
+
+        dot_lines.append('}')
+
+        self.close()
+        return '\n'.join(dot_lines)
+
+
+def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="KnowledgeGraph填充工具")
+    parser.add_argument("--extract", action="store_true", help="从L4提取知识")
+    parser.add_argument("--limit", type=int, default=50, help="处理记忆数量限制")
+    parser.add_argument("--stats", action="store_true", help="查看统计")
+    parser.add_argument("--visualize", action="store_true", help="生成Graphviz格式")
+    args = parser.parse_args()
+
+    builder = KnowledgeGraphBuilder()
+
+    if args.extract:
+        print("\n=== 从L4 Semantic层提取知识 ===\n")
+        result = builder.extract_from_l4_memories(limit=args.limit)
+        print(json.dumps(result, indent=2, ensure_ascii=False, default=str))
+
+    if args.stats:
+        print("\n=== KnowledgeGraph 统计 ===\n")
+        stats = builder.get_stats()
+        print(json.dumps(stats, indent=2, ensure_ascii=False, default=str))
+
+    if args.visualize:
+        print("\n=== Graphviz DOT格式 ===\n")
+        dot = builder.generate_graphviz()
+        print(dot)
+
+        # 保存到文件
+        output_path = DB_PATH.parent / "knowledge_graph.dot"
+        output_path.write_text(dot, encoding='utf-8')
+        print(f"\n✅ 已保存至: {output_path}")
+
+    if not args.extract and not args.stats and not args.visualize:
+        parser.print_help()
+
+
+if __name__ == "__main__":
+    main()

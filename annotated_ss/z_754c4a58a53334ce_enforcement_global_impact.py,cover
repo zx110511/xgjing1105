@@ -1,0 +1,988 @@
+> r"""
+> 天机全局辐射影响模型 (Tianji Global Impact Model) v2.0
+> ======================================================
+> 对话内容科学录入作为基础设施，对天机v9.0全系统的全局辐射影响分析。
+  
+> 四维权重算法 (v2.0 增强版):
+>   DIW = Direct Impact Weight (直接影响权重, 0-1)
+>     └─ 子维度: field_dependency(0.35) + api_dependency(0.25) + behavior_dependency(0.25) + lifecycle_dependency(0.15)
+>   DFW = Data Flow Weight    (数据流经权重, 0-1)
+>     └─ 子维度: data_through_rate(0.40) + data_quality_impact(0.30) + data_path_criticality(0.30)
+>   EU  = Evolution Urgency   (进化紧迫度, 0-1)
+>     └─ 子维度: gap_severity(0.35) + alignment_urgency(0.30) + consumer_demand_pressure(0.20) + standard_gap(0.15)
+>   SC  = System Criticality  (系统关键性, 0-1)
+>     └─ 子维度: availability_requirement(0.35) + security_impact(0.25) + recoverability_impact(0.25) + dependency_count(0.15)
+  
+> 综合影响力 CompositeScore = DIW * 0.40 + DFW * 0.30 + EU * 0.20 + SC * 0.10
+  
+> 辐射等级 (v2.0 动态阈值):
+>   S级 (>=0.80): 核心基础设施 — 对话录入直接影响，必须进化，每10轮对话评估
+>   A级 (>=0.60): 关键链路 — 数据流经关键节点，优先进化，每50轮对话评估
+>   B级 (>=0.40): 重要依存 — 间接受影响，按需进化，每200轮对话评估
+>   C级 (>=0.20): 弱关联 — 可感知影响，低优先级进化，每1000轮对话评估
+>   D级 ( <0.20): 几乎无关 — 无需进化，仅系统大版本升级时评估
+  
+> 适应性调整三阶策略:
+>   Consumer-Aware: 根据活跃ConsumerProfile动态调整field优先级
+>   Load-Aware:     根据系统负载动态调整记录粒度
+>   Feedback-Aware: 根据下游模块反馈动态调整质量门禁阈值
+> """
+  
+! import json
+! import time
+! import math
+! from typing import Dict, List, Optional, Tuple, Set, Callable
+! from dataclasses import dataclass, field
+! from enum import Enum
+  
+  
+! class ImpactTier(str, Enum):
+!     S = "S"  # 核心基础设施
+!     A = "A"  # 关键链路
+!     B = "B"  # 重要依存
+!     C = "C"  # 弱关联
+!     D = "D"  # 几乎无关
+  
+  
+! class ImpactDimension(str, Enum):
+!     DIRECT = "直接影响"
+!     MEMORY_STORE = "记忆存储链"
+!     LEARNING = "学习进化链"
+!     KNOWLEDGE = "知识抽取链"
+!     AGENT_SCHEDULE = "智能调度链"
+!     GOVERNANCE = "治理审计链"
+!     API_EXPOSE = "API暴露链"
+!     INFRASTRUCTURE = "基础设施链"
+  
+  
+! @dataclass
+! class ModuleImpact:
+!     module_name: str
+!     file_path: str
+!     tier: ImpactTier
+!     diw: float
+!     dfw: float
+!     eu: float
+!     sc: float
+!     composite: float = 0.0
+!     dimensions: List[str] = field(default_factory=list)
+!     evolution_targets: List[str] = field(default_factory=list)
+!     impact_description: str = ""
+  
+!     def __post_init__(self):
+!         self.composite = round(self.diw * 0.40 + self.dfw * 0.30 + self.eu * 0.20 + self.sc * 0.10, 4)
+  
+!     def to_dict(self) -> dict:
+!         return {
+!             "module": self.module_name,
+!             "tier": self.tier.value,
+!             "diw": self.diw, "dfw": self.dfw, "eu": self.eu, "sc": self.sc,
+!             "composite": self.composite,
+!             "dimensions": self.dimensions,
+!             "evolution_targets": self.evolution_targets,
+!         }
+  
+  
+! @dataclass
+! class SubWeightDetail:
+!     """四维权重的子维度分解，用于精确校准"""
+!     name: str
+!     value: float
+!     description: str = ""
+!     calibration_source: str = ""
+  
+!     def to_dict(self) -> dict:
+!         return {"name": self.name, "value": self.value,
+!                 "description": self.description, "calibration_source": self.calibration_source}
+  
+  
+! @dataclass
+! class WeightBreakdown:
+!     """四维权重的完整分解"""
+!     diw_value: float
+!     diw_subs: List[SubWeightDetail] = field(default_factory=list)
+!     dfw_value: float = 0.0
+!     dfw_subs: List[SubWeightDetail] = field(default_factory=list)
+!     eu_value: float = 0.0
+!     eu_subs: List[SubWeightDetail] = field(default_factory=list)
+!     sc_value: float = 0.0
+!     sc_subs: List[SubWeightDetail] = field(default_factory=list)
+!     composite: float = 0.0
+  
+!     def __post_init__(self):
+!         self.composite = round(self.diw_value * 0.40 + self.dfw_value * 0.30 + self.eu_value * 0.20 + self.sc_value * 0.10, 4)
+  
+!     def to_calibration_report(self) -> dict:
+!         return {
+!             "composite": self.composite,
+!             "diw": {"total": self.diw_value, "subs": [s.to_dict() for s in self.diw_subs]},
+!             "dfw": {"total": self.dfw_value, "subs": [s.to_dict() for s in self.dfw_subs]},
+!             "eu": {"total": self.eu_value, "subs": [s.to_dict() for s in self.eu_subs]},
+!             "sc": {"total": self.sc_value, "subs": [s.to_dict() for s in self.sc_subs]},
+!         }
+  
+  
+! DIW_SUB_WEIGHTS = {
+!     "field_dependency": 0.35,
+!     "api_dependency": 0.25,
+!     "behavior_dependency": 0.25,
+!     "lifecycle_dependency": 0.15,
+! }
+  
+! DFW_SUB_WEIGHTS = {
+!     "data_through_rate": 0.40,
+!     "data_quality_impact": 0.30,
+!     "data_path_criticality": 0.30,
+! }
+  
+! EU_SUB_WEIGHTS = {
+!     "gap_severity": 0.35,
+!     "alignment_urgency": 0.30,
+!     "consumer_demand_pressure": 0.20,
+!     "standard_gap": 0.15,
+! }
+  
+! SC_SUB_WEIGHTS = {
+!     "availability_requirement": 0.35,
+!     "security_impact": 0.25,
+!     "recoverability_impact": 0.25,
+!     "dependency_count": 0.15,
+! }
+  
+  
+! @dataclass
+! class StandardGap:
+!     """国际标准对标差距"""
+!     standard_name: str
+!     standard_version: str
+!     current_support: float
+!     gap_description: str
+!     required_fields: List[str] = field(default_factory=list)
+!     priority: str = "P2"
+  
+!     def to_dict(self) -> dict:
+!         return {
+!             "standard": f"{self.standard_name} {self.standard_version}",
+!             "current_support": self.current_support,
+!             "gap": self.gap_description,
+!             "required_fields": self.required_fields,
+!             "priority": self.priority,
+!         }
+  
+  
+! STANDARD_GAPS: Dict[str, StandardGap] = {
+!     "otel_genai_agent": StandardGap(
+!         "OpenTelemetry GenAI Agent Spans", "v1.41.0", 0.35,
+!         "天机MCP拦截器未按OTel标准生成create_agent/invoke_agent/execute_tool span，"
+!         "缺少gen_ai.agent.name、gen_ai.conversation.id等标准属性",
+!         ["gen_ai.agent.name", "gen_ai.agent.id", "gen_ai.agent.version",
+!          "gen_ai.conversation.id", "gen_ai.operation.name", "gen_ai.provider.name"],
+!         "P1",
+!     ),
+!     "otel_genai_tool": StandardGap(
+!         "OpenTelemetry GenAI Tool Execution", "v1.41.0", 0.30,
+!         "天机MCP工具调用未记录execute_tool span标准属性（tool.name/tool.parameters/tool.result.status）",
+!         ["tool.name", "tool.parameters", "tool.result.status", "tool.call.duration_ms"],
+!         "P1",
+!     ),
+!     "otel_evaluation": StandardGap(
+!         "OpenTelemetry GenAI Evaluation", "v1.41.0", 0.15,
+!         "天机未实现gen_ai.evaluation标准评估属性（evaluation.name/score.value/score.label）",
+!         ["gen_ai.evaluation.name", "gen_ai.evaluation.score.value",
+!          "gen_ai.evaluation.score.label", "gen_ai.evaluation.explanation"],
+!         "P2",
+!     ),
+!     "vcon_container": StandardGap(
+!         "IETF vCon", "draft-ietf-vcon-vcon-core-01", 0.40,
+!         "天机ConversationRecord未对齐vCon JSON容器格式，缺少party/analysis/attachments标准段",
+!         ["vcon_uuid", "parties[]", "dialog[]", "analysis[]", "attachments[]"],
+!         "P1",
+!     ),
+!     "aos_instrument": StandardGap(
+!         "OWASP Agent Observability Standard", "Working Draft 2026", 0.10,
+!         "天机缺少OWASP AOS定义的Instrument/Trace/Inspect三柱架构，无可观测性中间件层",
+!         ["instrument_hooks", "trace_events", "AgBOM_component_list"],
+!         "P2",
+!     ),
+!     "iso_daml": StandardGap(
+!         "ISO 24617-2 DiAML", "2020", 0.55,
+!         "天机ISO标注仅覆盖10维中的5维(Task/AutoFB/AlloFB/SOM/DiscourseStruct)，"
+!         "缺少ContactMgmt/PartnerMgmt/TimeMgmt/OwnCommMgmt维度",
+!         ["contact_management_dim", "partner_management_dim",
+!          "time_management_dim", "own_communication_management_dim"],
+!         "P1",
+!     ),
+!     "ms_agent_task": StandardGap(
+!         "Microsoft Agent Framework execute_task span", "2025.10", 0.20,
+!         "天机Agent调度未记录execute_task/agent_to_agent_interaction span，"
+!         "缺少任务分解和Agent间通信的可观测性",
+!         ["execute_task span", "agent_to_agent_interaction span",
+!          "agent.state.management span", "agent_planning span"],
+!         "P2",
+!     ),
+! }
+  
+  
+! @dataclass
+! class ConsumerDemand:
+!     """下游消费模块需求"""
+!     consumer_name: str
+!     demand_score: float
+!     required_fields: List[str]
+!     max_tolerable_latency_ms: float = 5000.0
+!     description: str = ""
+  
+!     def to_dict(self) -> dict:
+!         return {
+!             "consumer": self.consumer_name,
+!             "demand": self.demand_score,
+!             "required_fields": self.required_fields,
+!             "max_latency_ms": self.max_tolerable_latency_ms,
+!             "description": self.description,
+!         }
+  
+  
+! CONSUMER_DEMANDS: Dict[str, ConsumerDemand] = {
+!     "memory_engine": ConsumerDemand(
+!         "memory_engine", 0.95,
+!         ["session_id", "user_input", "ai_response", "timestamp", "content_hash"],
+!         5000.0, "记忆引擎需要完整对话内容+哈希去重，偏好逐条写入episodic层",
+!     ),
+!     "quality_gate": ConsumerDemand(
+!         "quality_gate", 0.85,
+!         ["content_hash", "conversation_class", "iso_annotation", "prov_trace"],
+!         3000.0, "质量门禁需要分类+标注信息以执行三问推演判决",
+!     ),
+!     "learning": ConsumerDemand(
+!         "learning", 0.80,
+!         ["user_input", "ai_response", "agent_id", "conversation_class", "tags"],
+!         10000.0, "学习闭环需要用户意图+AI响应+分类标签以提炼Skill",
+!     ),
+!     "knowledge": ConsumerDemand(
+!         "knowledge", 0.75,
+!         ["user_input", "ai_response", "tags", "iso_annotation", "prov_trace"],
+!         8000.0, "知识抽取器需要语义标注+溯源信息以构建知识图谱",
+!     ),
+!     "agent_schedule": ConsumerDemand(
+!         "agent_schedule", 0.70,
+!         ["agent_id", "agent_switches", "mcp_call_details", "dispatch_count"],
+!         3000.0, "智能调度需要Agent切换记录+MCP调用细节以优化调度策略",
+!     ),
+!     "governance": ConsumerDemand(
+!         "governance", 0.65,
+!         ["prov_trace", "fair_metadata", "content_hash", "token_economy"],
+!         15000.0, "治理审计需要PROV溯源+FAIR元数据+Token经济以合规审计",
+!     ),
+!     "api": ConsumerDemand(
+!         "api", 0.55,
+!         ["session_id", "timestamp", "agent_id", "conversation_class"],
+!         2000.0, "API路由层需要基本标识信息以提供查询服务",
+!     ),
+!     "security": ConsumerDemand(
+!         "security", 0.60,
+!         ["content_hash", "prov_trace", "file_operations"],
+!         10000.0, "安全审计需要文件操作记录+溯源链以检测异常行为",
+!     ),
+!     "performance": ConsumerDemand(
+!         "performance", 0.45,
+!         ["token_economy", "mcp_call_details", "dispatch_count"],
+!         5000.0, "性能分析需要Token消耗+MCP调用时长以诊断瓶颈",
+!     ),
+! }
+  
+  
+! @dataclass
+! class ModuleEvolutionSpec:
+!     """模块进化规格 — 天机v9.0全系统51模块进化目标总表"""
+!     module_name: str
+!     tier: ImpactTier
+!     composite: float
+!     evolution_targets: List[str]
+!     estimated_effort_hours: float = 0.0
+!     risk_level: str = "low"
+!     standard_alignment: List[str] = field(default_factory=list)
+!     consumer_impacts: List[str] = field(default_factory=list)
+  
+!     def to_dict(self) -> dict:
+!         return {
+!             "module": self.module_name,
+!             "tier": self.tier.value,
+!             "composite": self.composite,
+!             "targets": self.evolution_targets,
+!             "effort_hours": self.estimated_effort_hours,
+!             "risk": self.risk_level,
+!             "standards": self.standard_alignment,
+!             "consumers": self.consumer_impacts,
+!         }
+  
+  
+! GLOBAL_IMPACT_MATRIX: List[ModuleImpact] = [
+      # ═══════════════════════════════════════════
+      # S级 (>=0.80): 核心基础设施 — 对话录入直接影响
+      # ═══════════════════════════════════════════
+!     ModuleImpact("enforcement_hook", "core/enforcement_hook.py", ImpactTier.S,
+!                  1.00, 0.95, 0.95, 0.95,
+!                  dimensions=["直接影响", "记忆存储链", "学习进化链"],
+!                  evolution_targets=["ConversationRecord字段", "_nudge_decide阈值", "_classify_conversation权重",
+!                                     "_annotate_iso_dialogue_acts规则", "_track_token_economy公式",
+!                                     "_generate_fair_metadata模板", "_detect_agent_switches模式",
+!                                     "ConversationRegistry缓存策略"],
+!                  impact_description="对话录入核心，23字段ConRecords直接生成于此，所有辐射的起点"),
+  
+!     ModuleImpact("tianji_mcp_server", "mcp/tianji_mcp_server.py", ImpactTier.S,
+!                  0.95, 0.90, 0.90, 0.90,
+!                  dimensions=["直接影响", "智能调度链"],
+!                  evolution_targets=["MCP拦截策略", "handle_tools_call记录粒度", "session_id自动注入"],
+!                  impact_description="MCP工具调用拦截器，拦截所有工具调用为录入提供细节数据"),
+  
+!     ModuleImpact("quality_gate", "core/quality_gate.py", ImpactTier.S,
+!                  0.85, 0.90, 0.90, 0.85,
+!                  dimensions=["直接影响", "记忆存储链"],
+!                  evolution_targets=["min_value_score阈值", "max_similarity阈值", "三问推演规则"],
+!                  impact_description="QualityGate v5.0决定每条录入是否通过/降级/拒绝，直接影响录入成功率"),
+  
+      # ═══════════════════════════════════════════
+      # A级 (>=0.60): 关键链路 — 数据流经关键节点
+      # ═══════════════════════════════════════════
+!     ModuleImpact("engine", "core/engine.py", ImpactTier.A,
+!                  0.80, 0.85, 0.70, 0.95,
+!                  dimensions=["记忆存储链"],
+!                  evolution_targets=["ICME六层写入性能", "记忆固结间隔", "容量分配策略"],
+!                  impact_description="ICME核心引擎v5.3，六层记忆的写入/检索/固结中枢"),
+  
+!     ModuleImpact("hybrid_engine", "core/hybrid_engine.py", ImpactTier.A,
+!                  0.70, 0.85, 0.65, 0.85,
+!                  dimensions=["记忆存储链"],
+!                  evolution_targets=["SQLite+JSON混合存储策略", "写入批量化"],
+!                  impact_description="SQLite+JSON混合存储，对话记录持久化的物理层"),
+  
+!     ModuleImpact("sqlite_store", "core/sqlite_store.py", ImpactTier.A,
+!                  0.65, 0.85, 0.60, 0.80,
+!                  dimensions=["记忆存储链"],
+!                  evolution_targets=["FTS5索引策略", "WAL并发优化"],
+!                  impact_description="FTS5全文搜索+WAL并发，对话内容可检索性的基石"),
+  
+!     ModuleImpact("deepseek_driver", "core/deepseek_driver.py", ImpactTier.A,
+!                  0.75, 0.70, 0.80, 0.85,
+!                  dimensions=["学习进化链", "直接影响"],
+!                  evolution_targets=["三循环并行参数", "TraeConversationCapture捕获频率", "决策质量评估"],
+!                  impact_description="DeepSeek驾驶者v2.0，三循环决策驱动，对话捕获+记忆决策的双重角色"),
+  
+!     ModuleImpact("models", "core/models.py", ImpactTier.A,
+!                  0.60, 0.80, 0.75, 0.80,
+!                  dimensions=["直接影响"],
+!                  evolution_targets=["Pydantic数据模型", "ConversationRecord序列化规范"],
+!                  impact_description="Pydantic数据模型定义，ConversationRecord结构和验证的基础"),
+  
+!     ModuleImpact("conversation_engine", "core/conversation_engine.py", ImpactTier.A,
+!                  0.85, 0.75, 0.70, 0.70,
+!                  dimensions=["直接影响", "智能调度链"],
+!                  evolution_targets=["对话流转引擎", "上下文窗口管理"],
+!                  impact_description="对话引擎，直接管理对话流转和上下文窗口"),
+  
+!     ModuleImpact("config", "core/config.py", ImpactTier.A,
+!                  0.50, 0.65, 0.65, 0.90,
+!                  dimensions=["直接影响"],
+!                  evolution_targets=["ICMEConfig v8.0参数", "容量上限值"],
+!                  impact_description="ICMEConfig v8.0，六层容量上限/固结间隔等全局配置"),
+  
+!     ModuleImpact("enforcement/mcp_bridge", "core/enforcement/mcp_bridge.py", ImpactTier.A,
+!                  0.80, 0.70, 0.75, 0.70,
+!                  dimensions=["直接影响", "智能调度链"],
+!                  evolution_targets=["MCP桥接方法集", "register_*系列方法扩展"],
+!                  impact_description="MCP桥接器，连接enforcement_hook和MCP Server的双向通道"),
+  
+      # ═══════════════════════════════════════════
+      # B级 (>=0.40): 重要依存 — 间接受影响
+      # ═══════════════════════════════════════════
+!     ModuleImpact("learning_loop", "core/learning_loop.py", ImpactTier.B,
+!                  0.55, 0.55, 0.70, 0.70,
+!                  dimensions=["学习进化链"],
+!                  evolution_targets=["闭环学习触发周期", "Skill提炼阈值", "反思周期"],
+!                  impact_description="闭环学习引擎，从录入内容中提炼Skill和经验"),
+  
+!     ModuleImpact("evolution_loop", "core/evolution_loop.py", ImpactTier.B,
+!                  0.50, 0.50, 0.75, 0.70,
+!                  dimensions=["学习进化链"],
+!                  evolution_targets=["OBSERVE→LEARN→EVOLVE周期", "Urgency公式", "EffectWatchdog阈值"],
+!                  impact_description="进化闭环协议，录入质量下降时触发进化信号"),
+  
+!     ModuleImpact("evolution_engine", "core/evolution_engine.py", ImpactTier.B,
+!                  0.45, 0.45, 0.85, 0.70,
+!                  dimensions=["学习进化链"],
+!                  evolution_targets=["三级自修改参数", "规则增补策略", "架构演化条件"],
+!                  impact_description="三级自修改引擎，参数调优→规则增补→架构演化"),
+  
+!     ModuleImpact("evolution_bus", "core/evolution_bus.py", ImpactTier.B,
+!                  0.40, 0.45, 0.70, 0.65,
+!                  dimensions=["学习进化链"],
+!                  evolution_targets=["进化信号路由", "ROUTING_TABLE自适应", "signal_history窗口"],
+!                  impact_description="进化总线，录入异常信号跨模块广播和联动"),
+  
+!     ModuleImpact("knowledge_extractor", "core/knowledge_extractor.py", ImpactTier.B,
+!                  0.50, 0.55, 0.65, 0.60,
+!                  dimensions=["知识抽取链"],
+!                  evolution_targets=["知识三元组抽取规则", "实体识别准确率"],
+!                  impact_description="知识抽取器，从录入内容中提取(主体-关系-客体)三元组"),
+  
+!     ModuleImpact("llm_bridge", "core/llm_bridge.py", ImpactTier.B,
+!                  0.55, 0.50, 0.60, 0.70,
+!                  dimensions=["知识抽取链", "直接录入"],
+!                  evolution_targets=["DeepSeek注入参数", "remember/recall接口优化"],
+!                  impact_description="LLM桥接，DeepSeekremember()/recall()双注入"),
+  
+!     ModuleImpact("llm_kg_enhancer", "core/llm_kg_enhancer.py", ImpactTier.B,
+!                  0.40, 0.45, 0.60, 0.55,
+!                  dimensions=["知识抽取链"],
+!                  evolution_targets=["知识图谱增强规则", "LLM增强策略"],
+!                  impact_description="知识图谱增强器，用LLM增强录入内容的知识抽取质量"),
+  
+!     ModuleImpact("kg_sync_hook", "core/kg_sync_hook.py", ImpactTier.B,
+!                  0.45, 0.40, 0.55, 0.50,
+!                  dimensions=["知识抽取链"],
+!                  evolution_targets=["知识图谱同步频率", "冲突检测规则"],
+!                  impact_description="知识图谱同步钩子，录入内容→知识图谱实时同步"),
+  
+!     ModuleImpact("adaptive_retriever", "core/adaptive_retriever.py", ImpactTier.B,
+!                  0.35, 0.50, 0.55, 0.60,
+!                  dimensions=["记忆存储链"],
+!                  evolution_targets=["检索策略自适应", "检索权重调优"],
+!                  impact_description="自适应检索器，录入内容→检索策略自适应优化"),
+  
+!     ModuleImpact("hybrid_retriever", "core/hybrid_retriever.py", ImpactTier.B,
+!                  0.35, 0.50, 0.50, 0.55,
+!                  dimensions=["记忆存储链"],
+!                  evolution_targets=["混合检索融合权重", "FTS5+向量检索比例"],
+!                  impact_description="混合检索器，全文+语义双路检索融合"),
+  
+!     ModuleImpact("preference_learner", "core/preference_learner.py", ImpactTier.B,
+!                  0.45, 0.40, 0.55, 0.50,
+!                  dimensions=["学习进化链"],
+!                  evolution_targets=["用户偏好学习模型", "偏好置信度阈值"],
+!                  impact_description="偏好学习器，从录入对话中学习用户偏好模式"),
+  
+!     ModuleImpact("skill_learner", "core/skill_learner.py", ImpactTier.B,
+!                  0.40, 0.40, 0.55, 0.50,
+!                  dimensions=["学习进化链"],
+!                  evolution_targets=["Skill自动生成规则", "Skill复用触发条件"],
+!                  impact_description="技能学习器，从成功录入案例中自动提炼Skill"),
+  
+!     ModuleImpact("skill_registry", "core/skill_registry.py", ImpactTier.B,
+!                  0.35, 0.35, 0.45, 0.60,
+!                  dimensions=["智能调度链"],
+!                  evolution_targets=["Skill注册策略", "discover扫描频率"],
+!                  impact_description="技能注册表，录入产生的Skill自动注册和管理"),
+  
+!     ModuleImpact("agent_orchestrator", "core/agent_orchestrator.py", ImpactTier.B,
+!                  0.55, 0.50, 0.65, 0.70,
+!                  dimensions=["智能调度链"],
+!                  evolution_targets=["Agent编排策略", "长链流水线优化", "并行分析调度"],
+!                  impact_description="Agent编排器，18Agent调度，录入内容提供决策上下文"),
+  
+!     ModuleImpact("intelligent_scheduler", "core/intelligent_scheduler.py", ImpactTier.B,
+!                  0.50, 0.45, 0.60, 0.65,
+!                  dimensions=["智能调度链"],
+!                  evolution_targets=["调度优先级算法", "负载均衡策略"],
+!                  impact_description="智能调度器，任务分解和资源分配"),
+  
+!     ModuleImpact("tvp_bridge", "core/tvp_bridge.py", ImpactTier.B,
+!                  0.60, 0.50, 0.55, 0.55,
+!                  dimensions=["智能调度链", "直接影响"],
+!                  evolution_targets=["TVP声明格式", "Agent切换追踪粒度"],
+!                  impact_description="TVP透明调度桥接，Agent切换记录→录入数据源"),
+  
+!     ModuleImpact("message_gateway", "core/message_gateway.py", ImpactTier.B,
+!                  0.45, 0.45, 0.45, 0.55,
+!                  dimensions=["智能调度链"],
+!                  evolution_targets=["多平台消息路由", "统一网关格式"],
+!                  impact_description="多平台统一网关，多入口对话统一接入录入"),
+  
+!     ModuleImpact("workflow_engine", "core/workflow_engine.py", ImpactTier.B,
+!                  0.40, 0.40, 0.45, 0.55,
+!                  dimensions=["智能调度链"],
+!                  evolution_targets=["Skill编排策略", "工作流模板库"],
+!                  impact_description="Skill编排引擎，录入触发的自动化工作流"),
+  
+      # ═══════════════════════════════════════════
+      # C级 (>=0.20): 弱关联 — 可感知影响
+      # ═══════════════════════════════════════════
+!     ModuleImpact("governance_pipeline", "core/governance_pipeline.py", ImpactTier.C,
+!                  0.35, 0.35, 0.40, 0.55,
+!                  dimensions=["治理审计链"],
+!                  evolution_targets=["审计流水线规则", "Plan→Audit→Implement→Approve周期"],
+!                  impact_description="治理流水线，录入内容的合规审计"),
+  
+!     ModuleImpact("governance_orchestrator", "core/governance_orchestrator.py", ImpactTier.C,
+!                  0.30, 0.30, 0.35, 0.50,
+!                  dimensions=["治理审计链"],
+!                  evolution_targets=["治理编排策略", "审计触发条件"],
+!                  impact_description="治理编排器，录入异常触发治理流程"),
+  
+!     ModuleImpact("full_system_audit", "core/full_system_audit.py", ImpactTier.C,
+!                  0.25, 0.25, 0.45, 0.55,
+!                  dimensions=["治理审计链"],
+!                  evolution_targets=["全系统审计范围", "审计报告格式"],
+!                  impact_description="全系统审计，录入质量纳入系统级审计指标"),
+  
+!     ModuleImpact("active_memory", "active_memory/", ImpactTier.C,
+!                  0.40, 0.40, 0.45, 0.50,
+!                  dimensions=["直接影响"],
+!                  evolution_targets=["主动记忆推送频率", "tianji_intercept优先级"],
+!                  impact_description="主动记忆协议，对话前主动注入历史上下文"),
+  
+!     ModuleImpact("indexing", "indexing/", ImpactTier.C,
+!                  0.30, 0.50, 0.45, 0.55,
+!                  dimensions=["知识抽取链"],
+!                  evolution_targets=["语义搜索索引策略", "认知流水线阶段"],
+!                  impact_description="语义搜索索引，录入内容→索引更新策略"),
+  
+!     ModuleImpact("event_consumer", "core/event_consumer.py", ImpactTier.C,
+!                  0.25, 0.35, 0.35, 0.40,
+!                  dimensions=["基础设施链"],
+!                  evolution_targets=["事件消费优先级", "事件过滤规则"],
+!                  impact_description="事件消费者，录入事件→系统级事件分发"),
+  
+!     ModuleImpact("resilience", "core/resilience.py", ImpactTier.C,
+!                  0.25, 0.30, 0.40, 0.50,
+!                  dimensions=["基础设施链"],
+!                  evolution_targets=["降级触发条件", "恢复策略"],
+!                  impact_description="韧性模块，录入链路的故障降级SOP"),
+  
+!     ModuleImpact("performance_optimizer", "core/performance_optimizer.py", ImpactTier.C,
+!                  0.25, 0.30, 0.35, 0.45,
+!                  dimensions=["基础设施链"],
+!                  evolution_targets=["性能优化策略", "瓶颈检测阈值"],
+!                  impact_description="性能优化器，录入吞吐量+延迟优化"),
+  
+!     ModuleImpact("procedural_memory", "core/procedural_memory.py", ImpactTier.C,
+!                  0.30, 0.30, 0.35, 0.40,
+!                  dimensions=["学习进化链"],
+!                  evolution_targets=["程序记忆模板", "流程固化规则"],
+!                  impact_description="程序记忆，录入→业务流程模板固化"),
+  
+!     ModuleImpact("memory_state_manager", "core/memory_state_manager.py", ImpactTier.C,
+!                  0.30, 0.40, 0.35, 0.45,
+!                  dimensions=["记忆存储链"],
+!                  evolution_targets=["记忆状态管理", "状态转换策略"],
+!                  impact_description="记忆状态管理器，录入内容的状态生命周期管理"),
+  
+!     ModuleImpact("memory_dynamic_manager", "core/memory_dynamic_manager.py", ImpactTier.C,
+!                  0.30, 0.40, 0.40, 0.45,
+!                  dimensions=["记忆存储链"],
+!                  evolution_targets=["动态容量管理", "层间迁移策略"],
+!                  impact_description="记忆动态管理器，录入压力下的层间迁移策略"),
+  
+      # ═══════════════════════════════════════════
+      # D级 (<0.20): 几乎无关
+      # ═══════════════════════════════════════════
+!     ModuleImpact("tianji_container", "core/tianji_container.py", ImpactTier.D,
+!                  0.10, 0.15, 0.20, 0.70,
+!                  dimensions=["基础设施链"],
+!                  evolution_targets=["容器健康检查", "模块生命周期"],
+!                  impact_description="总控容器，间接承载录入模块的生命周期管理"),
+  
+!     ModuleImpact("module_manager", "core/module_manager.py", ImpactTier.D,
+!                  0.10, 0.10, 0.15, 0.60,
+!                  dimensions=["基础设施链"],
+!                  evolution_targets=["模块加载策略"],
+!                  impact_description="模块管理器，录入模块的加载和初始化"),
+  
+!     ModuleImpact("namespace_manager", "core/namespace_manager.py", ImpactTier.D,
+!                  0.05, 0.10, 0.10, 0.55,
+!                  dimensions=["基础设施链"],
+!                  evolution_targets=["命名空间隔离"],
+!                  impact_description="命名空间管理器，录入数据的命名空间隔离"),
+  
+!     ModuleImpact("service_registry", "core/service_registry.py", ImpactTier.D,
+!                  0.05, 0.10, 0.10, 0.55,
+!                  dimensions=["基础设施链"],
+!                  evolution_targets=["服务注册策略"],
+!                  impact_description="服务注册表，录入相关服务的注册和发现"),
+  
+!     ModuleImpact("dao_registry", "core/dao_registry.py", ImpactTier.D,
+!                  0.05, 0.15, 0.10, 0.50,
+!                  dimensions=["基础设施链"],
+!                  evolution_targets=["DAO注册策略"],
+!                  impact_description="DAO注册表，录入数据访问对象的注册管理"),
+  
+!     ModuleImpact("stat_collector", "core/stat_collector.py", ImpactTier.D,
+!                  0.15, 0.20, 0.20, 0.40,
+!                  dimensions=["基础设施链"],
+!                  evolution_targets=["统计采集频率"],
+!                  impact_description="统计收集器，录入数量/质量的统计指标"),
+  
+      # ═══════════════════════════════════════════
+      # API层辐射 (C级为主)
+      # ═══════════════════════════════════════════
+!     ModuleImpact("memory_routes", "server/api/memory_routes.py", ImpactTier.C,
+!                  0.40, 0.50, 0.40, 0.60,
+!                  dimensions=["API暴露链"],
+!                  evolution_targets=["/api/memory CRUD端点", "批量写入接口"],
+!                  impact_description="记忆API路由，对话记录的REST入口"),
+  
+!     ModuleImpact("enforcement_routes", "server/api/enforcement_routes.py", ImpactTier.C,
+!                  0.45, 0.45, 0.50, 0.50,
+!                  dimensions=["API暴露链"],
+!                  evolution_targets=["强制执行API端点", "进化状态查询接口"],
+!                  impact_description="强制执行API路由，录入状态的REST查询入口"),
+  
+!     ModuleImpact("search_routes", "server/api/search_routes.py", ImpactTier.C,
+!                  0.30, 0.45, 0.35, 0.55,
+!                  dimensions=["API暴露链"],
+!                  evolution_targets=["语义搜索API", "跨层检索端点"],
+!                  impact_description="搜索API路由，录入内容的检索入口"),
+  
+!     ModuleImpact("summary_routes", "server/api/summary_routes.py", ImpactTier.C,
+!                  0.35, 0.40, 0.35, 0.45,
+!                  dimensions=["API暴露链"],
+!                  evolution_targets=["会话摘要API"],
+!                  impact_description="摘要API路由，录入会话的摘要生成"),
+  
+!     ModuleImpact("active_routes", "server/api/active_routes.py", ImpactTier.C,
+!                  0.35, 0.40, 0.40, 0.45,
+!                  dimensions=["API暴露链"],
+!                  evolution_targets=["主动记录API", "tianji_intercept端点"],
+!                  impact_description="主动记忆API路由，tianji_intercept入口"),
+! ]
+  
+  
+! class GlobalImpactAnalyzer:
+!     """全局辐射影响分析器 v2.0 — 增强版"""
+  
+!     def get_by_tier(self, tier: ImpactTier) -> List[ModuleImpact]:
+!         return [m for m in GLOBAL_IMPACT_MATRIX if m.tier == tier]
+  
+!     def get_top_n(self, n: int = 10) -> List[ModuleImpact]:
+!         return sorted(GLOBAL_IMPACT_MATRIX, key=lambda m: m.composite, reverse=True)[:n]
+  
+!     def get_evolution_candidates(self, min_composite: float = 0.4) -> List[ModuleImpact]:
+!         return [m for m in GLOBAL_IMPACT_MATRIX if m.composite >= min_composite
+!                 and len(m.evolution_targets) > 0]
+  
+!     def get_tier_summary(self) -> Dict:
+!         summary = {}
+!         for tier in ImpactTier:
+!             modules = self.get_by_tier(tier)
+!             if modules:
+!                 summary[tier.value] = {
+!                     "count": len(modules),
+!                     "avg_composite": round(sum(m.composite for m in modules) / len(modules), 4),
+!                     "modules": [m.module_name for m in modules],
+!                     "total_evolution_targets": sum(len(m.evolution_targets) for m in modules),
+!                 }
+!         return summary
+  
+!     def get_dimension_coverage(self) -> Dict[str, List[str]]:
+!         coverage = {}
+!         for dim in ImpactDimension:
+!             modules = [m.module_name for m in GLOBAL_IMPACT_MATRIX if dim.value in m.dimensions]
+!             if modules:
+!                 coverage[dim.value] = modules
+!         return coverage
+  
+!     def get_priority_evolution_order(self) -> List[Dict]:
+!         candidates = self.get_evolution_candidates(min_composite=0.3)
+!         return [
+!             {
+!                 "rank": i + 1,
+!                 "module": m.module_name,
+!                 "tier": m.tier.value,
+!                 "composite": m.composite,
+!                 "evolution_targets": m.evolution_targets,
+!                 "impact_description": m.impact_description,
+!             }
+!             for i, m in enumerate(candidates)
+!         ]
+  
+!     def generate_report(self) -> Dict:
+!         return {
+!             "title": "天机v9.0 对话录入基础设施 全局辐射影响报告",
+!             "generated_at": time.time(),
+!             "total_modules_analyzed": len(GLOBAL_IMPACT_MATRIX),
+!             "tier_summary": self.get_tier_summary(),
+!             "dimension_coverage": self.get_dimension_coverage(),
+!             "top_10_by_impact": [m.to_dict() for m in self.get_top_n(10)],
+!             "evolution_candidates": len(self.get_evolution_candidates()),
+!             "priority_order": self.get_priority_evolution_order()[:15],
+!             "weight_formula": "CompositeScore = DIW*0.40 + DFW*0.30 + EU*0.20 + SC*0.10",
+!         }
+  
+!     def get_full_evolution_specs(self) -> List[ModuleEvolutionSpec]:
+!         """从GLOBAL_IMPACT_MATRIX导出完整的进化规格表，含工时估算和风险等级"""
+!         specs = []
+!         for m in GLOBAL_IMPACT_MATRIX:
+!             effort, risk = _estimate_effort_and_risk(m)
+!             standards, consumers = _map_standards_and_consumers(m)
+!             specs.append(ModuleEvolutionSpec(
+!                 module_name=m.module_name,
+!                 tier=m.tier,
+!                 composite=m.composite,
+!                 evolution_targets=m.evolution_targets,
+!                 estimated_effort_hours=effort,
+!                 risk_level=risk,
+!                 standard_alignment=standards,
+!                 consumer_impacts=consumers,
+!             ))
+!         return sorted(specs, key=lambda s: s.composite, reverse=True)
+  
+!     def get_standard_gap_report(self) -> Dict:
+!         """生成国际标准对标差距报告"""
+!         total_gap_score = sum(g.current_support for g in STANDARD_GAPS.values())
+!         return {
+!             "total_standards": len(STANDARD_GAPS),
+!             "avg_support": round(total_gap_score / len(STANDARD_GAPS), 2),
+!             "p1_gaps": [g.to_dict() for g in STANDARD_GAPS.values() if g.priority == "P1"],
+!             "p2_gaps": [g.to_dict() for g in STANDARD_GAPS.values() if g.priority == "P2"],
+!             "top_gap": max(STANDARD_GAPS.values(), key=lambda g: 1.0 - g.current_support).to_dict(),
+!         }
+  
+!     def get_consumer_demand_report(self) -> Dict:
+!         """生成下游消费者需求汇总报告"""
+!         demands = list(CONSUMER_DEMANDS.values())
+!         return {
+!             "total_consumers": len(demands),
+!             "avg_demand": round(sum(d.demand_score for d in demands) / len(demands), 2),
+!             "high_demand": [d.to_dict() for d in demands if d.demand_score >= 0.8],
+!             "field_demand_count": _aggregate_field_demand(demands),
+!             "field_priority_order": _compute_field_priority(demands),
+!         }
+  
+!     def get_tier_evolution_schedule(self, turn_count: int = 0) -> Dict:
+!         """基于对话轮数的动态进化评估调度"""
+!         def should_evaluate(tier: ImpactTier, turns: int) -> bool:
+!             intervals = {
+!                 ImpactTier.S: 10, ImpactTier.A: 50,
+!                 ImpactTier.B: 200, ImpactTier.C: 1000, ImpactTier.D: -1,
+!             }
+!             interval = intervals.get(tier, 1000)
+!             return interval > 0 and turns % interval == 0
+  
+!         return {
+!             "current_turn": turn_count,
+!             "next_evaluations": {
+!                 tier.value: {
+!                     "interval": {"S": 10, "A": 50, "B": 200, "C": 1000, "D": -1}[tier.value],
+!                     "turns_until_next": _turns_until_next(tier, turn_count),
+!                     "modules_count": len(self.get_by_tier(tier)),
+!                     "should_evaluate_now": should_evaluate(tier, turn_count),
+!                 }
+!                 for tier in ImpactTier
+!             },
+!         }
+  
+!     def generate_adaptive_strategy(self, active_consumers: List[str] = None,
+!                                     system_load: float = 0.5) -> Dict:
+!         """生成适应性录入策略建议"""
+!         if active_consumers is None:
+!             active_consumers = list(CONSUMER_DEMANDS.keys())
+  
+!         required_fields: Set[str] = set()
+!         preferred_layer_votes: Dict[str, float] = {}
+!         max_latency_ms = float("inf")
+  
+!         for consumer_name in active_consumers:
+!             demand = CONSUMER_DEMANDS.get(consumer_name)
+!             if not demand:
+!                 continue
+!             for f in demand.required_fields:
+!                 required_fields.add(f)
+!             layer = "episodic"
+!             preferred_layer_votes[layer] = preferred_layer_votes.get(layer, 0.0) + demand.demand_score
+!             max_latency_ms = min(max_latency_ms, demand.max_tolerable_latency_ms)
+  
+!         preferred_layer = max(preferred_layer_votes, key=preferred_layer_votes.get) if preferred_layer_votes else "episodic"
+  
+!         if system_load > 0.8:
+!             required_fields = {f for f in required_fields
+!                                if f in {"session_id", "timestamp", "user_input", "ai_response", "content_hash"}}
+!         elif system_load > 0.5:
+!             required_fields = {f for f in required_fields
+!                                if f not in {"prov_trace", "fair_metadata"}}
+  
+!         return {
+!             "active_consumers": active_consumers,
+!             "system_load": system_load,
+!             "required_fields": sorted(required_fields),
+!             "preferred_layer": preferred_layer,
+!             "max_tolerable_latency_ms": max_latency_ms,
+!             "strategy": "degraded_core_only" if system_load > 0.8 else
+!                        "balanced_essential" if system_load > 0.5 else "full_fidelity",
+!         }
+  
+!     def generate_comprehensive_report(self) -> Dict:
+!         """生成综合分析报告"""
+!         report = self.generate_report()
+!         report.update({
+!             "version": "2.0.0",
+!             "standard_gap_analysis": self.get_standard_gap_report(),
+!             "consumer_demand_analysis": self.get_consumer_demand_report(),
+!             "evolution_schedule": self.get_tier_evolution_schedule(),
+!             "full_evolution_specs": [s.to_dict() for s in self.get_full_evolution_specs()],
+!             "adaptive_strategy_default": self.generate_adaptive_strategy(),
+!             "weight_sub_dimensions": {
+!                 "diw": DIW_SUB_WEIGHTS,
+!                 "dfw": DFW_SUB_WEIGHTS,
+!                 "eu": EU_SUB_WEIGHTS,
+!                 "sc": SC_SUB_WEIGHTS,
+!             },
+!             "sub_weight_calibration": _generate_calibration_examples(),
+!         })
+!         return report
+  
+  
+! def _estimate_effort_and_risk(m: ModuleImpact) -> Tuple[float, str]:
+!     """根据module影响评估估算工时和风险等级"""
+!     target_count = len(m.evolution_targets)
+!     if m.tier == ImpactTier.S:
+!         effort = target_count * 3.0
+!         risk = "high"
+!     elif m.tier == ImpactTier.A:
+!         effort = target_count * 1.5
+!         risk = "medium"
+!     elif m.tier == ImpactTier.B:
+!         effort = target_count * 0.8
+!         risk = "low"
+!     else:
+!         effort = target_count * 0.3
+!         risk = "low"
+!     return round(effort, 1), risk
+  
+  
+! def _map_standards_and_consumers(m: ModuleImpact) -> Tuple[List[str], List[str]]:
+!     """将模块映射到相关标准和消费者"""
+!     standards = []
+!     consumers = []
+!     name_lower = m.module_name.lower()
+!     target_text = " ".join(m.evolution_targets).lower()
+  
+!     if "otel_genai" in name_lower or "mcp" in name_lower or "agent" in name_lower:
+!         standards.append("otel_genai_agent")
+!     if "mcp" in name_lower or "tool" in target_text:
+!         standards.append("otel_genai_tool")
+!     if "vcon" in target_text or "record" in name_lower:
+!         standards.append("vcon_container")
+!     if "iso" in target_text or "dialogue" in target_text:
+!         standards.append("iso_daml")
+!     if "agent" in name_lower or "tvp" in name_lower:
+!         standards.append("aos_instrument")
+  
+!     if "engine" in name_lower or "store" in name_lower:
+!         consumers.append("memory_engine")
+!     if "quality" in name_lower or "gate" in name_lower:
+!         consumers.append("quality_gate")
+!     if "learn" in name_lower or "evol" in name_lower:
+!         consumers.append("learning")
+!     if "knowledge" in name_lower or "kg_" in name_lower:
+!         consumers.append("knowledge")
+!     if "agent" in name_lower or "schedule" in name_lower:
+!         consumers.append("agent_schedule")
+!     if "governance" in name_lower or "audit" in name_lower:
+!         consumers.append("governance")
+  
+!     return standards, consumers
+  
+  
+! def _aggregate_field_demand(demands: List[ConsumerDemand]) -> Dict[str, float]:
+!     """聚合所有消费者对每个字段的需求分数"""
+!     field_scores: Dict[str, float] = {}
+!     for d in demands:
+!         for f in d.required_fields:
+!             field_scores[f] = field_scores.get(f, 0.0) + d.demand_score
+!     return {f: round(s, 2) for f, s in sorted(field_scores.items(), key=lambda x: x[1], reverse=True)}
+  
+  
+! def _compute_field_priority(demands: List[ConsumerDemand]) -> List[Dict]:
+!     """计算字段优先级排序（下游需求驱动）"""
+!     aggregated = _aggregate_field_demand(demands)
+!     max_score = max(aggregated.values()) if aggregated else 1.0
+!     return [
+!         {"field": f, "aggregate_demand": s, "priority_score": round(s / max_score, 2)}
+!         for f, s in sorted(aggregated.items(), key=lambda x: x[1], reverse=True)
+!     ]
+  
+  
+! def _turns_until_next(tier: ImpactTier, current_turns: int) -> int:
+!     intervals = {ImpactTier.S: 10, ImpactTier.A: 50, ImpactTier.B: 200, ImpactTier.C: 1000, ImpactTier.D: -1}
+!     interval = intervals.get(tier, 1000)
+!     if interval < 0:
+!         return -1
+!     remainder = current_turns % interval
+!     return interval - remainder if remainder > 0 else 0
+  
+  
+! def _generate_calibration_examples() -> List[Dict]:
+!     """生成四维权重校准示例"""
+!     examples = []
+!     modules = sorted(GLOBAL_IMPACT_MATRIX, key=lambda m: m.composite, reverse=True)
+  
+!     for m in modules[:5]:
+!         diw_subs = [
+!             SubWeightDetail("field_dependency", round(m.diw * 0.35, 3),
+!                             f"{m.module_name}对ConversationRecord字段的直接依赖"),
+!             SubWeightDetail("api_dependency", round(m.diw * 0.25, 3),
+!                             f"{m.module_name}通过API消费录入数据"),
+!             SubWeightDetail("behavior_dependency", round(m.diw * 0.25, 3),
+!                             f"录入行为变化直接影响{m.module_name}逻辑"),
+!             SubWeightDetail("lifecycle_dependency", round(m.diw * 0.15, 3),
+!                             f"{m.module_name}生命周期与录入耦合"),
+!         ]
+!         dfw_subs = [
+!             SubWeightDetail("data_through_rate", round(m.dfw * 0.40, 3),
+!                             f"录入数据流经{m.module_name}的比例"),
+!             SubWeightDetail("data_quality_impact", round(m.dfw * 0.30, 3),
+!                             f"录入质量对{m.module_name}产出的影响"),
+!             SubWeightDetail("data_path_criticality", round(m.dfw * 0.30, 3),
+!                             f"数据路径上{m.module_name}的关键度"),
+!         ]
+!         eu_subs = [
+!             SubWeightDetail("gap_severity", round(m.eu * 0.35, 3),
+!                             f"{m.module_name}当前与理想状态的差距"),
+!             SubWeightDetail("alignment_urgency", round(m.eu * 0.30, 3),
+!                             f"思考对齐对{m.module_name}的紧迫性"),
+!             SubWeightDetail("consumer_demand_pressure", round(m.eu * 0.20, 3),
+!                             f"下游消费者对{m.module_name}的需求压力"),
+!             SubWeightDetail("standard_gap", round(m.eu * 0.15, 3),
+!                             f"国际标准对{m.module_name}的对标差距"),
+!         ]
+!         sc_subs = [
+!             SubWeightDetail("availability_requirement", round(m.sc * 0.35, 3),
+!                             f"{m.module_name}的可用性要求"),
+!             SubWeightDetail("security_impact", round(m.sc * 0.25, 3),
+!                             f"{m.module_name}的安全影响面"),
+!             SubWeightDetail("recoverability_impact", round(m.sc * 0.25, 3),
+!                             f"{m.module_name}故障恢复难度"),
+!             SubWeightDetail("dependency_count", round(m.sc * 0.15, 3),
+!                             f"依赖{m.module_name}的下游模块数"),
+!         ]
+!         wb = WeightBreakdown(
+!             diw_value=m.diw, diw_subs=diw_subs,
+!             dfw_value=m.dfw, dfw_subs=dfw_subs,
+!             eu_value=m.eu, eu_subs=eu_subs,
+!             sc_value=m.sc, sc_subs=sc_subs,
+!         )
+!         examples.append({
+!             "module": m.module_name,
+!             "tier": m.tier.value,
+!             "breakdown": wb.to_calibration_report(),
+!         })
+!     return examples
+  
+  
+! def get_global_impact_matrix() -> List[ModuleImpact]:
+!     return GLOBAL_IMPACT_MATRIX
+  
+  
+! def get_top_impact_modules(n: int = 5) -> List[ModuleImpact]:
+!     return sorted(GLOBAL_IMPACT_MATRIX, key=lambda m: m.composite, reverse=True)[:n]
+  
+  
+! def get_standard_gaps() -> Dict[str, StandardGap]:
+!     return STANDARD_GAPS
+  
+  
+! def get_consumer_demands() -> Dict[str, ConsumerDemand]:
+!     return CONSUMER_DEMANDS
+  
+  
+! def get_analyzer() -> GlobalImpactAnalyzer:
+!     return GlobalImpactAnalyzer()

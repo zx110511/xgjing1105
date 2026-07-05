@@ -1,0 +1,29 @@
+﻿{
+  "phase": "3.2.1",
+  "description": "核心MCP工具功能验证",
+  "timestamp": "2026-07-03",
+  "total": 4,
+  "passed": 1,
+  "results": [
+    {
+      "name": "memory_remember (记忆写入)",
+      "pass": false,
+      "detail": "HTTPConnectionPool(host='127.0.0.1', port=8771): Read timed out. (read timeout=10)"
+    },
+    {
+      "name": "memory_recall (记忆检索)",
+      "pass": false,
+      "detail": "found 0 results"
+    },
+    {
+      "name": "context_extract (上下文提取)",
+      "pass": true,
+      "detail": "intents=0, entities=0"
+    },
+    {
+      "name": "agent_dispatch (Agent调度)",
+      "pass": false,
+      "detail": "recommended=N/A, confidence=N/A"
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "id": "e3f3ec7a-2e43-430a-af96-83a9069c7ac6",
+  "title": "新对话",
+  "messages": [
+    {
+      "id": "msg-2612ae74",
+      "role": "user",
+      "content": "列举天机规则",
+      "timestamp": 1782172659.2342498,
+      "token_count": 6,
+      "fidelity": "full"
+    },
+    {
+      "id": "msg-e53f2e47",
+      "role": "assistant",
+      "content": "让我先从记忆系统检索天机规则，同时查看宪法文件。找到规则文件目录。让我读取所有核心法则文件来完整整理。\n\n<｜｜DSML｜｜tool_calls>\n<｜｜DSML｜｜invoke name=\"execute_command\">\n<｜｜DSML｜｜parameter name=\"command\" string=\"true\">type \"D:\\元初系统\\天机v8.1\\.trae\\rules\\01-天机宪法.md\"</｜｜DSML｜｜parameter>\n<｜｜DSML｜｜parameter name=\"cwd\" string=\"true\">D:\\元初系统\\天机v8.1\\.trae\\rules</｜｜DSML｜｜parameter>\n</｜｜DSML｜｜invoke>\n<｜｜DSML｜｜invoke name=\"execute_command\">\n<｜｜DSML｜｜parameter name=\"command\" string=\"true\">type \"D:\\元初系统\\天机v8.1\\.trae\\rules\\02-智能体律令.md\"</｜｜DSML｜｜parameter>\n<｜｜DSML｜｜parameter name=\"cwd\" string=\"true\">D:\\元初系统\\天机v8.1\\.trae\\rules</｜｜DSML｜｜parameter>\n</｜｜DSML｜｜invoke>\n<｜｜DSML｜｜invoke name=\"execute_command\">\n<｜｜DSML｜｜parameter name=\"command\" string=\"true\">type \"D:\\元初系统\\天机v8.1\\.trae\\rules\\03-质量铁律.md\"</｜｜DSML｜｜parameter>\n<｜｜DSML｜｜parameter name=\"cwd\" string=\"true\">D:\\元初系统\\天机v8.1\\.trae\\rules</｜｜DSML｜｜parameter>\n</｜｜DSML｜｜invoke>\n<｜｜DSML｜｜invoke name=\"execute_command\">\n<｜｜DSML｜｜parameter name=\"command\" string=\"true\">type \"D:\\元初系统\\天机v8.1\\.trae\\rules\\04-操作手册与决策引擎.md\"</｜｜DSML｜｜parameter>\n<｜｜DSML｜｜parameter name=\"cwd\" string=\"true\">D:\\元初系统\\天机v8.1\\.trae\\rules</｜｜DSML｜｜parameter>\n</｜｜DSML｜｜invoke>\n<｜｜DSML｜｜invoke name=\"execute_command\">\n<｜｜DSML｜｜parameter name=\"command\" string=\"true\">type \"D:\\元初系统\\天机v8.1\\.trae\\rules\\05-故障降级SOP.md\"</｜｜DSML｜｜parameter>\n<｜｜DSML｜｜parameter name=\"cwd\" string=\"true\">D:\\元初系统\\天机v8.1\\.trae\\rules</｜｜DSML｜｜parameter>\n</｜｜DSML｜｜invoke>\n<｜｜DSML｜｜invoke name=\"execute_command\">\n<｜｜DSML｜｜parameter name=\"command\" string=\"true\">type \"D:\\元初系统\\天机v8.1\\.trae\\rules\\06-归档与协同.md\"</｜｜DSML｜｜parameter>\n<｜｜DSML｜｜parameter name=\"cwd\" string=\"true\">D:\\元初系统\\天机v8.1\\.trae\\rules</｜｜DSML｜｜parameter>\n</｜｜DSML｜｜invoke>\n<｜｜DSML｜｜invoke name=\"execute_command\">\n<｜｜DSML｜｜parameter name=\"command\" string=\"true\">type \"D:\\元初系统\\天机v8.1\\.trae\\rules\\07-升级状态与下一程.md\"</｜｜DSML｜｜parameter>\n<｜｜DSML｜｜parameter name=\"cwd\" string=\"true\">D:\\元初系统\\天机v8.1\\.trae\\rules</｜｜DSML｜｜parameter>\n</｜｜DSML｜｜invoke>\n</｜｜DSML｜｜tool_calls>",
+      "timestamp": 1782172702.3362122,
+      "token_count": 671,
+      "fidelity": "full"
+    }
+  ],
+  "total_tokens": 671,
+  "summary": "",
+  "created_at": 1782172659.231713,
+  "updated_at": 1782172702.3362122,
+  "message_count": 2,
+  "pinned": false
+}

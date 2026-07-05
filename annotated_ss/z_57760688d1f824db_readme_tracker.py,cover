@@ -1,0 +1,608 @@
+> r"""
+> 根目录源架构追踪索引系统 (Root Source Architecture Tracking & Indexing System)
+> ====================================================================================
+> R-SATIS v9.0 — 全量路径索引映射 + 文件摘要映射 + README.md 动态维护
+  
+> 灵境道谱溯源:
+>   跨道域元模块 — 超越单一地煞的全系统基础设施
+>   ├─ 道一·记忆体道: D1-3 混合检索煞 — 目录索引检索 + 文件路径映射
+>   ├─ 道七·守护体道: D7-3 性能剖析煞 — 文件系统监控守护 + 增量更新
+>   ├─ 道八·知识体道: D8-1 知识图谱煞 — 内容摘要知识化 + SHA-256指纹
+>   └─ 道九·配置体道: D9-1 配置中心煞 — .r-satis.json 统一配置
+  
+> 能力:
+>   1. 递归扫描指定父项目的每个子文件夹
+>   2. 为每个文件夹维护 README.md，含三项核心功能:
+>      - 全量路径索引映射 (文件夹+文件)
+>      - 全量内容摘要与文件路径一对一映射 (SHA-256/元数据)
+>      - 保留用户手动编写的自定义内容 (标记区块隔离)
+>   3. 动态增量更新 (SHA-256 哈希对比 / watchdog 实时监听 / 定时扫描)
+>   4. EvolutionLoop 自进化闭环
+  
+> 依赖: M1(TianjiContainer) + M28(ConfigManager)
+> 版本: v9.0
+> """
+  
+! from __future__ import annotations
+  
+! import hashlib
+! import json
+! import os
+! import threading
+! import time
+! import fnmatch
+! import logging
+! from dataclasses import dataclass, field
+! from datetime import datetime
+! from pathlib import Path
+! from typing import Any, Callable, Dict, List, Optional, Tuple
+  
+! logger = logging.getLogger("tianji.readme_tracker")
+  
+  
+! try:
+!     from .evolution_loop import EvolutionLoop, CausalPairRecorder
+! except ImportError:
+!     EvolutionLoop = None
+!     CausalPairRecorder = None
+  
+  
+! AUTO_START = "<!-- AUTO-START -->"
+! AUTO_END = "<!-- AUTO-END -->"
+  
+  
+! @dataclass
+! class ReadmeTrackerConfig:
+!     root_path: str = ""
+!     exclude_patterns: List[str] = field(default_factory=lambda: [
+!         ".git", "__pycache__", "node_modules", ".venv", "venv",
+!         "*.pyc", "*.pyo", ".DS_Store", "Thumbs.db",
+!     ])
+!     summary_method: str = "hash"
+!     update_interval_seconds: int = 300
+!     watchdog_enabled: bool = False
+  
+  
+! @dataclass
+! class FileEntry:
+!     name: str
+!     rel_path: str
+!     size: int
+!     mtime: float
+!     sha256: str = ""
+  
+  
+! @dataclass
+! class FolderState:
+!     path: str
+!     files: Dict[str, FileEntry] = field(default_factory=dict)
+!     subdirs: List[str] = field(default_factory=list)
+!     last_updated: float = 0.0
+  
+  
+! class ReadmeTracker:
+!     def __init__(
+!         self,
+!         config: Optional[ReadmeTrackerConfig] = None,
+!         config_path: Optional[str] = None,
+!         recorder: Optional[Any] = None,
+!         learning_engine: Optional[Any] = None,
+!     ):
+!         self._recorder = recorder
+!         self._learning_engine = learning_engine
+!         self._errors = 0
+!         self._folders_scanned = 0
+!         self._files_indexed = 0
+!         self._readme_updated = 0
+!         self._daemon_running = False
+!         self._daemon_thread: Optional[threading.Thread] = None
+!         self._lock = threading.Lock()
+!         self._folder_states: Dict[str, FolderState] = {}
+  
+!         if config:
+!             self._config = config
+!         elif config_path:
+!             self._config = self._load_config(config_path)
+!         else:
+!             self._config = ReadmeTrackerConfig()
+  
+!         self._evo_loop = None
+!         if EvolutionLoop is not None:
+!             try:
+!                 self._evo_loop = EvolutionLoop(
+!                     module_name="readme_tracker",
+!                     effectiveness_fn=self._calc_effectiveness,
+!                     learn_fn=self._learn_from_tracker,
+!                     evolve_fn=self._evolve_tracker_config,
+!                     mutable_config={
+!                         "max_file_size_mb": 10,
+!                         "hash_buffer_size": 65536,
+!                     },
+!                     recorder=recorder,
+!                 )
+!             except Exception:
+!                 self._errors += 1
+  
+!     def _load_config(self, config_path: str) -> ReadmeTrackerConfig:
+!         try:
+!             with open(config_path, "r", encoding="utf-8") as f:
+!                 data = json.load(f)
+!             return ReadmeTrackerConfig(
+!                 root_path=data.get("root", data.get("root_path", "")),
+!                 exclude_patterns=data.get("exclude", data.get("exclude_patterns",
+!                     [".git", "__pycache__", "node_modules", ".venv", "venv",
+!                      "*.pyc", "*.pyo", ".DS_Store", "Thumbs.db"])),
+!                 summary_method=data.get("summary_method", "hash"),
+!                 update_interval_seconds=data.get("interval_seconds", data.get("update_interval_seconds", 300)),
+!                 watchdog_enabled=data.get("watchdog", data.get("watchdog_enabled", False)),
+!             )
+!         except Exception as e:
+!             logger.warning(f"R-SATIS config load failed: {e}, using defaults")
+!             self._errors += 1
+!             return ReadmeTrackerConfig()
+  
+!     def _should_exclude(self, name: str, path: str = "") -> bool:
+!         for pattern in self._config.exclude_patterns:
+!             if fnmatch.fnmatch(name, pattern):
+!                 return True
+!             if pattern.startswith(".") and name == pattern:
+!                 return True
+!         return False
+  
+!     def _hash_file(self, filepath: str) -> str:
+!         try:
+!             sha = hashlib.sha256()
+!             with open(filepath, "rb") as f:
+!                 while True:
+!                     chunk = f.read(65536)
+!                     if not chunk:
+!                         break
+!                     sha.update(chunk)
+!             return sha.hexdigest()
+!         except Exception:
+!             self._errors += 1
+!             return ""
+  
+!     def _metadata_snapshot(self, filepath: str) -> str:
+!         try:
+!             stat = os.stat(filepath)
+!             size_kb = stat.st_size / 1024
+!             mtime = datetime.fromtimestamp(stat.st_mtime).isoformat()
+!             head_lines = []
+!             try:
+!                 with open(filepath, "r", encoding="utf-8", errors="replace") as f:
+!                     for i, line in enumerate(f):
+!                         if i >= 10:
+!                             break
+!                         head_lines.append(line.rstrip())
+!             except Exception:
+!                 head_lines = ["<binary file>"]
+!             head_preview = "\n".join(head_lines[:3]) if head_lines else "<empty>"
+!             return f"size={size_kb:.1f}KB | mtime={mtime} | head=`{head_preview[:80]}`"
+!         except Exception:
+!             self._errors += 1
+!             return "<unreadable>"
+  
+!     def _compute_summary(self, filepath: str) -> str:
+!         method = self._config.summary_method
+!         if method == "hash":
+!             sha = self._hash_file(filepath)
+!             return f"SHA-256: `{sha[:16]}...`" if sha else "<hash failed>"
+!         elif method == "metadata":
+!             return self._metadata_snapshot(filepath)
+!         else:
+!             sha = self._hash_file(filepath)
+!             return f"SHA-256: `{sha[:16]}...`" if sha else "<hash failed>"
+  
+!     def scan_folder(self, folder_path: str) -> Tuple[List[str], List[FileEntry]]:
+!         subdirs = []
+!         files = []
+!         try:
+!             with os.scandir(folder_path) as entries:
+!                 for entry in entries:
+!                     if self._should_exclude(entry.name, entry.path):
+!                         continue
+!                     if entry.is_dir(follow_symlinks=False):
+!                         subdirs.append(entry.name)
+!                     elif entry.is_file(follow_symlinks=False):
+!                         filepath = entry.path
+!                         try:
+!                             stat = entry.stat()
+!                             fe = FileEntry(
+!                                 name=entry.name,
+!                                 rel_path=f"./{entry.name}",
+!                                 size=stat.st_size,
+!                                 mtime=stat.st_mtime,
+!                             )
+!                             files.append(fe)
+!                         except OSError:
+!                             self._errors += 1
+!         except PermissionError:
+!             self._errors += 1
+!         except Exception as e:
+!             logger.debug(f"R-SATIS scan error: {e}")
+!             self._errors += 1
+  
+!         subdirs.sort()
+!         files.sort(key=lambda f: f.name)
+!         return subdirs, files
+  
+!     def _read_readme(self, folder_path: str) -> Tuple[bool, str]:
+!         readme_path = os.path.join(folder_path, "README.md")
+!         if os.path.isfile(readme_path):
+!             try:
+!                 with open(readme_path, "r", encoding="utf-8", errors="replace") as f:
+!                     return True, f.read()
+!             except Exception:
+!                 self._errors += 1
+!         return False, ""
+  
+!     def _extract_user_content(self, content: str) -> str:
+!         result = content
+!         while AUTO_START in result and AUTO_END in result:
+!             start_idx = result.index(AUTO_START)
+!             end_idx = result.index(AUTO_END) + len(AUTO_END)
+!             result = result[:start_idx] + result[end_idx:]
+!         return result.strip()
+  
+!     def _generate_path_index(
+!         self, subdirs: List[str], files: List[FileEntry]
+!     ) -> str:
+!         lines = ["## 📁 文件夹索引", ""]
+!         if subdirs:
+!             for sd in subdirs:
+!                 lines.append(f"- ./{sd}/")
+!         else:
+!             lines.append("- *(无子文件夹)*")
+!         lines.append("")
+!         lines.append("## 📄 文件索引")
+!         lines.append("")
+!         if files:
+!             for fe in files:
+!                 lines.append(f"- {fe.rel_path}")
+!         else:
+!             lines.append("- *(无文件)*")
+!         return "\n".join(lines)
+  
+!     def _generate_summary_table(
+!         self, file_summaries: Dict[str, str]
+!     ) -> str:
+!         lines = ["## 🔖 文件摘要映射", ""]
+!         if file_summaries:
+!             lines.append("| 文件路径 | 摘要 |")
+!             lines.append("|---------|------|")
+!             for fpath, summary in sorted(file_summaries.items()):
+!                 lines.append(f"| {fpath} | {summary} |")
+!         else:
+!             lines.append("*(无文件摘要)*")
+!         return "\n".join(lines)
+  
+!     def _build_auto_block(
+!         self, path_index: str, summary_table: str
+!     ) -> str:
+!         return "\n".join([
+!             AUTO_START, path_index, "", summary_table, AUTO_END,
+!         ])
+  
+!     def _merge_content(
+!         self,
+!         user_content: str,
+!         auto_block: str,
+!         folder_name: str,
+!     ) -> str:
+!         if not user_content:
+!             user_content = f"# {folder_name}\n\n> 自动生成于 R-SATIS v9.0\n"
+  
+!         if AUTO_START in user_content and AUTO_END in user_content:
+!             start_idx = user_content.find(AUTO_START)
+!             end_idx = user_content.find(AUTO_END) + len(AUTO_END)
+!             user_content = user_content[:start_idx] + auto_block + user_content[end_idx:]
+!         else:
+!             user_content = user_content.rstrip() + "\n\n" + auto_block
+  
+!         return user_content + "\n"
+  
+!     def update_readme(self, folder_path: str) -> bool:
+!         try:
+!             folder_path = os.path.abspath(folder_path)
+!             if not os.path.isdir(folder_path):
+!                 return False
+  
+!             folder_name = os.path.basename(folder_path) or folder_path
+!             subdirs, files = self.scan_folder(folder_path)
+!             exists, existing_content = self._read_readme(folder_path)
+!             user_content = self._extract_user_content(existing_content) if exists else ""
+  
+!             path_index = self._generate_path_index(subdirs, files)
+  
+!             file_summaries: Dict[str, str] = {}
+!             for fe in files:
+!                 filepath = os.path.join(folder_path, fe.name)
+!                 summary = self._compute_summary(filepath)
+!                 file_summaries[fe.rel_path] = summary
+  
+!             summary_table = self._generate_summary_table(file_summaries)
+!             auto_block = self._build_auto_block(path_index, summary_table)
+!             merged = self._merge_content(user_content, auto_block, folder_name)
+  
+!             readme_path = os.path.join(folder_path, "README.md")
+!             old_hash = ""
+!             if os.path.isfile(readme_path):
+!                 old_hash = self._hash_file(readme_path)
+  
+!             with open(readme_path, "w", encoding="utf-8") as f:
+!                 f.write(merged)
+  
+!             new_hash = self._hash_file(readme_path)
+  
+!             if self._evo_loop is not None:
+!                 try:
+!                     self._evo_loop.record_action(
+!                         action="update_readme",
+!                         state_before={"path": folder_path, "files": len(files)},
+!                         state_after={
+!                             "path": folder_path,
+!                             "files": len(files),
+!                             "subdirs": len(subdirs),
+!                             "summaries": len(file_summaries),
+!                             "changed": old_hash != new_hash,
+!                         },
+!                     )
+!                 except Exception:
+!                     pass
+  
+!             self._readme_updated += 1
+!             self._files_indexed += len(files)
+!             self._folders_scanned += 1
+  
+!             self._folder_states[folder_path] = FolderState(
+!                 path=folder_path,
+!                 files={fe.rel_path: fe for fe in files},
+!                 subdirs=subdirs,
+!                 last_updated=time.time(),
+!             )
+  
+!             return True
+!         except Exception as e:
+!             logger.debug(f"R-SATIS update_readme error: {e}")
+!             self._errors += 1
+!             return False
+  
+!     def update_folder(self, folder_path: str, recursive: bool = False) -> int:
+!         count = 0
+!         if self.update_readme(folder_path):
+!             count += 1
+  
+!         if recursive:
+!             try:
+!                 for entry in os.scandir(folder_path):
+!                     if entry.is_dir(follow_symlinks=False) and not self._should_exclude(entry.name):
+!                         count += self.update_folder(entry.path, recursive=True)
+!             except PermissionError:
+!                 self._errors += 1
+  
+!         return count
+  
+!     def update_all(self) -> int:
+!         root = self._config.root_path
+!         if not root or not os.path.isdir(root):
+!             logger.warning(f"R-SATIS root_path invalid: {root}")
+!             return 0
+!         count = self.update_folder(root, recursive=True)
+  
+!         if self._evo_loop is not None:
+!             try:
+!                 self._evo_loop.record_action(
+!                     action="update_all",
+!                     state_before={"root": root},
+!                     state_after={
+!                         "root": root,
+!                         "folders_updated": count,
+!                         "total_readme_updated": self._readme_updated,
+!                         "total_files_indexed": self._files_indexed,
+!                     },
+!                 )
+!             except Exception:
+!                 pass
+  
+!         return count
+  
+!     def get_status(self) -> Dict[str, Any]:
+!         return {
+!             "root_path": self._config.root_path,
+!             "summary_method": self._config.summary_method,
+!             "update_interval_seconds": self._config.update_interval_seconds,
+!             "watchdog_enabled": self._config.watchdog_enabled,
+!             "daemon_running": self._daemon_running,
+!             "folders_scanned": self._folders_scanned,
+!             "files_indexed": self._files_indexed,
+!             "readme_updated": self._readme_updated,
+!             "errors": self._errors,
+!             "tracked_folders_count": len(self._folder_states),
+!             "evo_loop_active": self._evo_loop is not None,
+!         }
+  
+!     def health(self) -> Dict[str, Any]:
+!         return {
+!             "status": "active" if self._daemon_running or self._readme_updated > 0 else "idle",
+!             "version": "9.0",
+!             "daemon_running": self._daemon_running,
+!             "folders_scanned": self._folders_scanned,
+!             "files_indexed": self._files_indexed,
+!             "readme_updated": self._readme_updated,
+!             "errors": self._errors,
+!             "tracked_folders": len(self._folder_states),
+!             "evo_loop_active": self._evo_loop is not None,
+!             "recorder_attached": self._recorder is not None,
+!         }
+  
+!     def tick(self):
+!         if self._evo_loop is not None:
+!             try:
+!                 self._evo_loop.tick()
+!             except Exception:
+!                 pass
+  
+!     def run_daemon(self):
+!         if self._daemon_running:
+!             return
+!         self._daemon_running = True
+!         self._daemon_thread = threading.Thread(target=self._daemon_loop, daemon=True)
+!         self._daemon_thread.start()
+  
+!     def stop_daemon(self):
+!         self._daemon_running = False
+  
+!     def _daemon_loop(self):
+!         while self._daemon_running:
+!             try:
+!                 if self._config.root_path and os.path.isdir(self._config.root_path):
+!                     self.update_all()
+!                 self.tick()
+!             except Exception as e:
+!                 logger.debug(f"R-SATIS daemon error: {e}")
+!                 self._errors += 1
+  
+!             if self._config.watchdog_enabled:
+!                 try:
+!                     self._watchdog_poll()
+!                 except Exception:
+!                     pass
+  
+!             if self._config.update_interval_seconds > 0:
+!                 time.sleep(self._config.update_interval_seconds)
+!             else:
+!                 time.sleep(60)
+  
+!     def _watchdog_poll(self):
+!         changes = 0
+!         for folder_path in list(self._folder_states.keys()):
+!             if not os.path.isdir(folder_path):
+!                 del self._folder_states[folder_path]
+!                 changes += 1
+!                 continue
+  
+!             try:
+!                 subdirs, files = self.scan_folder(folder_path)
+!                 old_state = self._folder_states.get(folder_path)
+!                 if old_state:
+!                     old_names = set(old_state.files.keys())
+!                     new_names = {fe.rel_path for fe in files}
+!                     if old_names != new_names:
+!                         changes += 1
+!                         continue
+!                     for fe in files:
+!                         old_fe = old_state.files.get(fe.rel_path)
+!                         if old_fe and (old_fe.size != fe.size or old_fe.mtime != fe.mtime):
+!                             changes += 1
+!                             break
+  
+!                 subdir_names = set(subdirs)
+!                 old_subdirs = set(old_state.subdirs) if old_state else set()
+!                 if subdir_names != old_subdirs:
+!                     changes += 1
+  
+!             except Exception:
+!                 self._errors += 1
+  
+!         if changes > 0:
+!             self._folders_scanned += changes
+!             logger.debug(f"R-SATIS watchdog: {changes} folder(s) changed")
+  
+!     def _calc_effectiveness(
+!         self, action: str, state_before: Dict[str, Any], state_after: Dict[str, Any]
+!     ) -> float:
+!         if action == "update_readme":
+!             files = state_after.get("files", 0)
+!             if files > 0:
+!                 return 0.6 + min(files / 100, 0.3)
+!             return 0.3
+!         elif action == "update_all":
+!             updated = state_after.get("folders_updated", 0)
+!             if updated > 0:
+!                 return 0.7 + min(updated / 50, 0.2)
+!             return 0.1
+!         return 0.0
+  
+!     def _learn_from_tracker(
+!         self, causal_pairs: List[Any], effectiveness_summary: Dict[str, Any]
+!     ) -> Dict[str, Any]:
+!         error_rate = self._errors / max(self._folders_scanned, 1)
+!         return {
+!             "patterns_found": len(causal_pairs),
+!             "avg_effectiveness": effectiveness_summary.get("avg_effectiveness", 0.0),
+!             "folders_scanned": self._folders_scanned,
+!             "files_indexed": self._files_indexed,
+!             "readme_updated": self._readme_updated,
+!             "error_rate": error_rate,
+!             "tracked_folders": len(self._folder_states),
+!         }
+  
+!     def _evolve_tracker_config(
+!         self, learn_result: Dict[str, Any], mutable_config: Dict[str, Any]
+!     ) -> Dict[str, Any]:
+!         changes = {}
+!         error_rate = learn_result.get("error_rate", 0.0)
+!         if error_rate > 0.05:
+!             changes["hash_buffer_size"] = min(262144,
+!                 mutable_config.get("hash_buffer_size", 65536) * 2)
+!         elif error_rate < 0.01:
+!             changes["hash_buffer_size"] = 65536
+  
+!         tracked = learn_result.get("tracked_folders", 0)
+!         if tracked > 100:
+!             changes["max_file_size_mb"] = 5
+  
+!         return {"rules_modified": changes, "skills_created": []}
+  
+  
+! def generate_default_config(root_path: str) -> ReadmeTrackerConfig:
+!     return ReadmeTrackerConfig(
+!         root_path=root_path,
+!         exclude_patterns=[
+!             ".git", "__pycache__", "node_modules", ".venv", "venv",
+!             "*.pyc", "*.pyo", ".DS_Store", "Thumbs.db",
+!         ],
+!         summary_method="hash",
+!         update_interval_seconds=300,
+!         watchdog_enabled=False,
+!     )
+  
+  
+! if __name__ == "__main__":
+!     import argparse
+  
+!     parser = argparse.ArgumentParser(description="R-SATIS v9.0 — 根目录源架构追踪索引系统")
+!     parser.add_argument("command", choices=["init", "watch", "run"],
+!                         help="init: 首次全量生成 / watch: 后台守护 / run: 手动增量更新")
+!     parser.add_argument("--config", type=str, default=None,
+!                         help="配置文件路径 (.r-satis.json)")
+!     parser.add_argument("--root", type=str, default=None,
+!                         help="父项目根目录路径")
+  
+!     args = parser.parse_args()
+  
+!     if args.config:
+!         tracker = ReadmeTracker(config_path=args.config)
+!     elif args.root:
+!         cfg = generate_default_config(args.root)
+!         tracker = ReadmeTracker(config=cfg)
+!     else:
+!         print("请指定 --config 或 --root")
+!         exit(1)
+  
+!     if args.command == "init":
+!         count = tracker.update_all()
+!         print(f"R-SATIS init: {count} README.md 已生成")
+!     elif args.command == "watch":
+!         print("R-SATIS watch 启动中...")
+!         tracker.run_daemon()
+!         try:
+!             while True:
+!                 time.sleep(5)
+!         except KeyboardInterrupt:
+!             tracker.stop_daemon()
+!             print("R-SATIS watch 已停止")
+!     elif args.command == "run":
+!         count = tracker.update_all()
+!         print(f"R-SATIS run: {count} README.md 已更新")

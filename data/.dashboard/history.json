@@ -1,0 +1,5650 @@
+[
+  {
+    "timestamp": 1780662683,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70351,
+    "db_size_mb": 147.86
+  },
+  {
+    "timestamp": 1780665175,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70359,
+    "db_size_mb": 148.02
+  },
+  {
+    "timestamp": 1780665246,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70359,
+    "db_size_mb": 148.02
+  },
+  {
+    "timestamp": 1780665328,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70359,
+    "db_size_mb": 148.02
+  },
+  {
+    "timestamp": 1780665433,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70359,
+    "db_size_mb": 148.02
+  },
+  {
+    "timestamp": 1780665499,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70359,
+    "db_size_mb": 148.02
+  },
+  {
+    "timestamp": 1780665568,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70359,
+    "db_size_mb": 148.02
+  },
+  {
+    "timestamp": 1780665629,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70359,
+    "db_size_mb": 148.02
+  },
+  {
+    "timestamp": 1780665749,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70359,
+    "db_size_mb": 148.02
+  },
+  {
+    "timestamp": 1780665869,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70359,
+    "db_size_mb": 148.02
+  },
+  {
+    "timestamp": 1780665989,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70359,
+    "db_size_mb": 148.02
+  },
+  {
+    "timestamp": 1780666049,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70359,
+    "db_size_mb": 148.02
+  },
+  {
+    "timestamp": 1780666169,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70359,
+    "db_size_mb": 148.02
+  },
+  {
+    "timestamp": 1780666229,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70359,
+    "db_size_mb": 148.02
+  },
+  {
+    "timestamp": 1780666348,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70359,
+    "db_size_mb": 148.02
+  },
+  {
+    "timestamp": 1780666408,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70360,
+    "db_size_mb": 148.02
+  },
+  {
+    "timestamp": 1780666468,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70360,
+    "db_size_mb": 148.02
+  },
+  {
+    "timestamp": 1780666589,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70360,
+    "db_size_mb": 148.02
+  },
+  {
+    "timestamp": 1780666708,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70361,
+    "db_size_mb": 148.02
+  },
+  {
+    "timestamp": 1780666829,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70361,
+    "db_size_mb": 148.02
+  },
+  {
+    "timestamp": 1780666948,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70361,
+    "db_size_mb": 148.02
+  },
+  {
+    "timestamp": 1780667068,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70362,
+    "db_size_mb": 148.02
+  },
+  {
+    "timestamp": 1780667188,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70363,
+    "db_size_mb": 148.14
+  },
+  {
+    "timestamp": 1780667249,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70364,
+    "db_size_mb": 148.14
+  },
+  {
+    "timestamp": 1780667368,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70364,
+    "db_size_mb": 148.14
+  },
+  {
+    "timestamp": 1780667489,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70364,
+    "db_size_mb": 148.14
+  },
+  {
+    "timestamp": 1780667608,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70365,
+    "db_size_mb": 148.14
+  },
+  {
+    "timestamp": 1780667668,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70366,
+    "db_size_mb": 148.14
+  },
+  {
+    "timestamp": 1780667728,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70366,
+    "db_size_mb": 148.14
+  },
+  {
+    "timestamp": 1780667848,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70366,
+    "db_size_mb": 148.14
+  },
+  {
+    "timestamp": 1780667968,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70367,
+    "db_size_mb": 148.14
+  },
+  {
+    "timestamp": 1780668028,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70367,
+    "db_size_mb": 148.14
+  },
+  {
+    "timestamp": 1780668148,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70367,
+    "db_size_mb": 148.14
+  },
+  {
+    "timestamp": 1780668209,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70367,
+    "db_size_mb": 148.14
+  },
+  {
+    "timestamp": 1780668328,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70367,
+    "db_size_mb": 148.14
+  },
+  {
+    "timestamp": 1780668388,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70367,
+    "db_size_mb": 148.14
+  },
+  {
+    "timestamp": 1780668449,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70367,
+    "db_size_mb": 148.14
+  },
+  {
+    "timestamp": 1780668568,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70367,
+    "db_size_mb": 148.14
+  },
+  {
+    "timestamp": 1780668689,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70367,
+    "db_size_mb": 148.14
+  },
+  {
+    "timestamp": 1780668808,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70367,
+    "db_size_mb": 148.14
+  },
+  {
+    "timestamp": 1780668928,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70367,
+    "db_size_mb": 148.14
+  },
+  {
+    "timestamp": 1780668989,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70367,
+    "db_size_mb": 148.14
+  },
+  {
+    "timestamp": 1780747568,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70454,
+    "db_size_mb": 149.36
+  },
+  {
+    "timestamp": 1780761567,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70804,
+    "db_size_mb": 150.35
+  },
+  {
+    "timestamp": 1780761628,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70861,
+    "db_size_mb": 150.53
+  },
+  {
+    "timestamp": 1780761747,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70882,
+    "db_size_mb": 150.62
+  },
+  {
+    "timestamp": 1780761861,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 70882,
+    "db_size_mb": 150.62
+  },
+  {
+    "timestamp": 1780781361,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 71357,
+    "db_size_mb": 152.41
+  },
+  {
+    "timestamp": 1780782152,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 71459,
+    "db_size_mb": 152.77
+  },
+  {
+    "timestamp": 1780782459,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 71463,
+    "db_size_mb": 152.77
+  },
+  {
+    "timestamp": 1780783845,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 71230,
+    "db_size_mb": 153.16
+  },
+  {
+    "timestamp": 1780786260,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 71266,
+    "db_size_mb": 153.98
+  },
+  {
+    "timestamp": 1780786801,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 71312,
+    "db_size_mb": 153.98
+  },
+  {
+    "timestamp": 1780787343,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 71312,
+    "db_size_mb": 153.98
+  },
+  {
+    "timestamp": 1780787973,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 71374,
+    "db_size_mb": 153.98
+  },
+  {
+    "timestamp": 1780791956,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 71529,
+    "db_size_mb": 155.87
+  },
+  {
+    "timestamp": 1780795156,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 71949,
+    "db_size_mb": 155.87
+  },
+  {
+    "timestamp": 1780799828,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 72857,
+    "db_size_mb": 171.37
+  },
+  {
+    "timestamp": 1780799888,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 72857,
+    "db_size_mb": 171.37
+  },
+  {
+    "timestamp": 1780799967,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 72859,
+    "db_size_mb": 171.37
+  },
+  {
+    "timestamp": 1780800027,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 72859,
+    "db_size_mb": 171.37
+  },
+  {
+    "timestamp": 1780800147,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 72860,
+    "db_size_mb": 171.37
+  },
+  {
+    "timestamp": 1780800267,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 72861,
+    "db_size_mb": 171.37
+  },
+  {
+    "timestamp": 1780800387,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 72861,
+    "db_size_mb": 171.37
+  },
+  {
+    "timestamp": 1780800447,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 72861,
+    "db_size_mb": 171.37
+  },
+  {
+    "timestamp": 1780801774,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 73171,
+    "db_size_mb": 171.52
+  },
+  {
+    "timestamp": 1780843126,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74267,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780843559,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74269,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780879710,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74393,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780879774,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74393,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780879838,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74394,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780879902,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74425,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780879966,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780880030,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780880094,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780880158,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780880222,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780880286,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780880350,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780880414,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780880478,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780880542,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780880606,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780880670,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780880734,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780880798,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780880862,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780880926,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780880990,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780881054,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780881118,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780881182,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780881246,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780881310,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780881374,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780881438,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780881502,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780881566,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780881630,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780881694,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780881758,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780881822,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780881886,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780881950,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780882014,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780882078,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780882142,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780882206,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780882271,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780882334,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780882398,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780882462,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780882526,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780882590,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780882654,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780882718,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780882782,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780882846,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780882910,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780882974,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780883038,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780883102,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780883166,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780883230,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780883294,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780883359,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780883425,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780883545,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780883605,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780883725,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780883845,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780883965,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780884025,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780884085,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780884145,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780884265,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780884385,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780884505,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780884625,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780884685,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780884805,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780884865,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780884925,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780884985,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780885105,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780885225,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780885285,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780885405,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780885465,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780885525,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780885585,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780892580,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780897093,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74439,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780956329,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74532,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1780965263,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 74724,
+    "db_size_mb": 181.32
+  },
+  {
+    "timestamp": 1781052526,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75250,
+    "db_size_mb": 183.7
+  },
+  {
+    "timestamp": 1781068775,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75286,
+    "db_size_mb": 183.77
+  },
+  {
+    "timestamp": 1781069098,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.77
+  },
+  {
+    "timestamp": 1781069209,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781095655,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781095786,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781098469,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781098529,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781098590,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781098659,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781098720,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781098789,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781098859,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781098929,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781098989,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781099049,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781099110,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781099194,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781099254,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781099374,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781099494,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781099554,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781099674,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781099794,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781099854,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781099914,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781100034,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781100094,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781100214,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781100274,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781100394,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781100454,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781100574,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781100694,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781100814,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781100874,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781100963,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781101029,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781101099,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781101170,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781101239,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781101309,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781101369,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781101429,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781101499,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781101559,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781101629,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781101699,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781101769,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781101829,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781101899,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781101969,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781102029,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781102100,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781102194,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781102254,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781102314,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781102374,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781102434,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781102554,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781102614,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781102734,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75300,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781102794,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75301,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781102854,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75301,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781102974,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75301,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781103094,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75301,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781103214,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75301,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781103334,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75301,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781103454,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75305,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781103574,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75305,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781103694,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75305,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781103814,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75305,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781103874,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75306,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781103935,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75306,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781104054,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75306,
+    "db_size_mb": 183.83
+  },
+  {
+    "timestamp": 1781165098,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75422,
+    "db_size_mb": 186.08
+  },
+  {
+    "timestamp": 1781186917,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75490,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781187347,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75504,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781188030,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75523,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781188157,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75537,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781188293,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75551,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781188422,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75556,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781188511,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75559,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781188572,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75560,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781188675,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75563,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781188794,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75563,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781188914,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75563,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781188975,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75563,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781189095,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75563,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781189214,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75564,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781189275,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75564,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781189395,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75564,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781189455,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75564,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781189575,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75564,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781189695,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75564,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781189814,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75564,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781189874,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75564,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781189934,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75564,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781189995,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75564,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781190114,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75564,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781190174,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75564,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781190234,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75564,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781190354,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75564,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781190415,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75564,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781190835,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75596,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781190896,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75596,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781191014,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75610,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781191074,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75610,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781191135,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75610,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781191494,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75643,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781191557,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75644,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781191674,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75660,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781191794,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75661,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781191855,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75661,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781192470,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75693,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781192598,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75739,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781193073,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75788,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781193184,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 75820,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781214490,
+    "online_modules": 53,
+    "total_modules": 62,
+    "coverage_pct": 85.5,
+    "memory_total": 76115,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781214656,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 76161,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781214726,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 76161,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781214786,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 76161,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781216372,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 76372,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781225118,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 76613,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781230602,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77189,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781230910,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77290,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781231069,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77290,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781231133,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77290,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781231197,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77290,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781231261,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77290,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781231325,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77290,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781231389,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77290,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781231453,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77290,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781231518,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77290,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781231581,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77290,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781231646,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77290,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781231709,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77290,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781231774,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77290,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781231837,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77290,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781231902,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77290,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781231965,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77290,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781232030,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77290,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781232093,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77290,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781232157,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77290,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781232221,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77290,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781232285,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77290,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781232349,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77290,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781232414,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77290,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781233038,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77323,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781233102,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77354,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781233165,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781233230,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781233293,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781233357,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781233421,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781233485,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781233549,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781233613,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781233678,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781233741,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781233806,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781233869,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781233934,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781233997,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781234062,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781234125,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781234190,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781234253,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781234317,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781234381,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781234445,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781234509,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781234573,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781234638,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781234701,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781234766,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781234829,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781234894,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781234957,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781235022,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781235085,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781235150,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781235213,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781235277,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781235341,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781235405,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781235469,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781235533,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781235598,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781235661,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781235726,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781235789,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781235854,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781235917,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781235982,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781236045,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781236110,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781236173,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781236237,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781236301,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781236365,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781236429,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781236493,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781236558,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781236621,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781236686,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781236749,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781236814,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781236877,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781236942,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781237005,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781237070,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781237133,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781237197,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781237261,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781237325,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781237389,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781237453,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781237518,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781237581,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781237646,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781237709,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781237774,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781237837,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781237902,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781237965,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781238030,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781238093,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781238157,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781238221,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781238285,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781238349,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781238413,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781238478,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781238541,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77369,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781238606,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77370,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781238670,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77371,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781238732,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77372,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781238796,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77373,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781238924,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77376,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781238988,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77406,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781239053,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77408,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781239116,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77420,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781239180,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77453,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781239332,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77495,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781239397,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77532,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781239460,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77546,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781239524,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77560,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781239588,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77560,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781239652,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77560,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781239716,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77560,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781239780,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77560,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781239844,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77560,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781239908,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77560,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781239972,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77560,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781240036,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77560,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781240100,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77560,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781240164,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77560,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781240228,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77560,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781240436,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77593,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781240500,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77625,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781240564,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77640,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781240628,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77654,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781240692,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77657,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781240756,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77658,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781240820,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77658,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781240884,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77658,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781241631,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77658,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781242884,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77727,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781243138,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77773,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781243736,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 77820,
+    "db_size_mb": 187.29
+  },
+  {
+    "timestamp": 1781248867,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78238,
+    "db_size_mb": 188.06
+  },
+  {
+    "timestamp": 1781250277,
+    "online_modules": 0,
+    "total_modules": 52,
+    "coverage_pct": 0.0,
+    "memory_total": 78292,
+    "db_size_mb": 189.19
+  },
+  {
+    "timestamp": 1781250548,
+    "online_modules": 0,
+    "total_modules": 52,
+    "coverage_pct": 0.0,
+    "memory_total": 78340,
+    "db_size_mb": 189.32
+  },
+  {
+    "timestamp": 1781255593,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78490,
+    "db_size_mb": 189.65
+  },
+  {
+    "timestamp": 1781255654,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78490,
+    "db_size_mb": 189.65
+  },
+  {
+    "timestamp": 1781255717,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78490,
+    "db_size_mb": 189.65
+  },
+  {
+    "timestamp": 1781255812,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78490,
+    "db_size_mb": 189.65
+  },
+  {
+    "timestamp": 1781255932,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78490,
+    "db_size_mb": 189.65
+  },
+  {
+    "timestamp": 1781255992,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78490,
+    "db_size_mb": 189.65
+  },
+  {
+    "timestamp": 1781256112,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78490,
+    "db_size_mb": 189.65
+  },
+  {
+    "timestamp": 1781256172,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78490,
+    "db_size_mb": 189.65
+  },
+  {
+    "timestamp": 1781256292,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78490,
+    "db_size_mb": 189.65
+  },
+  {
+    "timestamp": 1781256369,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78490,
+    "db_size_mb": 189.65
+  },
+  {
+    "timestamp": 1781256472,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78490,
+    "db_size_mb": 189.65
+  },
+  {
+    "timestamp": 1781256532,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78490,
+    "db_size_mb": 189.65
+  },
+  {
+    "timestamp": 1781256652,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78490,
+    "db_size_mb": 189.65
+  },
+  {
+    "timestamp": 1781256772,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78490,
+    "db_size_mb": 189.65
+  },
+  {
+    "timestamp": 1781256892,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78491,
+    "db_size_mb": 189.65
+  },
+  {
+    "timestamp": 1781257012,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78491,
+    "db_size_mb": 189.65
+  },
+  {
+    "timestamp": 1781257072,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78491,
+    "db_size_mb": 189.65
+  },
+  {
+    "timestamp": 1781257132,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78491,
+    "db_size_mb": 189.65
+  },
+  {
+    "timestamp": 1781257192,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78491,
+    "db_size_mb": 189.65
+  },
+  {
+    "timestamp": 1781257312,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78491,
+    "db_size_mb": 189.65
+  },
+  {
+    "timestamp": 1781257372,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78491,
+    "db_size_mb": 189.65
+  },
+  {
+    "timestamp": 1781257492,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78491,
+    "db_size_mb": 189.65
+  },
+  {
+    "timestamp": 1781257612,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78491,
+    "db_size_mb": 189.65
+  },
+  {
+    "timestamp": 1781257672,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78491,
+    "db_size_mb": 189.65
+  },
+  {
+    "timestamp": 1781257732,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78491,
+    "db_size_mb": 189.65
+  },
+  {
+    "timestamp": 1781257852,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78491,
+    "db_size_mb": 189.65
+  },
+  {
+    "timestamp": 1781257912,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78491,
+    "db_size_mb": 189.65
+  },
+  {
+    "timestamp": 1781258032,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78491,
+    "db_size_mb": 189.65
+  },
+  {
+    "timestamp": 1781258152,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78491,
+    "db_size_mb": 189.65
+  },
+  {
+    "timestamp": 1781258212,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78491,
+    "db_size_mb": 189.65
+  },
+  {
+    "timestamp": 1781258332,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78491,
+    "db_size_mb": 189.65
+  },
+  {
+    "timestamp": 1781258452,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78491,
+    "db_size_mb": 189.65
+  },
+  {
+    "timestamp": 1781258512,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78491,
+    "db_size_mb": 189.65
+  },
+  {
+    "timestamp": 1781258632,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78491,
+    "db_size_mb": 189.65
+  },
+  {
+    "timestamp": 1781258692,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78491,
+    "db_size_mb": 189.65
+  },
+  {
+    "timestamp": 1781258812,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78491,
+    "db_size_mb": 189.65
+  },
+  {
+    "timestamp": 1781258932,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78491,
+    "db_size_mb": 189.65
+  },
+  {
+    "timestamp": 1781258992,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78491,
+    "db_size_mb": 189.65
+  },
+  {
+    "timestamp": 1781259052,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78491,
+    "db_size_mb": 189.65
+  },
+  {
+    "timestamp": 1781264375,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78528,
+    "db_size_mb": 189.8
+  },
+  {
+    "timestamp": 1781264468,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78542,
+    "db_size_mb": 189.84
+  },
+  {
+    "timestamp": 1781265936,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78543,
+    "db_size_mb": 189.84
+  },
+  {
+    "timestamp": 1781266002,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78546,
+    "db_size_mb": 189.84
+  },
+  {
+    "timestamp": 1781266072,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78546,
+    "db_size_mb": 189.84
+  },
+  {
+    "timestamp": 1781266132,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78547,
+    "db_size_mb": 189.84
+  },
+  {
+    "timestamp": 1781266252,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78547,
+    "db_size_mb": 189.84
+  },
+  {
+    "timestamp": 1781266312,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78547,
+    "db_size_mb": 189.84
+  },
+  {
+    "timestamp": 1781266432,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78547,
+    "db_size_mb": 189.84
+  },
+  {
+    "timestamp": 1781266552,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78547,
+    "db_size_mb": 189.84
+  },
+  {
+    "timestamp": 1781266672,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78547,
+    "db_size_mb": 189.84
+  },
+  {
+    "timestamp": 1781266792,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78547,
+    "db_size_mb": 189.84
+  },
+  {
+    "timestamp": 1781266852,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78547,
+    "db_size_mb": 189.84
+  },
+  {
+    "timestamp": 1781266912,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78547,
+    "db_size_mb": 189.84
+  },
+  {
+    "timestamp": 1781267032,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78547,
+    "db_size_mb": 189.84
+  },
+  {
+    "timestamp": 1781267152,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78547,
+    "db_size_mb": 189.84
+  },
+  {
+    "timestamp": 1781267212,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78547,
+    "db_size_mb": 189.84
+  },
+  {
+    "timestamp": 1781267620,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 78579,
+    "db_size_mb": 190.64
+  },
+  {
+    "timestamp": 1781299348,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79815,
+    "db_size_mb": 192.83
+  },
+  {
+    "timestamp": 1781493616,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79903,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781493681,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79906,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781493745,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79911,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781493809,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79915,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781493873,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79920,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781493937,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79924,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781494001,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79929,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781494065,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79933,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781494129,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79937,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781494193,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79942,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781494257,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79946,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781494321,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79948,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781494385,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79948,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781494449,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79948,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781494513,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79948,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781494577,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79948,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781494641,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79948,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781494705,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79948,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781494769,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79948,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781494833,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79948,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781494897,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79948,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781494961,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79948,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781495025,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79948,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781495089,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79948,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781495153,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79948,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781495217,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79948,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781495281,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79948,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781495345,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79948,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781495409,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79948,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781495473,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79948,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781495537,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79948,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781495601,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79948,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781495665,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79948,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781495729,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79948,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781495811,
+    "online_modules": 0,
+    "total_modules": 52,
+    "coverage_pct": 0.0,
+    "memory_total": 79948,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781495897,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79949,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781495962,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79953,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781496026,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79957,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781496089,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79961,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781496153,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79966,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781496217,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79970,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781496281,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79975,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781496345,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79979,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781496409,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79984,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781496473,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79988,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781496537,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79993,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781496601,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79997,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781496665,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79998,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781496729,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79998,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781496793,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79998,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781496857,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79998,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781496921,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79998,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781496985,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79998,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781497049,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79998,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781497139,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79998,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781497259,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79998,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781497319,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79998,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781497379,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79998,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781497439,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79998,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781497559,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79998,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781497679,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79998,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781497739,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79998,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781497859,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79998,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781497979,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79998,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781498099,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79998,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781498159,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79998,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781498219,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79998,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781498339,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79998,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781498459,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79998,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781498579,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79998,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781498639,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79998,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781498759,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79998,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781498879,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79998,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781498999,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79998,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781499059,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79998,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781499179,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79998,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781499299,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 79998,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781499719,
+    "online_modules": 0,
+    "total_modules": 52,
+    "coverage_pct": 0.0,
+    "memory_total": 79998,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781499779,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80000,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781499844,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80004,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781499984,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80013,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781500079,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80019,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781500139,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80023,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781500199,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80028,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781500319,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80036,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781500379,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80040,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781500499,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80048,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781500559,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80048,
+    "db_size_mb": 194.5
+  },
+  {
+    "timestamp": 1781503936,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80048,
+    "db_size_mb": 194.67
+  },
+  {
+    "timestamp": 1781504087,
+    "online_modules": 57,
+    "total_modules": 62,
+    "coverage_pct": 91.9,
+    "memory_total": 80050,
+    "db_size_mb": 194.67
+  },
+  {
+    "timestamp": 1781504279,
+    "online_modules": 0,
+    "total_modules": 52,
+    "coverage_pct": 0.0,
+    "memory_total": 80057,
+    "db_size_mb": 194.67
+  },
+  {
+    "timestamp": 1781504341,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80060,
+    "db_size_mb": 194.67
+  },
+  {
+    "timestamp": 1781504459,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80067,
+    "db_size_mb": 194.67
+  },
+  {
+    "timestamp": 1781504579,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80075,
+    "db_size_mb": 194.67
+  },
+  {
+    "timestamp": 1781504639,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80079,
+    "db_size_mb": 194.67
+  },
+  {
+    "timestamp": 1781504759,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80088,
+    "db_size_mb": 194.67
+  },
+  {
+    "timestamp": 1781504879,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80096,
+    "db_size_mb": 194.67
+  },
+  {
+    "timestamp": 1781505240,
+    "online_modules": 0,
+    "total_modules": 52,
+    "coverage_pct": 0.0,
+    "memory_total": 80107,
+    "db_size_mb": 194.67
+  },
+  {
+    "timestamp": 1781505365,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80111,
+    "db_size_mb": 194.67
+  },
+  {
+    "timestamp": 1781505479,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80123,
+    "db_size_mb": 194.67
+  },
+  {
+    "timestamp": 1781505539,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80130,
+    "db_size_mb": 194.67
+  },
+  {
+    "timestamp": 1781505599,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80137,
+    "db_size_mb": 194.67
+  },
+  {
+    "timestamp": 1781505719,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80151,
+    "db_size_mb": 194.76
+  },
+  {
+    "timestamp": 1781505839,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80165,
+    "db_size_mb": 194.76
+  },
+  {
+    "timestamp": 1781505959,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80178,
+    "db_size_mb": 194.76
+  },
+  {
+    "timestamp": 1781506019,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80186,
+    "db_size_mb": 194.76
+  },
+  {
+    "timestamp": 1781506139,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80189,
+    "db_size_mb": 194.76
+  },
+  {
+    "timestamp": 1781506259,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80189,
+    "db_size_mb": 194.77
+  },
+  {
+    "timestamp": 1781529248,
+    "online_modules": 0,
+    "total_modules": 52,
+    "coverage_pct": 0.0,
+    "memory_total": 80203,
+    "db_size_mb": 194.82
+  },
+  {
+    "timestamp": 1781529312,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80205,
+    "db_size_mb": 194.82
+  },
+  {
+    "timestamp": 1781529378,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80208,
+    "db_size_mb": 194.82
+  },
+  {
+    "timestamp": 1781529443,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80212,
+    "db_size_mb": 194.82
+  },
+  {
+    "timestamp": 1781529512,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80216,
+    "db_size_mb": 194.82
+  },
+  {
+    "timestamp": 1781529599,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80223,
+    "db_size_mb": 194.82
+  },
+  {
+    "timestamp": 1781529659,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80227,
+    "db_size_mb": 194.86
+  },
+  {
+    "timestamp": 1781529719,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80231,
+    "db_size_mb": 194.86
+  },
+  {
+    "timestamp": 1781529839,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80239,
+    "db_size_mb": 194.86
+  },
+  {
+    "timestamp": 1781529959,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80248,
+    "db_size_mb": 194.89
+  },
+  {
+    "timestamp": 1781530079,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 194.89
+  },
+  {
+    "timestamp": 1781530139,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 194.89
+  },
+  {
+    "timestamp": 1781530259,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 194.89
+  },
+  {
+    "timestamp": 1781530379,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 194.89
+  },
+  {
+    "timestamp": 1781530439,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 194.94
+  },
+  {
+    "timestamp": 1781530559,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 194.94
+  },
+  {
+    "timestamp": 1781530679,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 194.94
+  },
+  {
+    "timestamp": 1781530799,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 194.94
+  },
+  {
+    "timestamp": 1781530859,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 194.98
+  },
+  {
+    "timestamp": 1781530979,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 194.98
+  },
+  {
+    "timestamp": 1781531042,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 194.98
+  },
+  {
+    "timestamp": 1781531112,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 194.98
+  },
+  {
+    "timestamp": 1781531219,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 194.98
+  },
+  {
+    "timestamp": 1781531339,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 195.01
+  },
+  {
+    "timestamp": 1781531459,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 195.01
+  },
+  {
+    "timestamp": 1781531579,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 195.01
+  },
+  {
+    "timestamp": 1781531639,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 195.01
+  },
+  {
+    "timestamp": 1781531699,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 195.01
+  },
+  {
+    "timestamp": 1781531819,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 195.04
+  },
+  {
+    "timestamp": 1781531879,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 195.04
+  },
+  {
+    "timestamp": 1781531999,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 195.04
+  },
+  {
+    "timestamp": 1781532059,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 195.04
+  },
+  {
+    "timestamp": 1781532119,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 195.04
+  },
+  {
+    "timestamp": 1781532239,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 195.11
+  },
+  {
+    "timestamp": 1781532299,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 195.11
+  },
+  {
+    "timestamp": 1781532359,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 195.11
+  },
+  {
+    "timestamp": 1781532419,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 195.11
+  },
+  {
+    "timestamp": 1781532539,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 195.11
+  },
+  {
+    "timestamp": 1781532599,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 195.11
+  },
+  {
+    "timestamp": 1781532719,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 195.11
+  },
+  {
+    "timestamp": 1781532779,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 195.11
+  },
+  {
+    "timestamp": 1781532899,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 195.11
+  },
+  {
+    "timestamp": 1781532959,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 195.11
+  },
+  {
+    "timestamp": 1781533019,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 195.11
+  },
+  {
+    "timestamp": 1781533079,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 195.11
+  },
+  {
+    "timestamp": 1781533199,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 195.16
+  },
+  {
+    "timestamp": 1781533319,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 195.16
+  },
+  {
+    "timestamp": 1781533439,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 195.16
+  },
+  {
+    "timestamp": 1781533559,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 195.17
+  },
+  {
+    "timestamp": 1781533619,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 195.17
+  },
+  {
+    "timestamp": 1781533739,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 195.17
+  },
+  {
+    "timestamp": 1781533859,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 195.17
+  },
+  {
+    "timestamp": 1781533979,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 195.17
+  },
+  {
+    "timestamp": 1781534099,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 195.24
+  },
+  {
+    "timestamp": 1781534219,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 195.24
+  },
+  {
+    "timestamp": 1781534339,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 195.24
+  },
+  {
+    "timestamp": 1781534459,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 195.24
+  },
+  {
+    "timestamp": 1781534519,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 195.35
+  },
+  {
+    "timestamp": 1781534639,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80253,
+    "db_size_mb": 195.35
+  },
+  {
+    "timestamp": 1781561539,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 80455,
+    "db_size_mb": 197.46
+  },
+  {
+    "timestamp": 1781571554,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 21490,
+    "db_size_mb": 200.25
+  },
+  {
+    "timestamp": 1781571618,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 22110,
+    "db_size_mb": 200.7
+  },
+  {
+    "timestamp": 1781571718,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 22204,
+    "db_size_mb": 200.7
+  },
+  {
+    "timestamp": 1781571838,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 22290,
+    "db_size_mb": 203.33
+  },
+  {
+    "timestamp": 1781572017,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 23221,
+    "db_size_mb": 203.33
+  },
+  {
+    "timestamp": 1781575660,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 83650,
+    "db_size_mb": 276.81
+  },
+  {
+    "timestamp": 1781575724,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 84296,
+    "db_size_mb": 276.81
+  },
+  {
+    "timestamp": 1781575798,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 84984,
+    "db_size_mb": 279.28
+  },
+  {
+    "timestamp": 1781575862,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 85556,
+    "db_size_mb": 280.51
+  },
+  {
+    "timestamp": 1781575928,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 85960,
+    "db_size_mb": 280.51
+  },
+  {
+    "timestamp": 1781576343,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 86702,
+    "db_size_mb": 280.51
+  },
+  {
+    "timestamp": 1781577384,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 87643,
+    "db_size_mb": 286.36
+  },
+  {
+    "timestamp": 1781577497,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 88060,
+    "db_size_mb": 287.25
+  },
+  {
+    "timestamp": 1781577557,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 89428,
+    "db_size_mb": 288.27
+  },
+  {
+    "timestamp": 1781577786,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 91414,
+    "db_size_mb": 290.46
+  },
+  {
+    "timestamp": 1781578161,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 93640,
+    "db_size_mb": 291.92
+  },
+  {
+    "timestamp": 1781580243,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 95816,
+    "db_size_mb": 296.65
+  },
+  {
+    "timestamp": 1781580581,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 97505,
+    "db_size_mb": 297.86
+  },
+  {
+    "timestamp": 1781580684,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 98050,
+    "db_size_mb": 298.31
+  },
+  {
+    "timestamp": 1781580829,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 98712,
+    "db_size_mb": 300.05
+  },
+  {
+    "timestamp": 1781581006,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 99622,
+    "db_size_mb": 300.99
+  },
+  {
+    "timestamp": 1781581201,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 100653,
+    "db_size_mb": 302.45
+  },
+  {
+    "timestamp": 1781581289,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 101173,
+    "db_size_mb": 303.27
+  },
+  {
+    "timestamp": 1781581413,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 101644,
+    "db_size_mb": 304.69
+  },
+  {
+    "timestamp": 1781589872,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 137056,
+    "db_size_mb": 343.11
+  },
+  {
+    "timestamp": 1781592111,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 138068,
+    "db_size_mb": 348.67
+  },
+  {
+    "timestamp": 1781592264,
+    "online_modules": 0,
+    "total_modules": 52,
+    "coverage_pct": 0.0,
+    "memory_total": 139119,
+    "db_size_mb": 349.67
+  },
+  {
+    "timestamp": 1781592332,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 139406,
+    "db_size_mb": 351.86
+  },
+  {
+    "timestamp": 1781592418,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 139673,
+    "db_size_mb": 351.86
+  },
+  {
+    "timestamp": 1781592738,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 140761,
+    "db_size_mb": 352.0
+  },
+  {
+    "timestamp": 1781593125,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 142114,
+    "db_size_mb": 352.35
+  },
+  {
+    "timestamp": 1781593678,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 142399,
+    "db_size_mb": 355.24
+  },
+  {
+    "timestamp": 1781593809,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 142796,
+    "db_size_mb": 355.24
+  },
+  {
+    "timestamp": 1781593900,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 143111,
+    "db_size_mb": 355.5
+  },
+  {
+    "timestamp": 1781594811,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 146161,
+    "db_size_mb": 360.65
+  },
+  {
+    "timestamp": 1781596406,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 150469,
+    "db_size_mb": 366.54
+  },
+  {
+    "timestamp": 1781597158,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 151140,
+    "db_size_mb": 368.42
+  },
+  {
+    "timestamp": 1781597236,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 151487,
+    "db_size_mb": 368.42
+  },
+  {
+    "timestamp": 1781597542,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 152426,
+    "db_size_mb": 368.42
+  },
+  {
+    "timestamp": 1781597703,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 153087,
+    "db_size_mb": 369.7
+  },
+  {
+    "timestamp": 1781597766,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 153272,
+    "db_size_mb": 370.39
+  },
+  {
+    "timestamp": 1781597878,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 153531,
+    "db_size_mb": 372.5
+  },
+  {
+    "timestamp": 1781597998,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 153722,
+    "db_size_mb": 374.11
+  },
+  {
+    "timestamp": 1781598179,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 154022,
+    "db_size_mb": 374.13
+  },
+  {
+    "timestamp": 1781598618,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 155505,
+    "db_size_mb": 375.92
+  },
+  {
+    "timestamp": 1781598960,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 153705,
+    "db_size_mb": 379.76
+  },
+  {
+    "timestamp": 1781599033,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 153394,
+    "db_size_mb": 379.79
+  },
+  {
+    "timestamp": 1781599158,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 153784,
+    "db_size_mb": 380.13
+  },
+  {
+    "timestamp": 1781599718,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 155473,
+    "db_size_mb": 385.58
+  },
+  {
+    "timestamp": 1781599966,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 156229,
+    "db_size_mb": 385.58
+  },
+  {
+    "timestamp": 1781600239,
+    "online_modules": 62,
+    "total_modules": 62,
+    "coverage_pct": 100.0,
+    "memory_total": 157017,
+    "db_size_mb": 385.64
+  }
+]

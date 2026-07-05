@@ -1,0 +1,326 @@
+> r"""
+> LLM桥接层 — DeepSeek ←→ ICME Engine v1.1
+> ===========================================
+> 将DeepSeek的异步决策能力同步注入记忆引擎的每个操作。
+  
+> M26升级: EvolutionLoop闭环 + record_action喂入 + health() + 双注入
+> 灵境道谱溯源: D9-4【桥接通道煞】· 道九·通道体 · 四地煞之桥之术
+>   - 同步↔异步桥接+TVP协议推送+降级友好回退+零阻塞感知
+>   - 源文件: core/llm_bridge.py → LLMBridge
+  
+> 桥接策略:
+>   remember()  → 无tags/无layer时 → DeepSeek自动分类
+>   remember()  → 可选 → DeepSeek评估价值+提取知识
+>   recall()    → semantic=True时 → DeepSeek查询扩展+重排序
+>   consolidate → DeepSeek评估晋升必要性
+  
+> 设计原则:
+>   - 同步封装 (engine是同步的)
+>   - 降级友好 (DeepSeek不可用时静默回退)
+>   - 零阻塞感知 (超时保护)
+> """
+  
+> import time
+> import threading
+> from typing import Any, Optional, List, Dict
+  
+> from llm_integration.client import DeepSeekClient, DeepSeekConfig
+> from llm_integration.decision_engine import MemoryDecisionEngine, StorageDecision, ClassificationResult
+  
+> try:
+>     from .evolution_loop import EvolutionLoop
+! except ImportError:
+!     EvolutionLoop = None
+  
+  
+> class LLMBridge:
+>     def __init__(self, config: Optional[DeepSeekConfig] = None,
+>                  recorder: Optional[Any] = None,
+>                  learning_engine: Optional[Any] = None):
+!         self.config = config or DeepSeekConfig.from_env()
+!         self._client: Optional[DeepSeekClient] = None
+!         self._engine: Optional[MemoryDecisionEngine] = None
+!         self._ready = False
+!         self._lock = threading.RLock()
+!         self._recorder = recorder
+!         self._learning_engine = learning_engine
+!         self._stats = {
+!             "total_calls": 0, "successful_calls": 0,
+!             "failed_calls": 0, "fallback_calls": 0,
+!             "last_call_time": 0.0,
+!             "classify_ops": 0, "tag_ops": 0,
+!             "assess_ops": 0, "decide_ops": 0,
+!             "extract_ops": 0, "summarize_ops": 0,
+!             "expand_ops": 0, "enrich_remember_ops": 0,
+!             "enrich_recall_ops": 0, "start_time": time.time(),
+!         }
+!         self._errors = 0
+  
+!         self._evo_loop = None
+!         if EvolutionLoop is not None:
+!             try:
+!                 self._evo_loop = EvolutionLoop(
+!                     module_name="llm_bridge",
+!                     effectiveness_fn=self._calc_bridge_effectiveness,
+!                     learn_fn=self._learn_from_bridge,
+!                     evolve_fn=self._evolve_bridge_config,
+!                     mutable_config={
+!                         "fallback_threshold": 0.3,
+!                         "enrich_timeout_ms": 5000,
+!                     },
+!                     recorder=recorder,
+!                     learning_engine=learning_engine,
+!                 )
+!             except Exception as e:
+!                 import logging
+!                 logging.getLogger(__name__).warning(
+!                     f"LLMBridge EvolutionLoop init failed: {e}")
+  
+!         self._init()
+  
+>     def _init(self):
+!         if not self.config.api_key:
+!             return
+!         self._client = DeepSeekClient(self.config)
+!         self._engine = MemoryDecisionEngine(self._client)
+!         self._ready = True
+  
+>     @property
+>     def is_ready(self) -> bool:
+!         return self._ready
+  
+>     def _call_llm(self, fn, *args, **kwargs) -> Any:
+!         self._stats["total_calls"] += 1
+!         self._stats["last_call_time"] = time.time()
+!         try:
+!             result = fn(*args, **kwargs)
+!             self._stats["successful_calls"] += 1
+!             return result
+!         except Exception as e:
+!             self._stats["failed_calls"] += 1
+!             self._stats["fallback_calls"] += 1
+!             return None
+  
+>     def classify_content(self, content: str, context: Optional[Dict] = None) -> Optional[ClassificationResult]:
+!         self._stats["classify_ops"] += 1
+!         if not self._ready:
+!             return None
+!         return self._call_llm(self._engine.classify_layer, content, context)
+  
+>     def auto_tag(self, content: str) -> List[str]:
+!         self._stats["tag_ops"] += 1
+!         if not self._ready:
+!             return []
+!         result = self._call_llm(self._engine.auto_tag, content)
+!         return result if isinstance(result, list) else []
+  
+>     def assess_value(self, content: str) -> float:
+!         self._stats["assess_ops"] += 1
+!         if not self._ready:
+!             return 0.5
+!         result = self._call_llm(self._engine.assess_value, content)
+!         if isinstance(result, dict):
+!             return float(result.get("value_score", 0.5))
+!         return 0.5
+  
+>     def decide_storage(self, content: str, context: Optional[Dict] = None) -> Optional[StorageDecision]:
+!         self._stats["decide_ops"] += 1
+!         if not self._ready:
+!             return None
+!         return self._call_llm(self._engine.decide_storage, content, context)
+  
+>     def extract_knowledge(self, content: str) -> List[Dict]:
+!         self._stats["extract_ops"] += 1
+!         if not self._ready:
+!             return []
+!         result = self._call_llm(self._engine.extract_knowledge, content)
+!         return result if isinstance(result, list) else []
+  
+>     def summarize(self, content: str, max_length: int = 200) -> str:
+!         self._stats["summarize_ops"] += 1
+!         if not self._ready:
+!             return content[:max_length]
+!         result = self._call_llm(self._engine.summarize, content, max_length)
+!         return result if isinstance(result, str) else content[:max_length]
+  
+>     def expand_query(self, query: str) -> List[str]:
+!         self._stats["expand_ops"] += 1
+!         if not self._ready:
+!             return [query]
+!         result = self._call_llm(self._engine.expand_query, query)
+!         return result if isinstance(result, list) else [query]
+  
+>     def enrich_remember(
+>         self, content: str, layer: Optional[str] = None,
+>         tags: Optional[List[str]] = None, priority: Optional[str] = None,
+>     ) -> Dict[str, Any]:
+!         self._stats["enrich_remember_ops"] += 1
+!         enrichment = {
+!             "layer": layer,
+!             "tags": tags or [],
+!             "priority": priority or "medium",
+!             "value_score": 0.5,
+!             "summary": "",
+!             "knowledge_triples": [],
+!             "llm_enriched": False,
+!         }
+  
+!         if not self._ready:
+!             if self._evo_loop is not None:
+!                 try:
+!                     self._evo_loop.record_action(
+!                         action="enrich_remember",
+!                         state_before={"ready": False},
+!                         state_after={"ready": False, "llm_enriched": False},
+!                     )
+!                 except Exception:
+!                     pass
+!             return enrichment
+  
+!         decision = self.decide_storage(content)
+  
+!         if decision is None:
+!             return enrichment
+  
+!         enrichment["llm_enriched"] = True
+  
+!         if not layer:
+!             enrichment["layer"] = decision.layer
+!         if not tags:
+!             enrichment["tags"] = decision.tags
+!         if not priority:
+!             enrichment["priority"] = decision.priority
+!         enrichment["value_score"] = decision.value_score
+  
+!         if len(content) > 300:
+!             enrichment["summary"] = decision.summary or self.summarize(content)
+  
+!         if decision.value_score >= 0.5:
+!             enrichment["knowledge_triples"] = self.extract_knowledge(content)
+  
+!         if self._evo_loop is not None:
+!             try:
+!                 self._evo_loop.record_action(
+!                     action="enrich_remember",
+!                     state_before={"ready": True, "llm_enriched": False},
+!                     state_after={"ready": True, "llm_enriched": True,
+!                                  "layer": enrichment["layer"],
+!                                  "value_score": enrichment["value_score"],
+!                                  "triples_count": len(enrichment["knowledge_triples"])},
+!                 )
+!             except Exception:
+!                 pass
+  
+!         return enrichment
+  
+>     def enrich_recall(self, query: str, entries: List, limit: int = 20) -> List:
+!         self._stats["enrich_recall_ops"] += 1
+!         if not self._ready or not entries:
+!             return entries[:limit]
+  
+!         expansions = self.expand_query(query)
+  
+!         scored = []
+!         for entry in entries[:min(50, len(entries))]:
+!             content = entry.content if hasattr(entry, "content") else entry.get("content", "")
+!             base_score = entry.value_score() if hasattr(entry, "value_score") else entry.get("value_score", 0.5)
+!             for exp in expansions:
+!                 if exp.lower() in content.lower():
+!                     base_score *= 1.3
+!                     break
+!             scored.append((base_score, entry))
+  
+!         scored.sort(key=lambda x: x[0], reverse=True)
+!         result = [e for _, e in scored[:limit]]
+  
+!         if self._evo_loop is not None:
+!             try:
+!                 self._evo_loop.record_action(
+!                     action="enrich_recall",
+!                     state_before={"query": query, "entries_in": len(entries)},
+!                     state_after={"query": query, "entries_out": len(result),
+!                                  "expansions": len(expansions)},
+!                 )
+!             except Exception:
+!                 pass
+  
+!         return result
+  
+>     def health(self) -> Dict[str, Any]:
+!         with self._lock:
+!             return {
+!                 "status": "ready" if self.is_ready else "not_ready",
+!                 "version": "1.1",
+!                 "is_ready": self.is_ready,
+!                 "total_calls": self._stats["total_calls"],
+!                 "successful_calls": self._stats["successful_calls"],
+!                 "failed_calls": self._stats["failed_calls"],
+!                 "fallback_calls": self._stats["fallback_calls"],
+!                 "errors": self._errors,
+!                 "evo_loop_active": self._evo_loop is not None,
+!                 "recorder_attached": self._recorder is not None,
+!                 "classify_ops": self._stats["classify_ops"],
+!                 "enrich_remember_ops": self._stats["enrich_remember_ops"],
+!                 "enrich_recall_ops": self._stats["enrich_recall_ops"],
+!             }
+  
+>     def get_stats(self) -> Dict[str, Any]:
+!         with self._lock:
+!             return {
+!                 "version": "1.1",
+!                 "status": "ready" if self.is_ready else "not_ready",
+!                 "is_ready": self.is_ready,
+!                 **self._stats,
+!                 "errors": self._errors,
+!                 "evo_loop_active": self._evo_loop is not None,
+!                 "recorder_attached": self._recorder is not None,
+!                 "evo_loop": self._evo_loop.get_stats() if self._evo_loop else {},
+!             }
+  
+>     def tick(self):
+!         if self._evo_loop is not None:
+!             try:
+!                 self._evo_loop.tick()
+!             except Exception:
+!                 pass
+  
+>     def _calc_bridge_effectiveness(self, action: str,
+>                                     state_before: Dict[str, Any],
+>                                     state_after: Dict[str, Any]) -> float:
+!         if action == "enrich_remember":
+!             if state_after.get("llm_enriched", False):
+!                 score = state_after.get("value_score", 0.5)
+!                 triples = state_after.get("triples_count", 0)
+!                 return min(0.8, score * 0.4 + triples * 0.1)
+!             return 0.1
+!         elif action == "enrich_recall":
+!             expansions = state_after.get("expansions", 0)
+!             entries_out = state_after.get("entries_out", 0)
+!             return min(0.6, 0.2 + expansions * 0.1 + entries_out * 0.02)
+!         return 0.0
+  
+>     def _learn_from_bridge(self, causal_pairs: List[Any],
+>                             effectiveness_summary: Dict[str, Any]) -> Dict[str, Any]:
+!         with self._lock:
+!             return {
+!                 "patterns_found": len(causal_pairs),
+!                 "avg_effectiveness": effectiveness_summary.get("avg_effectiveness", 0.0),
+!                 "success_rate": (
+!                     self._stats["successful_calls"] / max(self._stats["total_calls"], 1)
+!                 ),
+!                 "total_enriched": (
+!                     self._stats["enrich_remember_ops"] + self._stats["enrich_recall_ops"]
+!                 ),
+!             }
+  
+>     def _evolve_bridge_config(self, learn_result: Dict[str, Any],
+>                                mutable_config: Dict[str, Any]) -> Dict[str, Any]:
+!         changes = {}
+!         success_rate = learn_result.get("success_rate", 1.0)
+!         if success_rate < 0.5:
+!             changes["enrich_timeout_ms"] = min(10000,
+!                 mutable_config.get("enrich_timeout_ms", 5000) + 1000)
+!         if success_rate > 0.9 and mutable_config.get("enrich_timeout_ms", 5000) > 2000:
+!             changes["enrich_timeout_ms"] = max(2000,
+!                 mutable_config.get("enrich_timeout_ms", 5000) - 500)
+!         return {"rules_modified": changes, "skills_created": []}

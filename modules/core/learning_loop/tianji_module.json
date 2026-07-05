@@ -1,0 +1,31 @@
+﻿﻿﻿{
+    "id": "learning_loop",
+    "display_name": "闭环学习引擎",
+    "version": "1.0.0",
+    "description": "执行→反思→提炼→沉淀→复用 闭环学习系统",
+    "author": "tianji_core",
+    "category": "core",
+    "type": "loop",
+    "import_path": "core.learning_loop.ClosedLoopLearningEngine",
+    "init_args": {
+        "_resolve": "learning_loop"
+    },
+    "depends_on": [
+        "skill_registry",
+        "event_bus",
+        "evolution_engine"
+    ],
+    "provides": [
+        "closed_loop_learning",
+        "knowledge_distillation",
+        "experience_reuse"
+    ],
+    "tags": [
+        "learning",
+        "loop",
+        "evolution",
+        "core"
+    ],
+    "min_platform_version": "9.1.0""config_schema": {},
+    "health_check_interval": 60.0
+}

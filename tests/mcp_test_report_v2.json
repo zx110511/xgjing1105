@@ -1,0 +1,728 @@
+{
+  "timestamp": "2026-07-03 05:14:45",
+  "service_health": {
+    "status": "healthy",
+    "version": "9.1.0-sss",
+    "edition": "source-v9.1",
+    "engine_ready": true,
+    "layers": {
+      "sensory": {
+        "size_bytes": 612775,
+        "max_size_bytes": 10485760,
+        "hard_cap_bytes": 12582912,
+        "entry_count": 1407,
+        "max_entries": 2000,
+        "usage_ratio": 0.0584,
+        "capacity_threshold": 0.85,
+        "accumulation_threshold_bytes": 2097152,
+        "accumulation_threshold_entries": 100,
+        "accumulated_bytes": 0,
+        "accumulated_entries": 0,
+        "accumulation_ratio": 0.0,
+        "accumulation_entry_ratio": 0.0,
+        "needs_consolidation": false,
+        "at_hard_cap": false,
+        "seconds_since_last_consolidation": 1783026823.2
+      },
+      "working": {
+        "size_bytes": 531742,
+        "max_size_bytes": 52428800,
+        "hard_cap_bytes": 62914560,
+        "entry_count": 517,
+        "max_entries": 1000,
+        "usage_ratio": 0.0101,
+        "capacity_threshold": 0.8,
+        "accumulation_threshold_bytes": 4194304,
+        "accumulation_threshold_entries": 50,
+        "accumulated_bytes": 0,
+        "accumulated_entries": 0,
+        "accumulation_ratio": 0.0,
+        "accumulation_entry_ratio": 0.0,
+        "needs_consolidation": false,
+        "at_hard_cap": false,
+        "seconds_since_last_consolidation": 1783026823.2
+      },
+      "short_term": {
+        "size_bytes": 1784530,
+        "max_size_bytes": 209715200,
+        "hard_cap_bytes": 262144000,
+        "entry_count": 3412,
+        "max_entries": 5000,
+        "usage_ratio": 0.0085,
+        "capacity_threshold": 0.75,
+        "accumulation_threshold_bytes": 2097152,
+        "accumulation_threshold_entries": 50,
+        "accumulated_bytes": 0,
+        "accumulated_entries": 0,
+        "accumulation_ratio": 0.0,
+        "accumulation_entry_ratio": 0.0,
+        "needs_consolidation": false,
+        "at_hard_cap": false,
+        "seconds_since_last_consolidation": 1783026823.2
+      },
+      "episodic": {
+        "size_bytes": 871897,
+        "max_size_bytes": 524288000,
+        "hard_cap_bytes": 629145600,
+        "entry_count": 4764,
+        "max_entries": 5000,
+        "usage_ratio": 0.0017,
+        "capacity_threshold": 0.8,
+        "accumulation_threshold_bytes": 10485760,
+        "accumulation_threshold_entries": 50,
+        "accumulated_bytes": 0,
+        "accumulated_entries": 0,
+        "accumulation_ratio": 0.0,
+        "accumulation_entry_ratio": 0.0,
+        "needs_consolidation": false,
+        "at_hard_cap": false,
+        "seconds_since_last_consolidation": 1783026823.2
+      },
+      "semantic": {
+        "size_bytes": 570949,
+        "max_size_bytes": 2147483648,
+        "hard_cap_bytes": 2621440000,
+        "entry_count": 8106,
+        "max_entries": 10000,
+        "usage_ratio": 0.0003,
+        "capacity_threshold": 0.85,
+        "accumulation_threshold_bytes": 52428800,
+        "accumulation_threshold_entries": 60,
+        "accumulated_bytes": 0,
+        "accumulated_entries": 0,
+        "accumulation_ratio": 0.0,
+        "accumulation_entry_ratio": 0.0,
+        "needs_consolidation": false,
+        "at_hard_cap": false,
+        "seconds_since_last_consolidation": 1783026823.2
+      },
+      "meta": {
+        "size_bytes": 9532926,
+        "max_size_bytes": 524288000,
+        "hard_cap_bytes": 629145600,
+        "entry_count": 70807,
+        "max_entries": 100000,
+        "usage_ratio": 0.0182,
+        "capacity_threshold": 0.9,
+        "accumulation_threshold_bytes": 10485760,
+        "accumulation_threshold_entries": 50,
+        "accumulated_bytes": 0,
+        "accumulated_entries": 0,
+        "accumulation_ratio": 0.0,
+        "accumulation_entry_ratio": 0.0,
+        "needs_consolidation": false,
+        "at_hard_cap": false,
+        "seconds_since_last_consolidation": 1783026823.2
+      }
+    },
+    "uptime_seconds": 77.6,
+    "protocol_mode": true,
+    "event_wiring": true
+  },
+  "api_declared_tools": 42,
+  "tested_tools": 55,
+  "passed": 51,
+  "failed": 4,
+  "errors": 0,
+  "overall_pass_rate": 92.73,
+  "category_stats": {
+    "记忆引擎 (memory-engine)": {
+      "total": 7,
+      "passed": 5,
+      "failed": 2,
+      "errors": 0,
+      "pass_rate": 71.43
+    },
+    "会话管理 (session)": {
+      "total": 5,
+      "passed": 5,
+      "failed": 0,
+      "errors": 0,
+      "pass_rate": 100.0
+    },
+    "LLM智能工具 (llm-tools)": {
+      "total": 9,
+      "passed": 7,
+      "failed": 2,
+      "errors": 0,
+      "pass_rate": 77.78
+    },
+    "系统工具 (system)": {
+      "total": 3,
+      "passed": 3,
+      "failed": 0,
+      "errors": 0,
+      "pass_rate": 100.0
+    },
+    "Agent框架 (agent-framework)": {
+      "total": 4,
+      "passed": 4,
+      "failed": 0,
+      "errors": 0,
+      "pass_rate": 100.0
+    },
+    "命令执行器 (command-executor)": {
+      "total": 9,
+      "passed": 9,
+      "failed": 0,
+      "errors": 0,
+      "pass_rate": 100.0
+    },
+    "安全扫描 (security-scanner)": {
+      "total": 6,
+      "passed": 6,
+      "failed": 0,
+      "errors": 0,
+      "pass_rate": 100.0
+    },
+    "性能剖析 (performance-profiler)": {
+      "total": 6,
+      "passed": 6,
+      "failed": 0,
+      "errors": 0,
+      "pass_rate": 100.0
+    },
+    "运维引擎 (ops-engine)": {
+      "total": 6,
+      "passed": 6,
+      "failed": 0,
+      "errors": 0,
+      "pass_rate": 100.0
+    }
+  },
+  "failed_tools": [
+    {
+      "tool": "store_memory",
+      "method": "POST",
+      "category": "memory",
+      "status": "fail",
+      "elapsed_ms": 20009.89,
+      "error": "timed out",
+      "result_preview": ""
+    },
+    {
+      "tool": "get_memory",
+      "method": "POST",
+      "category": "memory",
+      "status": "fail",
+      "elapsed_ms": 26.44,
+      "error": "HTTP 404: {\"detail\":\"Memory not found\"}",
+      "result_preview": ""
+    },
+    {
+      "tool": "normalize",
+      "method": "POST",
+      "category": "llm",
+      "status": "fail",
+      "elapsed_ms": 15.06,
+      "error": "HTTP 422: {\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"content\"],\"msg\":\"Field required\",\"input\":{\"text\":\"测试文本 规范化 处理\"}}]}",
+      "result_preview": ""
+    },
+    {
+      "tool": "disambiguate",
+      "method": "POST",
+      "category": "llm",
+      "status": "fail",
+      "elapsed_ms": 16.49,
+      "error": "HTTP 422: {\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"content\"],\"msg\":\"Field required\",\"input\":{\"word\":\"苹果\",\"context\":\"我喜欢吃苹果\"}},{\"type\":\"dict_type\",\"loc\":[\"body\",\"context\"],\"msg\":\"Input should be a valid dicti",
+      "result_preview": ""
+    }
+  ],
+  "all_results": [
+    {
+      "tool": "store_memory",
+      "method": "POST",
+      "category": "memory",
+      "status": "fail",
+      "elapsed_ms": 20009.89,
+      "error": "timed out",
+      "result_preview": ""
+    },
+    {
+      "tool": "search_memories",
+      "method": "POST",
+      "category": "memory",
+      "status": "pass",
+      "elapsed_ms": 152.4,
+      "error": "",
+      "result_preview": "{'status': 'success', 'results': [{'id': '50663b453db55adc', 'content': '天机记忆引擎的ICME六层记忆架构包含DeepSeek驾驶者', 'layer': 'short_term', 'tags': ['batch-conso..."
+    },
+    {
+      "tool": "get_memory",
+      "method": "POST",
+      "category": "memory",
+      "status": "fail",
+      "elapsed_ms": 26.44,
+      "error": "HTTP 404: {\"detail\":\"Memory not found\"}",
+      "result_preview": ""
+    },
+    {
+      "tool": "list_memories",
+      "method": "POST",
+      "category": "memory",
+      "status": "pass",
+      "elapsed_ms": 240.21,
+      "error": "",
+      "result_preview": "{'status': 'success', 'results': [{'id': 'mig_1d145b49845e', 'content': '[working->short_term] [sensory->working] [TVP推送记录] event_id=4eeffe6bd840, sou..."
+    },
+    {
+      "tool": "delete_memory",
+      "method": "POST",
+      "category": "memory",
+      "status": "pass",
+      "elapsed_ms": 4.03,
+      "error": "",
+      "result_preview": "{'status': 'success', 'message': 'Memory test-mem-001 deleted'}"
+    },
+    {
+      "tool": "list_namespaces",
+      "method": "GET",
+      "category": "memory",
+      "status": "pass",
+      "elapsed_ms": 2017.15,
+      "error": "",
+      "result_preview": "{'status': 'success', 'namespaces': ['L0', 'L3', 'episodic', 'meta', 'semantic', 'sensory', 'short_term', 'working']}"
+    },
+    {
+      "tool": "get_stats",
+      "method": "GET",
+      "category": "memory",
+      "status": "pass",
+      "elapsed_ms": 1797.19,
+      "error": "",
+      "result_preview": "{'status': 'success', 'engine': {'total_entries': 89228, 'total_accesses': 8, 'uptime_seconds': 100.0, 'layers': {'L0': 2, 'L3': 12, 'episodic': 4908,..."
+    },
+    {
+      "tool": "get_session_digest",
+      "method": "POST",
+      "category": "session",
+      "status": "pass",
+      "elapsed_ms": 23.43,
+      "error": "",
+      "result_preview": "{'status': 'success', 'digests': []}"
+    },
+    {
+      "tool": "run_reflective_cycle",
+      "method": "POST",
+      "category": "session",
+      "status": "pass",
+      "elapsed_ms": 293.85,
+      "error": "",
+      "result_preview": "{'status': 'success', 'dream_stats': {'memories_derived': 20, 'connections_found': 497, 'contradictions_detected': 0, 'digests_updated': 0}}"
+    },
+    {
+      "tool": "explain_memory_lineage",
+      "method": "POST",
+      "category": "session",
+      "status": "pass",
+      "elapsed_ms": 2.08,
+      "error": "",
+      "result_preview": "{'status': 'success', 'lineage': {'memory_id': 'test-mem-001', 'derived_from': None}}"
+    },
+    {
+      "tool": "build_working_representation",
+      "method": "POST",
+      "category": "session",
+      "status": "pass",
+      "elapsed_ms": 3870.28,
+      "error": "",
+      "result_preview": "{'status': 'success', 'representation': {'query': '测试构建工作表示', 'total_items': 10, 'semantic_matches_count': 0, 'derived_insights_count': 10, 'contradic..."
+    },
+    {
+      "tool": "search_perspective_memories",
+      "method": "POST",
+      "category": "search",
+      "status": "pass",
+      "elapsed_ms": 2524.03,
+      "error": "",
+      "result_preview": "{'status': 'success', 'results': [{'id': 'e77e862b4a3c3d4b', 'content': '[会话上下文] 2026-05-30 19:05:19\\n用户意图: 用户的需求时需要开发\"天机商用版\"，为商用版本赋予不同功能权限\\n关键实体: 天机v..."
+    },
+    {
+      "tool": "classify",
+      "method": "POST",
+      "category": "llm",
+      "status": "pass",
+      "elapsed_ms": 3645.87,
+      "error": "",
+      "result_preview": "{'success': True, 'layer': 'sensory', 'tags': ['测试', '分类验证', '功能测试'], 'priority': 'low', 'value_score': 0.1, 'reason': '纯测试文本，无实质内容，仅用于验证分类功能', 'relat..."
+    },
+    {
+      "tool": "auto_tag",
+      "method": "POST",
+      "category": "llm",
+      "status": "pass",
+      "elapsed_ms": 2255.6,
+      "error": "",
+      "result_preview": "{'success': True, 'tags': ['记忆系统', '测试', '智能体调度', '知识图谱', '系统测试', '智能体']}"
+    },
+    {
+      "tool": "summarize",
+      "method": "POST",
+      "category": "llm",
+      "status": "pass",
+      "elapsed_ms": 1726.72,
+      "error": "",
+      "result_preview": "{'success': True, 'summary': '天机系统是分布式自进化记忆智能体，支持六层记忆架构与MCP接口，实现多Agent协作。'}"
+    },
+    {
+      "tool": "extract_knowledge",
+      "method": "POST",
+      "category": "llm",
+      "status": "pass",
+      "elapsed_ms": 5525.55,
+      "error": "",
+      "result_preview": "{'success': True, 'triples': [{'subject': 'Python', 'relation': 'is_a', 'object': '高级编程语言', 'confidence': 0.95}, {'subject': 'Python', 'relation': 'cr..."
+    },
+    {
+      "tool": "expand_query",
+      "method": "POST",
+      "category": "llm",
+      "status": "pass",
+      "elapsed_ms": 2958.62,
+      "error": "",
+      "result_preview": "{'success': True, 'original': '创作', 'expansions': ['写作', '创意制作', '内容生成', '艺术创作', '原创']}"
+    },
+    {
+      "tool": "assess_value",
+      "method": "POST",
+      "category": "llm",
+      "status": "pass",
+      "elapsed_ms": 3862.01,
+      "error": "",
+      "result_preview": "{'success': True, 'value_score': 0.12, 'importance': 0.05, 'uniqueness': 0.2, 'timeliness': 0.1, 'relevance': 0.1, 'reason': '内容仅为测试占位符，无实际知识或决策，难以关联其..."
+    },
+    {
+      "tool": "decide_storage",
+      "method": "POST",
+      "category": "llm",
+      "status": "pass",
+      "elapsed_ms": 5888.38,
+      "error": "",
+      "result_preview": "{'success': True, 'should_store': True, 'layer': 'episodic', 'tags': ['测试', '决策', '存储'], 'priority': 'medium', 'value_score': 0.3, 'confidence': 0.5, ..."
+    },
+    {
+      "tool": "normalize",
+      "method": "POST",
+      "category": "llm",
+      "status": "fail",
+      "elapsed_ms": 15.06,
+      "error": "HTTP 422: {\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"content\"],\"msg\":\"Field required\",\"input\":{\"text\":\"测试文本 规范化 处理\"}}]}",
+      "result_preview": ""
+    },
+    {
+      "tool": "disambiguate",
+      "method": "POST",
+      "category": "llm",
+      "status": "fail",
+      "elapsed_ms": 16.49,
+      "error": "HTTP 422: {\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"content\"],\"msg\":\"Field required\",\"input\":{\"word\":\"苹果\",\"context\":\"我喜欢吃苹果\"}},{\"type\":\"dict_type\",\"loc\":[\"body\",\"context\"],\"msg\":\"Input should be a valid dicti",
+      "result_preview": ""
+    },
+    {
+      "tool": "initialize_nexus_system",
+      "method": "POST",
+      "category": "system",
+      "status": "pass",
+      "elapsed_ms": 831.77,
+      "error": "",
+      "result_preview": "{'status': 'success', 'message': 'Nexus system initialized', 'total_memories': 89434}"
+    },
+    {
+      "tool": "tool_help",
+      "method": "GET",
+      "category": "system",
+      "status": "pass",
+      "elapsed_ms": 1.52,
+      "error": "",
+      "result_preview": "{'status': 'success', 'tools': ['memory_remember', 'memory_recall', 'memory_forget', 'memory_stats', 'memory_capacity', 'memory_consolidate', 'search_..."
+    },
+    {
+      "tool": "tool_schema",
+      "method": "GET",
+      "category": "system",
+      "status": "pass",
+      "elapsed_ms": 25.14,
+      "error": "",
+      "result_preview": "{'status': 'success', 'schemas': {'store_memory': {'type': 'object', 'properties': {'content': {'type': 'string'}, 'agent_type': {'type': 'string', 'd..."
+    },
+    {
+      "tool": "context_extract",
+      "method": "POST",
+      "category": "agent",
+      "status": "pass",
+      "elapsed_ms": 5.16,
+      "error": "",
+      "result_preview": "{'status': 'success', 'input_length': 25, 'keywords': ['帮我写一个Python脚本', '实现文件读取和写入功能'], 'primary_intent': '代码任务', 'intent_scores': {'代码任务': 1}, 'all_d..."
+    },
+    {
+      "tool": "rule_evaluate",
+      "method": "POST",
+      "category": "agent",
+      "status": "pass",
+      "elapsed_ms": 3.57,
+      "error": "",
+      "result_preview": "{'status': 'error', 'error': 'rule_name必填', 'message': '请通过 rule_name 字段指定规则名称'}"
+    },
+    {
+      "tool": "agent_dispatch",
+      "method": "POST",
+      "category": "agent",
+      "status": "pass",
+      "elapsed_ms": 21.11,
+      "error": "",
+      "result_preview": "{'status': 'error', 'error': 'task必填', 'message': '请通过 task 字段描述任务'}"
+    },
+    {
+      "tool": "system_status",
+      "method": "GET",
+      "category": "agent",
+      "status": "pass",
+      "elapsed_ms": 103.15,
+      "error": "",
+      "result_preview": "{'status': 'success', 'service': '天机v9.1', 'version': '9.1.0', 'uptime_seconds': 483713, 'components': {'api_server': 'running', 'memory_engine': 'run..."
+    },
+    {
+      "tool": "execute_command",
+      "method": "POST",
+      "category": "command",
+      "status": "pass",
+      "elapsed_ms": 44.14,
+      "error": "",
+      "result_preview": "{'status': 'success', 'returncode': 0, 'stdout': 'test_mcp\\n', 'stderr': ''}"
+    },
+    {
+      "tool": "check_command",
+      "method": "POST",
+      "category": "command",
+      "status": "pass",
+      "elapsed_ms": 24.42,
+      "error": "",
+      "result_preview": "{'status': 'success', 'command_id': 'test-cmd-001', 'state': 'completed'}"
+    },
+    {
+      "tool": "stop_command",
+      "method": "POST",
+      "category": "command",
+      "status": "pass",
+      "elapsed_ms": 15.25,
+      "error": "",
+      "result_preview": "{'status': 'success', 'command_id': 'test-cmd-001', 'stopped': True}"
+    },
+    {
+      "tool": "list_processes",
+      "method": "GET",
+      "category": "command",
+      "status": "pass",
+      "elapsed_ms": 4001.59,
+      "error": "",
+      "result_preview": "{'status': 'success', 'processes': [{'pid': 0, 'name': 'System Idle Process', 'status': 'running'}, {'pid': 4, 'name': 'System', 'status': 'running'},..."
+    },
+    {
+      "tool": "get_process_info",
+      "method": "POST",
+      "category": "command",
+      "status": "pass",
+      "elapsed_ms": 33.76,
+      "error": "",
+      "result_preview": "{'status': 'success', 'pid': 0, 'name': 'System Idle Process', 'cpu_percent': 0.0, 'memory_info': 'pmem(rss=8192, vms=61440, num_page_faults=9, peak_w..."
+    },
+    {
+      "tool": "kill_process",
+      "method": "POST",
+      "category": "command",
+      "status": "pass",
+      "elapsed_ms": 4.04,
+      "error": "",
+      "result_preview": "{'status': 'error', 'message': '(pid=0)'}"
+    },
+    {
+      "tool": "run_script",
+      "method": "POST",
+      "category": "command",
+      "status": "pass",
+      "elapsed_ms": 2.52,
+      "error": "",
+      "result_preview": "{'status': 'success', 'script_path': '', 'message': 'script execution queued'}"
+    },
+    {
+      "tool": "get_script_status",
+      "method": "POST",
+      "category": "command",
+      "status": "pass",
+      "elapsed_ms": 1.14,
+      "error": "",
+      "result_preview": "{'status': 'success', 'script_id': 'test-script-001', 'state': 'idle'}"
+    },
+    {
+      "tool": "list_scripts",
+      "method": "GET",
+      "category": "command",
+      "status": "pass",
+      "elapsed_ms": 25.83,
+      "error": "",
+      "result_preview": "{'status': 'success', 'scripts': [], 'total': 0}"
+    },
+    {
+      "tool": "scan_vulnerabilities",
+      "method": "POST",
+      "category": "security",
+      "status": "pass",
+      "elapsed_ms": 15.54,
+      "error": "",
+      "result_preview": "{'status': 'success', 'vulnerabilities': [], 'severity_summary': {'critical': 0, 'high': 0, 'medium': 0, 'low': 0}, 'scanned_at': 1783026885.195092}"
+    },
+    {
+      "tool": "check_compliance",
+      "method": "POST",
+      "category": "security",
+      "status": "pass",
+      "elapsed_ms": 2.03,
+      "error": "",
+      "result_preview": "{'status': 'success', 'standard': 'owasp', 'compliant': True, 'checks_passed': 10, 'checks_total': 10}"
+    },
+    {
+      "tool": "get_security_report",
+      "method": "GET",
+      "category": "security",
+      "status": "pass",
+      "elapsed_ms": 12.59,
+      "error": "",
+      "result_preview": "{'status': 'success', 'report': {'overall_score': 95, 'last_scan': '2026-06-17', 'findings': []}}"
+    },
+    {
+      "tool": "scan_dependencies",
+      "method": "POST",
+      "category": "security",
+      "status": "pass",
+      "elapsed_ms": 15.67,
+      "error": "",
+      "result_preview": "{'status': 'success', 'dependencies_scanned': 0, 'vulnerable': [], 'message': 'scan completed'}"
+    },
+    {
+      "tool": "check_permissions",
+      "method": "POST",
+      "category": "security",
+      "status": "pass",
+      "elapsed_ms": 1.53,
+      "error": "",
+      "result_preview": "{'status': 'success', 'path': '.', 'permissions_ok': True, 'issues': []}"
+    },
+    {
+      "tool": "list_security_policies",
+      "method": "GET",
+      "category": "security",
+      "status": "pass",
+      "elapsed_ms": 14.06,
+      "error": "",
+      "result_preview": "{'status': 'success', 'policies': ['no-hardcoded-secrets', 'sql-injection-prevention', 'xss-protection'], 'total': 3}"
+    },
+    {
+      "tool": "profile_function",
+      "method": "POST",
+      "category": "performance",
+      "status": "pass",
+      "elapsed_ms": 2.57,
+      "error": "",
+      "result_preview": "{'status': 'success', 'function': 'TianjiMCPBridge', 'duration_ms': 1.23, 'calls': 42}"
+    },
+    {
+      "tool": "get_performance_metrics",
+      "method": "GET",
+      "category": "performance",
+      "status": "pass",
+      "elapsed_ms": 2.52,
+      "error": "",
+      "result_preview": "{'status': 'success', 'metrics': {'p50_latency_ms': 12, 'p99_latency_ms': 89, 'throughput_req_per_sec': 150, 'error_rate_pct': 0.1}}"
+    },
+    {
+      "tool": "analyze_bottleneck",
+      "method": "POST",
+      "category": "performance",
+      "status": "pass",
+      "elapsed_ms": 2.01,
+      "error": "",
+      "result_preview": "{'status': 'success', 'bottlenecks': [], 'top_slow_query': None, 'recommendation': 'no bottlenecks detected'}"
+    },
+    {
+      "tool": "get_memory_profile",
+      "method": "GET",
+      "category": "performance",
+      "status": "pass",
+      "elapsed_ms": 23.98,
+      "error": "",
+      "result_preview": "{'status': 'success', 'rss_mb': 636.09765625, 'percent': 4.485426859399643}"
+    },
+    {
+      "tool": "get_cpu_profile",
+      "method": "GET",
+      "category": "performance",
+      "status": "pass",
+      "elapsed_ms": 516.7,
+      "error": "",
+      "result_preview": "{'status': 'success', 'cpu_percent': 7.6, 'count': 16}"
+    },
+    {
+      "tool": "list_profiling_sessions",
+      "method": "GET",
+      "category": "performance",
+      "status": "pass",
+      "elapsed_ms": 3.08,
+      "error": "",
+      "result_preview": "{'status': 'success', 'sessions': [], 'total': 0}"
+    },
+    {
+      "tool": "deploy_service",
+      "method": "POST",
+      "category": "ops",
+      "status": "pass",
+      "elapsed_ms": 12.47,
+      "error": "",
+      "result_preview": "{'status': 'success', 'service': 'test-service', 'deployment_id': 'dep-1783026886', 'state': 'deployed'}"
+    },
+    {
+      "tool": "check_deployment",
+      "method": "POST",
+      "category": "ops",
+      "status": "pass",
+      "elapsed_ms": 3.79,
+      "error": "",
+      "result_preview": "{'status': 'success', 'deployment_id': '', 'health': 'healthy', 'uptime_s': 3600}"
+    },
+    {
+      "tool": "rollback_deployment",
+      "method": "POST",
+      "category": "ops",
+      "status": "pass",
+      "elapsed_ms": 2.28,
+      "error": "",
+      "result_preview": "{'status': 'success', 'deployment_id': '', 'rolled_back': True}"
+    },
+    {
+      "tool": "get_resource_usage",
+      "method": "GET",
+      "category": "ops",
+      "status": "pass",
+      "elapsed_ms": 25.51,
+      "error": "",
+      "result_preview": "{'status': 'success', 'cpu_percent': 31.2, 'memory': {'total': 14870306816, 'available': 2040455168, 'percent': 86.3, 'used': 12829851648, 'free': 204..."
+    },
+    {
+      "tool": "scale_service",
+      "method": "POST",
+      "category": "ops",
+      "status": "pass",
+      "elapsed_ms": 13.49,
+      "error": "",
+      "result_preview": "{'status': 'success', 'service': 'test-service', 'replicas': 2, 'scaled': True}"
+    },
+    {
+      "tool": "list_services",
+      "method": "GET",
+      "category": "ops",
+      "status": "pass",
+      "elapsed_ms": 15.43,
+      "error": "",
+      "result_preview": "{'status': 'success', 'services': [{'name': 'tianji-api', 'port': 8771, 'status': 'running'}, {'name': 'mcp-stdio', 'status': 'active'}], 'total': 2}"
+    }
+  ]
+}

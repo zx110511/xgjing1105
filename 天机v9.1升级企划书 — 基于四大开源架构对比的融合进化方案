@@ -1,0 +1,265 @@
+天机v9.1升级企划书 — 基于四大开源架构对比的融合进化方案
+版本: v9.1 (不变) -升级为v9.2；根目录| 日期: 2026-06-14 | 基线: 基于真实开源项目最新版本对比
+
+第一部分：四大开源架构深度对比
+1.1 参考项目概况（2026年6月最新数据）
+项目	最新版本	Stars	技术栈	定位
+Cherry Studio	v1.9.11 (2026-06-07)	44.8K	Electron + React 19 + Redux Toolkit + Ant Design 5	多模型AI桌面客户端
+Hermes Agent	v0.16.0 (2026-06-06)	187K	Python + SQLite + FTS5 + 多Provider适配	自我改进型AI Agent框架
+OpenClaw	v2026.6.1 (2026-06-01)	346K	TypeScript + Gateway + 多渠道 + ClawHub	个人AI操作系统
+Craft Agents	v0.10.0 (2026-06-11)	~1K	Electron + Bun + TypeScript + Claude Agent SDK	Agent原生桌面工作流
+1.2 架构维度对比矩阵
+架构维度	Cherry Studio v1.9.11	Hermes Agent v0.16.0	OpenClaw v2026.6.1	Craft Agents v0.10.0	天机v9.1
+消息模型	Block Manager + Stream Processing	ReAct循环 + tool_call结构化	transcript-core + 流式增量	Rich Output Blocks(html/pdf/image/markdown-preview)	扁平Message + opEvents[]
+MCP集成	MCPService + IPC通道 + MCPWorld市场	MCP动态后端(47工具/19工具集)	MCP客户端 + ClawHub 44K+技能	MCP服务器 + OpenAPI + 本地文件系统	MCP Server代理层(6服务器/27工具)
+Agent系统	CherryClaw自主Agent + Agent Session	子代理委派 + 并行工作流	Workboard多Agent编排 + Dreaming	三级权限(Explore/Ask/Execute)	18个Agent + TVP协议 + Pipeline编排
+Skill系统	Skills(原Plugins v1.9.1) + 工作区symlink	GEPA自进化技能 + agentskills.io标准	Skill Workshop提案式治理 + ClawHub	YAML Frontmatter + @召唤 + 即时生效	30个SKILL.md + 意图匹配
+记忆系统	IndexedDB(Dexie) + SQLite(Drizzle ORM)	三层持久化(会话/记忆/技能) + FTS5搜索	SQLite状态 + 内存索引 + 文件监控	Craft文档工具30+ + 持久化会话	ICME六层记忆 + DeepSeek增强
+通信机制	IPC三进程架构(Main/Preload/Renderer)	CLI + Gateway + ACP + Cron多入口	Gateway + 多渠道(TG/Slack/WhatsApp等)	WebSocket远程 + Electron IPC	SSE单向 + WebSocket补充
+权限控制	MCP工具权限 + 安全沙箱	四层纵深防御 + 沙箱终端	OAuth/Token生命周期 + 技能隔离	Explore/Ask/Execute三级 + 远程评估门控	无用户侧权限控制
+数据持久化	IndexedDB + SQLite + redux-persist	SQLite + FTS5 + 轨迹压缩	SQLite + 插件索引持久化 + iMessage迁移	AES-256-GCM加密 + 会话持久化	IndexedDB + JSON文件双写
+用户交互	工具卡片(diff viewer/语法高亮)	TUI + Kanban + 多平台消息	Control UI + 流式输出优化 + 工具卡片	收件箱式会话 + 多任务并行 + 内置浏览器	文本气泡 + 彩色标签
+1.3 天机v9.1的架构差距诊断
+差距1：消息模型落后两代
+
+Cherry Studio有Block Manager + Stream Processing
+Craft Agents有Rich Output Blocks(html/pdf/image/markdown-preview)
+天机仍是扁平Message + opEvents[]，无法表达结构化操作
+差距2：MCP是"服务端"而非"客户端"
+
+四大项目都是MCP客户端（连接外部MCP Server获取工具能力）
+天机是MCP服务端（自己提供工具给Trae IDE调用），没有客户端能力
+结果：天机用户无法在对话中直接调用MCPWorld/ClaHub生态的44K+工具
+差距3：Skill系统缺乏治理和进化
+
+OpenClaw有Skill Workshop提案式治理（提交→审核→修订→批准/隔离/回滚）
+Hermes有GEPA遗传帕累托提示进化（技能自动改进）
+天机的30个SKILL.md是静态文件，无版本管理、无审批流程、无自进化
+差距4：通信是单向广播
+
+Cherry Studio用IPC三进程架构实现双向通信
+Craft Agents用WebSocket实现远程浏览器桥接
+天机SSE只能看不能干预，用户是旁观者
+差距5：记忆系统有架构但无闭环
+
+Hermes的三层持久化+FTS5搜索+轨迹压缩形成了完整的记忆闭环
+天机的ICME六层架构设计先进，但实际运行中记忆是"后置存储"而非"前置驱动"
+差距6：无用户侧权限控制
+
+Craft Agents的Explore/Ask/Execute三级权限是行业标配
+天机的工具调用全部自动执行，用户无法确认/拒绝/覆盖
+第二部分：天机v9.1开发过程复盘
+2.1 已知问题清单
+#	问题	根因	影响
+P1	前端Chat.tsx 1572行单文件巨石	缺乏组件化拆分策略	维护困难、渲染性能差
+P2	后端chat_routes.py工具调用循环硬编码3轮	无动态策略	复杂任务无法深度执行
+P3	记忆系统"有架构无闭环"	违反宪法原则1(记忆优先决策)	对话无上下文连续性
+P4	MCP Server与前端无直连通道	MCP仅服务Trae IDE	Web端用户无法调用MCP工具
+P5	Agent调度对用户不可见	SSE单向广播	用户无法干预Agent切换
+P6	Skill匹配靠关键词	无语义匹配	意图理解粗糙
+P7	无E2E测试	仅手动验证	回归风险高
+P8	配置散落(mcp.json/agents/registry三处)	无单源生成	配置漂移
+2.2 开发流程问题
+问题	表现	根因
+需求驱动无边界	功能越加越多，核心体验无突破	缺乏Shape Up式的"胃口(Appetite)"约束
+架构先行实现滞后	ICME六层设计先进但只实现L0/L1	过度设计+渐进交付缺失
+无质量门禁	代码合入无强制检查	缺乏CI/CD + Stage Gate
+文档与代码脱节	SKILL.md描述与实际行为不一致	无Skill Workshop治理流程
+第三部分：升级开发企划书
+3.1 开发方法论：Shape Up + 天机宪法融合
+采用Shape Up方法论（Basecamp创造），融合天机宪法的记忆优先原则：
+
+天机增强：
+
+记忆优先Shaping: 每个Pitch必须先查询L4/L5记忆，参考历史经验
+操作必记录Building: 每个Build操作记录到L1/L3
+故障必回溯Cool Down: 每个Bug必须回溯到L3根因
+3.2 升级路线图：3个Cycle
+Cycle 1: 基础重构 (6周Build + 2周Cool Down)
+目标: 消息模型升级 + MCP客户端化 + 双向通信
+
+Pitch C1-1: FusionMessage Block组合式消息模型
+问题: 当前扁平Message+opEvents[]无法表达结构化操作，落后Cherry Studio/Craft Agents两代
+
+胃口: 6周
+
+解决方案:
+
+步骤	操作指令(原子级)	产出	验证标准
+1.1	mkdir -p web/src/types/blocks	Block类型目录	目录存在
+1.2	创建 web/src/types/blocks/index.ts，定义 MessageBlock 联合类型(TextBlock/MCPCallBlock/AgentOpBlock/SkillInvocationBlock/MemoryAuditBlock/ConfirmationBlock/ErrorBlock)	Block类型定义	TypeScript编译通过
+1.3	创建 web/src/types/blocks/mcp-call.ts，定义MCPCallBlock接口(toolName/serverName/input/output/status/duration_ms/round/confirmRequired/retryable/expandable)	MCPCallBlock类型	类型完整
+1.4	创建 web/src/types/blocks/agent-op.ts，定义AgentOpBlock接口(operation/fromAgent/toAgent/tvpDeclaration/taskContext/status/userCanOverride/alternativeAgents)	AgentOpBlock类型	类型完整
+1.5	创建 web/src/types/blocks/skill-invocation.ts，定义SkillInvocationBlock接口(skillName/boundAgent/matchedIntent/confidence/mcpTools/steps/status/userCanTrigger/userCanCancel/degradationPlan)	SkillInvocationBlock类型	类型完整
+1.6	创建 web/src/types/blocks/memory-audit.ts，定义MemoryAuditBlock接口(operations[{direction,layer,content_summary,tags,quality_score,time_str}])	MemoryAuditBlock类型	类型完整
+1.7	创建 web/src/types/fusion-message.ts，定义FusionMessage接口(id/role/timestamp/blocks/MessageBlock[]/memoryAudit/context)	FusionMessage类型	类型完整
+1.8	修改 server/api/chat_routes.py，新增FusionMessage序列化器，将现有消息结构转换为FusionMessage格式	后端兼容层	现有对话不受影响
+1.9	修改 web/src/services/chat-storage.ts，IndexedDB schema升级，支持FusionMessage存储	存储兼容	旧数据可迁移
+1.10	创建 web/src/components/blocks/BlockRenderer.tsx，根据block.type分发到对应渲染组件	Block渲染器	每种Block有独立渲染
+兔子洞: 不要一次性重写Chat.tsx所有消息渲染，先用适配器模式包装旧Message为FusionMessage
+
+No-Go: 本Pitch不做前端交互式卡片(确认/拒绝/覆盖)，仅做展示
+
+Pitch C1-2: MCP客户端化 — 对话中直接调用MCP工具
+问题: 天机是MCP Server，不是MCP Client。用户无法在对话中调用外部MCP工具生态
+
+胃口: 5周
+
+解决方案:
+
+步骤	操作指令(原子级)	产出	验证标准
+2.1	pip install mcp 安装MCP Python SDK	MCP客户端依赖	import成功
+2.2	创建 core/mcp_client/manager.py，实现MCPClientManager类，支持stdio/SSE两种传输方式连接外部MCP Server	MCP客户端管理器	可连接外部MCP Server
+2.3	创建 core/mcp_client/registry.py，实现动态工具发现：连接MCP Server → 调用tools/list → 注册到本地工具表	动态工具注册	工具列表可获取
+2.4	创建 core/mcp_client/executor.py，实现工具调用：构造tools/call请求 → 发送到MCP Server → 返回结果	工具调用执行器	可调用外部工具
+2.5	修改 server/api/chat_routes.py，在工具调用循环中新增MCP Client工具源：核心工具 + SkillResolver匹配工具 + MCP Client动态工具	工具调用集成	对话中可调用外部MCP工具
+2.6	新增SSE事件 mcp_tool_available，当新MCP工具被发现时推送通知前端	工具发现通知	前端收到通知
+2.7	新增API GET /api/mcp/client/servers，列出已连接的MCP Server及工具	MCP客户端API	API可访问
+2.8	新增API POST /api/mcp/client/connect，动态连接新的MCP Server	动态连接API	可动态添加MCP Server
+2.9	修改 web/src/pages/Chat.tsx，在工具调用结果区域展示MCP Client工具调用	前端展示	MCP工具调用可见
+兔子洞: 不要试图实现MCP World/ClawHub市场集成，先做本地MCP Server连接
+
+No-Go: 不做MCP Server管理UI，仅做对话中的工具调用
+
+Pitch C1-3: 双向通信 — WebSocket上行通道
+问题: SSE单向广播，用户无法干预工具调用/Agent切换
+
+胃口: 4周
+
+解决方案:
+
+步骤	操作指令(原子级)	产出	验证标准
+3.1	修改 server/api/ws_routes.py，新增 /ws/chat/control 端点，接收UserAction消息	WS控制端点	可连接
+3.2	定义UserAction协议: {type: confirm_tool/reject_tool/override_agent/trigger_skill/cancel_skill/retry_tool, targetBlockId, payload}	用户操作协议	协议定义完整
+3.3	创建 core/action_handler.py，实现ActionHandler类，根据UserAction类型路由到对应处理器	操作处理器	可处理用户操作
+3.4	实现 confirm_tool 处理：解除工具调用的awaiting_confirm状态，继续执行	工具确认	确认后工具继续执行
+3.5	实现 reject_tool 处理：取消工具调用，返回拒绝原因给LLM	工具拒绝	拒绝后LLM收到反馈
+3.6	实现 override_agent 处理：覆盖Agent调度选择，切换到用户指定的Agent	Agent覆盖	切换到用户选择的Agent
+3.7	创建 web/src/services/ws-control.ts，WebSocket控制客户端	前端WS客户端	可发送UserAction
+3.8	修改BlockRenderer中的MCPCallBlock，当confirmRequired=true时显示[确认][拒绝]按钮	工具确认UI	按钮可点击
+3.9	修改BlockRenderer中的AgentOpBlock，当userCanOverride=true时显示备选Agent列表	Agent选择UI	可选择备选Agent
+兔子洞: 不要实现完整的权限系统(如Craft Agents的Explore/Ask/Execute)，先做工具级确认
+
+No-Go: 不做Skill触发确认，仅做工具调用和Agent切换
+
+Cycle 2: 记忆闭环 + Skill治理 (6周Build + 2周Cool Down)
+目标: 记忆优先决策闭环 + Skill Workshop治理 + Quality Gate
+
+Pitch C2-1: 记忆优先决策闭环
+问题: 违反天机宪法原则1，记忆是后置存储而非前置驱动
+
+胃口: 5周
+
+解决方案:
+
+步骤	操作指令(原子级)	产出	验证标准
+4.1	创建 core/memory_gateway.py，实现MemoryGateway类，提供recall()和audit()方法	记忆网关	类可实例化
+4.2	实现recall()方法：接收用户输入 → 调用memory_recall(L4 Semantic, topK=5) → 调用memory_recall(L3 Episodic, topK=3) → 调用memory_recall(L5 Meta, topK=2) → 返回MemoryRecallRecord[]	前置召回	可召回相关记忆
+4.3	修改 server/api/chat_routes.py stream_chat()，在调用LLM之前插入MemoryGateway.recall()，将召回结果注入system_prompt	记忆注入LLM	LLM可参考历史记忆
+4.4	实现audit()方法：接收FusionMessage → 检查是否遗漏必记操作 → 检查记忆质量 → 检查宪法合规 → 返回QualityGateResult	记忆审计	可检测遗漏
+4.5	修改stream_chat()，在对话完成后插入MemoryGateway.audit()，将审计结果作为MemoryAuditBlock推送	审计推送	前端可见审计结果
+4.6	创建 web/src/components/blocks/MemoryAuditBlockRenderer.tsx，展示记忆召回/存储/审计结果	审计UI	可视化展示
+4.7	新增SSE事件 memory_recall，在LLM调用前推送召回的记忆上下文	召回通知	前端收到召回事件
+兔子洞: 不要做知识图谱可视化，先做文本级召回和审计
+
+No-Go: 不做跨会话记忆连续性（需要更复杂的会话管理）
+
+Pitch C2-2: Skill Workshop治理系统
+问题: 30个SKILL.md是静态文件，无版本管理、无审批流程、无自进化。对比OpenClaw的Skill Workshop提案式治理
+
+胃口: 6周
+
+解决方案:
+
+步骤	操作指令(原子级)	产出	验证标准
+5.1	创建 core/skill_workshop/proposal.py，实现SkillProposal类(id/name/description/steps/mcp_tools/status/created_at/updated_at/version)	技能提案模型	类定义完整
+5.2	创建 core/skill_workshop/review.py，实现SkillReview类，支持approve/reject/quarantine/rollback操作	技能审核器	可审核提案
+5.3	创建 core/skill_workshop/registry.py，实现SkillWorkshopRegistry，管理提案生命周期(submit→review→revise→approve→deploy)	技能注册表	生命周期完整
+5.4	新增API POST /api/skills/proposal，提交新技能提案	提案提交API	可提交提案
+5.5	新增API GET /api/skills/proposals，列出待审核提案	提案列表API	可查看提案
+5.6	新增API POST /api/skills/proposal/{id}/review，审核提案(approve/reject/quarantine)	审核API	可审核
+5.7	新增API POST /api/skills/proposal/{id}/revise，修订提案(版本化frontmatter)	修订API	可修订
+5.8	新增API POST /api/skills/proposal/{id}/rollback，回滚到上一版本	回滚API	可回滚
+5.9	创建 web/src/pages/SkillWorkshop.tsx，技能工坊页面(提案列表/今日视图/修订对话框/文件预览)	技能工坊UI	页面可访问
+5.10	修改 core/skill_resolver.py，仅加载已approved的技能，忽略pending/quarantined技能	技能加载安全	仅加载已审核技能
+兔子洞: 不要做GEPA自进化（Hermes级别），先做人工审核治理
+
+No-Go: 不做ClawHub/agentskills.io市场集成
+
+Cycle 3: 体验升级 + 生态开放 (6周Build + 2周Cool Down)
+目标: Chat.tsx组件化重构 + 权限系统 + MCP生态连接
+
+Pitch C3-1: Chat.tsx组件化拆分
+问题: Chat.tsx 1572行单文件巨石，维护困难
+
+胃口: 4周
+
+解决方案:
+
+步骤	操作指令(原子级)	产出
+6.1	创建 web/src/components/chat/ChatSidebar.tsx，拆分左侧边栏(对话列表/搜索/导入导出)	侧边栏组件
+6.2	创建 web/src/components/chat/ChatMessageList.tsx，拆分消息流展示区	消息列表组件
+6.3	创建 web/src/components/chat/ChatInput.tsx，拆分底部输入区(TextArea+发送+Skill推荐+工具结果)	输入区组件
+6.4	创建 web/src/components/chat/ChatHeader.tsx，拆分顶部Header(Agent标识+融合状态)	Header组件
+6.5	创建 web/src/components/chat/FusionStatusBar.tsx，融合系统状态栏(MCP/Skill/Agent/Memory四维度)	状态栏组件
+6.6	重构Chat.tsx为组合器，仅负责状态管理和子组件编排	主页面精简到<200行
+6.7	为每个子组件编写vitest单元测试	测试覆盖
+Pitch C3-2: 三级权限控制系统
+问题: 无用户侧权限控制，工具调用全部自动执行
+
+胃口: 4周
+
+解决方案:
+
+步骤	操作指令(原子级)	产出
+7.1	创建 core/permission_manager.py，实现PermissionManager，支持Explore/Ask/Execute三级模式	权限管理器
+7.2	Explore模式：所有工具调用只读，不执行写操作	只读模式
+7.3	Ask模式：写操作需用户确认(通过WS上行通道)	确认模式
+7.4	Execute模式：全自动执行(当前行为)	自动模式
+7.5	新增API GET/POST /api/chat/permission-mode，获取/设置当前权限模式	权限API
+7.6	修改ChatHeader，显示当前权限模式，支持SHIFT+TAB快捷切换(Craft Agents风格)	权限UI
+Pitch C3-3: MCP生态连接器
+问题: 无法连接外部MCP工具生态
+
+胃口: 5周
+
+解决方案:
+
+步骤	操作指令(原子级)	产出
+8.1	创建 web/src/pages/MCPMarketplace.tsx，MCP工具市场页面(浏览/搜索/安装MCP Server)	市场UI
+8.2	实现MCPWorld API集成，获取公开MCP Server列表	生态连接
+8.3	实现一键安装：点击安装 → 下载MCP Server配置 → 连接 → 工具可用	一键安装
+8.4	实现自然语言配置：用户输入"连接GitHub" → Agent自动查找MCP Server → 读取文档 → 获取凭证 → 完成配置(Craft Agents风格)	自然语言配置
+3.3 Cool Down活动（每个Cycle后2周）
+活动	操作指令	产出
+Bug修复	收集Cycle中所有已知Bug，按P0/P1/P2分级修复	Bug清零
+记忆审计	查询L3 Episodic，分析本轮Cycle的操作记录，识别遗漏	审计报告
+配置漂移检查	对比mcp.json/agents/_AGENT_REGISTRY.json/core/orchestration/registry.py，确保AMIM单源一致	配置一致性
+E2E测试补充	为每个新功能编写Playwright E2E测试	测试覆盖
+下一轮Shaping	基于用户反馈和记忆数据，定义下一Cycle的Pitch	Pitch文档
+3.4 质量门禁（每个Pitch必须通过）
+Gate	检查项	通过标准
+SG-0 代码规范	TypeScript strict / Python type hints ≥80%	0 error
+SG-1 单元测试	vitest(pytest)覆盖新增代码	≥80%
+SG-2 集成测试	API端点可调通 / SSE事件可接收	100%
+SG-3 记忆审计	MemoryGateway.audit()通过	无遗漏
+SG-4 安全扫描	无硬编码密钥 / 无XSS / 权限检查到位	0 critical
+3.5 关键指标
+指标	当前值	Cycle 1目标	Cycle 2目标	Cycle 3目标
+Chat.tsx行数	1572	1572(兼容层)	800	<200
+Block类型数	0	7	7	7
+MCP工具可达数	27(自有)	27+动态	27+动态	27+44K生态
+用户可干预操作	0	3(确认/拒绝/覆盖)	3	6(+Skill触发/取消)
+记忆前置召回	否	是(L3/L4/L5)	是	是
+记忆审计	否	是(QualityGate)	是	是
+Skill治理	无	无	Workshop完整	Workshop+市场
+权限模式	无	无	无	三级(Explore/Ask/Execute)
+E2E测试覆盖	0%	30%	60%	80%
+3.6 风险与缓解
+风险	概率	影响	缓解策略
+FusionMessage迁移导致旧对话丢失	中	高	适配器模式 + 数据迁移脚本 + 双写期
+MCP Client连接不稳定	中	中	重连机制 + 超时保护 + 降级到自有工具
+WebSocket上行通道安全风险	高	高	Token验证 + 操作白名单 + 频率限制
+Skill Workshop审核流程过重	低	中	支持自动审核(低风险技能) + 人工审核(高风险)
+Shape Up 6周周期不够	中	中	每个Pitch独立可交付，未完成部分推到下一Cycle
+总结: 天机v9.1升级的核心是从"后端服务"进化为"桌面操作系统"。对标Cherry Studio的Block消息模型、Hermes的记忆闭环、OpenClaw的Skill治理、Craft Agents的权限控制，通过3个Shape Up Cycle（共24周）实现MCP/Agent/Skill三大系统在对话界面的彻底融合。

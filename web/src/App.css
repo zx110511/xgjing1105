@@ -1,0 +1,284 @@
+.app-layout {
+  min-height: 100vh;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fff;
+  padding: 0 24px;
+  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
+}
+
+.app-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1890ff;
+}
+
+.app-sider {
+  background: #fff;
+  box-shadow: 2px 0 8px rgba(0, 21, 41, 0.08);
+}
+
+.app-content {
+  margin: 16px;
+  padding: 24px;
+  background: #fff;
+  border-radius: 8px;
+  min-height: calc(100vh - 64px - 32px);
+}
+
+/* ============================================================
+   监控侧边栏 — 可折叠容器+实例体系
+   ============================================================ */
+.monitoring-toggle {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 1001;
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  transition: all 0.3s ease;
+  font-size: 18px;
+}
+.monitoring-toggle:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+}
+.monitoring-toggle-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 22px;
+  height: 18px;
+  border-radius: 9px;
+  font-size: 11px;
+  color: #fff;
+  line-height: 18px;
+  text-align: center;
+  padding: 0 5px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.monitoring-sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 360px;
+  height: 100vh;
+  background: #1a1a2e;
+  color: #e0e0e0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.4);
+  animation: slideInLeft 0.3s ease;
+  font-size: 13px;
+}
+@keyframes slideInLeft {
+  from { transform: translateX(-100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.monitoring-sidebar-header {
+  display: flex;
+  align-items: center;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, #0f3460 0%, #16213e 100%);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  font-weight: 600;
+  font-size: 15px;
+}
+.monitoring-sidebar-stats {
+  font-size: 11px;
+  color: #52c41a;
+  background: rgba(82, 196, 26, 0.12);
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin-left: 8px;
+}
+
+.monitoring-sidebar-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 0;
+}
+.monitoring-sidebar-body::-webkit-scrollbar { width: 4px; }
+.monitoring-sidebar-body::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.15); border-radius: 2px;
+}
+
+.monitoring-error-bar {
+  margin: 8px 12px;
+  padding: 8px 12px;
+  background: rgba(255, 77, 79, 0.15);
+  color: #ff4d4f;
+  border-radius: 6px;
+  font-size: 12px;
+  text-align: center;
+}
+
+.monitoring-container {
+  margin: 4px 8px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(255,255,255,0.03);
+}
+.monitoring-container-header {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: all 0.2s;
+  user-select: none;
+}
+.monitoring-container-header:hover {
+  background: rgba(255,255,255,0.06);
+}
+.monitoring-container-icon {
+  margin-right: 8px;
+  font-size: 10px;
+  opacity: 0.6;
+}
+.monitoring-container-label-icon {
+  margin-right: 8px;
+  font-size: 14px;
+}
+.monitoring-container-label {
+  flex: 1;
+  font-weight: 500;
+  font-size: 13px;
+}
+.monitoring-container-count {
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  color: #fff;
+  min-width: 36px;
+  text-align: center;
+}
+
+.monitoring-instances {
+  padding: 2px 0 4px 0;
+}
+.monitoring-instance {
+  margin: 1px 0;
+}
+.monitoring-instance-header {
+  display: flex;
+  align-items: center;
+  padding: 6px 12px 6px 38px;
+  cursor: pointer;
+  transition: background 0.15s;
+  gap: 6px;
+  user-select: none;
+}
+.monitoring-instance-header:hover {
+  background: rgba(255,255,255,0.05);
+}
+.monitoring-instance-arrow {
+  width: 14px;
+  font-size: 10px;
+  opacity: 0.4;
+}
+.monitoring-instance-name {
+  flex: 1;
+  font-size: 12px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  color: #bbb;
+}
+.monitoring-instance-status {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 8px;
+}
+.monitoring-instance-status-online {
+  background: rgba(82, 196, 26, 0.15); color: #52c41a;
+}
+.monitoring-instance-status-offline {
+  background: rgba(255,255,255,0.06); color: #888;
+}
+.monitoring-instance-status-error {
+  background: rgba(255, 77, 79, 0.15); color: #ff4d4f;
+}
+
+.monitoring-instance-details {
+  padding: 4px 12px 8px 52px;
+  animation: fadeIn 0.2s ease;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.monitoring-instance-empty {
+  font-size: 11px;
+  color: #666;
+  padding: 4px 0;
+}
+.monitoring-instance-error {
+  font-size: 11px;
+  color: #ff4d4f;
+  padding: 4px 0;
+}
+
+.monitoring-metrics-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 8px;
+}
+.monitoring-metric-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 6px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 4px;
+  font-size: 11px;
+}
+.monitoring-metric-key {
+  color: #888;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 60%;
+}
+.monitoring-metric-value {
+  color: #e0e0e0;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.monitoring-cumulative-section {
+  margin-top: 6px;
+}
+.monitoring-cumulative-title {
+  font-size: 10px;
+  color: #666;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.monitoring-sidebar-footer {
+  padding: 8px 16px;
+  background: rgba(255,255,255,0.03);
+  border-top: 1px solid rgba(255,255,255,0.06);
+  font-size: 10px;
+  color: #555;
+  text-align: center;
+}

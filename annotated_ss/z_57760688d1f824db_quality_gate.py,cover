@@ -1,0 +1,935 @@
+> r"""
+> 天机v9.0 - 高质量记忆写入门禁 v5.1
+> ==========================================
+  
+> 基于三问推演的完整质量标准体系:
+  
+> Q1: 高质量记忆 ↔ 用户活动意志 (Will Intensity/Persistence/Delta)
+> Q2: 高质量记忆 ↔ 知识/项目的因果链上下游 (Upstream→Midstream→Downstream)
+> Q3: 高质量记忆 ↔ 不要元素的反向过滤 (冗余/无锚点/矛盾/过期/噪声)
+  
+> 写入前经过 QualityGate.check() 判定:
+>   PASS     → 直接写入目标层
+>   DOWNGRADE → 降级写入 (如 episodic→working)
+>   REJECT    → 拒绝写入 (噪声/完全重复)
+>   CONFLICT  → 标记冲突后写入
+>   PENDING_UPSTREAM → 等待上游锚点
+  
+> v5.1: ConflictResolver + PreferenceDriftDetector + ngram去重 + 7因子评分
+> """
+  
+> import time
+> import hashlib
+> import threading
+> from dataclasses import dataclass, field
+> from typing import Any, Optional, List, Dict, Set, Tuple
+> from enum import Enum
+> from collections import defaultdict
+  
+> from .config import QualityGateConfig, DEFAULT_CONFIG
+  
+> try:
+>     from .processors.conflict_resolver import (
+>         ConflictResolver, ResolutionVerdict,
+>     )
+!     _CONFLICT_RESOLVER_AVAILABLE = True
+> except ImportError:
+>     _CONFLICT_RESOLVER_AVAILABLE = False
+  
+> try:
+>     from .processors.preference_drift_detector import PreferenceDriftDetector
+!     _DRIFT_DETECTOR_AVAILABLE = True
+> except ImportError:
+>     _DRIFT_DETECTOR_AVAILABLE = False
+  
+  
+> class GateVerdict(str, Enum):
+>     PASS = "pass"
+>     DOWNGRADE = "downgrade"
+>     REJECT = "reject"
+>     CONFLICT = "conflict"
+>     PENDING_UPSTREAM = "pending_upstream"
+  
+  
+> @dataclass
+> class GateResult:
+>     verdict: GateVerdict
+>     target_layer: str
+>     reason: str
+>     adjustments: Dict[str, Any] = field(default_factory=dict)
+>     conflicts_with: List[str] = field(default_factory=list)
+>     suggested_upstream: Optional[str] = None
+>     quality_dimensions: Dict[str, float] = field(default_factory=dict)
+  
+  
+> class QualityGate:
+>     def __init__(self, config: Optional[QualityGateConfig] = None, engine=None):
+!         cfg = config or DEFAULT_CONFIG.quality_gate
+!         if hasattr(cfg, 'quality_gate'):
+!             cfg = cfg.quality_gate
+!         self.config = cfg
+!         self._engine = engine
+!         self._will_tracker: Dict[str, float] = defaultdict(float)
+!         self._will_decay_rate = 0.05
+  
+!         self._conflict_resolver = None
+!         if _CONFLICT_RESOLVER_AVAILABLE:
+!             self._conflict_resolver = ConflictResolver()
+  
+!         self._preference_drift_detector = None
+!         if _DRIFT_DETECTOR_AVAILABLE:
+!             self._preference_drift_detector = PreferenceDriftDetector()
+  
+!         self._gate_stats = {
+!             "total_checks": 0,
+!             "passes": 0,
+!             "downgrades": 0,
+!             "rejects": 0,
+!             "conflicts": 0,
+!         }
+  
+!         self._evo_loop = None
+!         try:
+!             from .evolution_loop import EvolutionLoop
+!             self._evo_loop = EvolutionLoop(
+!                 module_name="quality_gate",
+!                 effectiveness_fn=self._calc_gate_effectiveness,
+!                 learn_fn=self._learn_from_gates,
+!                 evolve_fn=self._evolve_gate_thresholds,
+!                 mutable_config={
+!                     "noise_threshold": self.config.noise_threshold if hasattr(self.config, 'noise_threshold') else 0.3,
+!                     "min_content_length": self.config.min_content_length if hasattr(self.config, 'min_content_length') else 20,
+!                     "duplicate_threshold": self.config.duplicate_threshold if hasattr(self.config, 'duplicate_threshold') else 0.85,
+!                     "will_decay_rate": self._will_decay_rate,
+!                 },
+!                 health_metrics_fn=self._get_health_metrics,
+!             )
+!         except ImportError:
+!             pass
+  
+>     def _calc_gate_effectiveness(self, action: str, state_before: Dict, state_after: Dict) -> float:
+!         verdict = state_after.get("verdict", "")
+!         priority = state_before.get("priority", "medium")
+!         if verdict == "reject" and priority in ("high", "critical"):
+!             return -0.5
+!         if verdict == "downgrade" and priority in ("high", "critical"):
+!             return -0.3
+!         if verdict == "pass" and priority == "low":
+!             return 0.1
+!         if verdict == "pass" and priority in ("high", "critical"):
+!             return 0.5
+!         return 0.0
+  
+>     def _learn_from_gates(self, causal_pairs, effectiveness_summary) -> Dict:
+!         neg_ratio = effectiveness_summary.get("negative_ratio", 0.0)
+!         avg_eff = effectiveness_summary.get("avg", 0.0)
+!         insight = ""
+!         if neg_ratio > 0.3:
+!             insight = f"拒绝/降级率过高({neg_ratio:.0%})，阈值可能过严"
+!         elif avg_eff > 0.3:
+!             insight = f"门禁效果良好(平均效果{avg_eff:.2f})"
+!         return {"insight": insight, "negative_ratio": neg_ratio, "avg_effectiveness": avg_eff}
+  
+>     def _evolve_gate_thresholds(self, learn_result, mutable_config) -> Dict:
+!         changes = []
+!         neg_ratio = learn_result.get("negative_ratio", 0.0)
+!         if neg_ratio > 0.3:
+!             old_noise = mutable_config.get("noise_threshold", 0.3)
+!             new_noise = min(old_noise * 1.1, 0.6)
+!             changes.append({"rule": "noise_threshold", "old_value": old_noise, "new_value": new_noise})
+!         elif neg_ratio < 0.05:
+!             old_noise = mutable_config.get("noise_threshold", 0.3)
+!             new_noise = max(old_noise * 0.95, 0.1)
+!             changes.append({"rule": "noise_threshold", "old_value": old_noise, "new_value": new_noise})
+!         return {"changes": changes}
+  
+>     def _get_health_metrics(self) -> Dict[str, float]:
+!         total = max(self._gate_stats["total_checks"], 1)
+!         return {
+!             "rejection_rate": self._gate_stats["rejects"] / total,
+!             "downgrade_rate": self._gate_stats["downgrades"] / total,
+!         }
+  
+>     @property
+>     def evolution_loop(self):
+!         return self._evo_loop
+  
+>     def _sync_evo_config(self):
+!         if not self._evo_loop:
+!             return
+!         mc = self._evo_loop.mutable_config
+!         if "noise_threshold" in mc:
+!             self.config.noise_threshold = mc["noise_threshold"]
+!         if "min_content_length" in mc:
+!             self.config.min_content_length = mc["min_content_length"]
+!         if "duplicate_threshold" in mc:
+!             self.config.duplicate_threshold = mc["duplicate_threshold"]
+!         if "will_decay_rate" in mc:
+!             self._will_decay_rate = mc["will_decay_rate"]
+  
+>     def check(
+>         self, content: str, layer: str, tags: List[str],
+>         priority: str, existing_entries: Optional[List] = None,
+>     ) -> GateResult:
+!         self._sync_evo_config()
+!         self._gate_stats["total_checks"] += 1
+!         dims = {}
+  
+!         noise_check = self._check_noise(content)
+!         if noise_check["is_noise"]:
+!             self._gate_stats["rejects"] += 1
+!             result = GateResult(
+!                 verdict=GateVerdict.REJECT,
+!                 target_layer="",
+!                 reason=f"噪声内容被拒绝: {noise_check['reason']}",
+!                 quality_dimensions={"noise": 0.0},
+!             )
+  
+!         dims["noise"] = noise_check["score"]
+  
+!         length_check = self._check_length(content)
+!         if not length_check["pass"]:
+!             return GateResult(
+!                 verdict=GateVerdict.DOWNGRADE if length_check["score"] > 0.3 else GateVerdict.REJECT,
+!                 target_layer=self.config.auto_downgrade_noisy_to,
+!                 reason=f"内容过短 ({len(content)}字符), 最低要求{self.config.min_content_length}",
+!                 quality_dimensions={"length": length_check["score"]},
+!             )
+  
+!         dims["length"] = length_check["score"]
+  
+!         dup_check = self._check_duplicate(content, existing_entries)
+!         if dup_check["is_duplicate"]:
+!             return GateResult(
+!                 verdict=GateVerdict.REJECT,
+!                 target_layer="",
+!                 reason=f"与已有记忆高度重复 (相似度{dup_check['similarity']:.2f})",
+!                 conflicts_with=dup_check.get("matched_ids", []),
+!                 quality_dimensions={"duplicate": dup_check["similarity"]},
+!             )
+!         dims["duplicate"] = dup_check["similarity"]
+  
+!         tag_check = self._check_tags(tags, layer)
+!         if not tag_check["pass"]:
+!             return GateResult(
+!                 verdict=GateVerdict.DOWNGRADE,
+!                 target_layer=self.config.auto_downgrade_noisy_to,
+!                 reason=f"层级 {layer} 要求标签，当前标签: {tags}",
+!                 adjustments={"suggested_tags": tag_check.get("suggested", [])},
+!                 quality_dimensions={"tags": 0.0},
+!             )
+!         dims["tags"] = tag_check["score"]
+  
+!         upstream_check = self._check_upstream(content, layer, existing_entries)
+!         if not upstream_check["pass"]:
+!             return GateResult(
+!                 verdict=GateVerdict.PENDING_UPSTREAM if upstream_check["can_pend"] else GateVerdict.DOWNGRADE,
+!                 target_layer=upstream_check.get("fallback_layer", "working"),
+!                 reason=f"缺少上游知识锚点: {upstream_check['reason']}",
+!                 suggested_upstream=upstream_check.get("suggested_upstream"),
+!                 quality_dimensions={"upstream": upstream_check["score"]},
+!             )
+!         dims["upstream"] = upstream_check["score"]
+  
+!         will_score = self._check_will_alignment(content, tags, priority)
+!         dims["will"] = will_score
+  
+!         causal_score = self._check_causal_chain(content, existing_entries)
+!         dims["causal"] = causal_score
+  
+!         conflict_check = self._check_conflict(content, existing_entries)
+!         if conflict_check["has_conflict"]:
+!             resolved = self._try_auto_resolve_conflict(
+!                 content, conflict_check, existing_entries
+!             )
+!             if resolved:
+!                 dims["conflict_resolved"] = 1.0
+!             else:
+!                 return GateResult(
+!                     verdict=GateVerdict.CONFLICT,
+!                     target_layer=layer,
+!                     reason=f"检测到潜在知识冲突: {conflict_check['reason']}",
+!                     conflicts_with=conflict_check.get("matched_ids", []),
+!                     quality_dimensions=dims,
+!                 )
+  
+!         drift_check = self._check_preference_drift(content, tags)
+!         dims["drift"] = drift_check["score"]
+!         if drift_check["has_drift"]:
+!             dims["drift_signal"] = drift_check["drift_type"]
+  
+!         overall = (
+!             dims.get("length", 0.5) * 0.12
+!             + (1.0 - dims.get("duplicate", 0.0)) * 0.18
+!             + dims.get("tags", 0.5) * 0.08
+!             + dims.get("upstream", 0.5) * 0.18
+!             + dims.get("will", 0.5) * 0.18
+!             + dims.get("causal", 0.5) * 0.12
+!             + dims.get("drift", 0.5) * 0.14
+!         )
+  
+!         if overall >= self.config.minimum_value_score_for_direct_write:
+!             self._gate_stats["passes"] += 1
+!             result = GateResult(
+!                 verdict=GateVerdict.PASS,
+!                 target_layer=layer,
+!                 reason=f"高质量记忆, 综合评分{overall:.2f}",
+!                 quality_dimensions=dims,
+!             )
+!         else:
+!             self._gate_stats["downgrades"] += 1
+!             fallback = self._determine_fallback(layer)
+!             result = GateResult(
+!                 verdict=GateVerdict.DOWNGRADE,
+!                 target_layer=fallback,
+!                 reason=f"综合质量不足({overall:.2f}<{self.config.minimum_value_score_for_direct_write}), 降级至{fallback}",
+!                 quality_dimensions=dims,
+!             )
+  
+!         if self._evo_loop:
+!             self._evo_loop.record_action(
+!                 action="gate_check",
+!                 state_before={"priority": priority, "layer": layer},
+!                 state_after={"verdict": result.verdict.value},
+!             )
+  
+!         return result
+  
+>     def update_will(self, topic: str, intensity: float):
+!         current = self._will_tracker.get(topic, 0.0)
+!         self._will_tracker[topic] = max(0.0, min(1.0, current + intensity))
+!         for t in list(self._will_tracker.keys()):
+!             if t != topic:
+!                 self._will_tracker[t] = max(0.0, self._will_tracker[t] - self._will_decay_rate)
+!                 if self._will_tracker[t] <= 0.01:
+!                     del self._will_tracker[t]
+  
+>     def get_will_topics(self, top_n: int = 5) -> List[Tuple[str, float]]:
+!         return sorted(self._will_tracker.items(), key=lambda x: x[1], reverse=True)[:top_n]
+  
+>     def _check_noise(self, content: str) -> dict:
+!         stripped = content.strip()
+!         if not stripped:
+!             return {"is_noise": True, "score": 0.0, "reason": "空内容"}
+!         for pattern in self.config.noise_patterns:
+!             if stripped == pattern:
+!                 return {"is_noise": True, "score": 0.0, "reason": f"纯噪声模式: '{pattern}'"}
+!         if len(set(stripped)) <= 2 and len(stripped) <= 10:
+!             return {"is_noise": True, "score": 0.0, "reason": "重复字符噪声"}
+!         if stripped in ("...", "---", "===", "***", "。。。", "，，，"):
+!             return {"is_noise": True, "score": 0.0, "reason": "符号噪声"}
+!         has_meaningful = any(c for c in stripped if '\u4e00' <= c <= '\u9fff' or c.isalpha())
+!         if not has_meaningful:
+!             return {"is_noise": True, "score": 0.1, "reason": "无有意义字符"}
+!         return {"is_noise": False, "score": 0.9}
+  
+>     def _check_length(self, content: str) -> dict:
+!         length = len(content)
+!         if length >= self.config.min_content_length * 3:
+!             return {"pass": True, "score": 1.0}
+!         elif length >= self.config.min_content_length * 2:
+!             return {"pass": True, "score": 0.8}
+!         elif length >= self.config.min_content_length:
+!             return {"pass": True, "score": 0.6}
+!         elif length >= self.config.min_content_length * 0.5:
+!             return {"pass": False, "score": 0.3}
+!         return {"pass": False, "score": 0.1}
+  
+>     def _check_duplicate(self, content: str, existing_entries: Optional[List]) -> dict:
+!         if not existing_entries:
+!             return {"is_duplicate": False, "similarity": 0.0, "matched_ids": []}
+!         content_words = set(content)
+!         best_similarity = 0.0
+!         best_id = None
+!         for entry in existing_entries:
+!             existing_content = entry.content if hasattr(entry, "content") else entry.get("content", "")
+!             existing_words = set(existing_content)
+!             if not content_words or not existing_words:
+!                 continue
+!             intersection = content_words & existing_words
+!             union = content_words | existing_words
+!             jaccard = len(intersection) / len(union) if union else 0
+!             long_substr = self._longest_common_substring(content, existing_content)
+!             substr_ratio = long_substr / max(len(content), 1)
+!             similarity = max(jaccard, substr_ratio)
+!             if similarity > best_similarity:
+!                 best_similarity = similarity
+!                 best_id = entry.id if hasattr(entry, "id") else entry.get("id")
+!         is_dup = best_similarity >= self.config.max_similarity_for_duplicate
+!         return {
+!             "is_duplicate": is_dup,
+!             "similarity": round(best_similarity, 4),
+!             "matched_ids": [best_id] if best_id else [],
+!         }
+  
+>     def _check_tags(self, tags: List[str], layer: str) -> dict:
+!         if layer not in self.config.require_tags_for_layers:
+!             return {"pass": True, "score": 1.0}
+!         if tags and len(tags) > 0:
+!             return {"pass": True, "score": min(1.0, len(tags) / 3.0)}
+!         return {"pass": False, "score": 0.0, "suggested": ["auto-generated"]}
+  
+>     def _check_upstream(
+>         self, content: str, layer: str, existing_entries: Optional[List]
+>     ) -> dict:
+!         if layer not in self.config.require_upstream_for_layers:
+!             return {"pass": True, "score": 0.8}
+!         if not existing_entries:
+!             return {
+!                 "pass": False, "score": 0.0, "can_pend": True,
+!                 "reason": "语义层无现有记忆可关联,待上游补全",
+!                 "fallback_layer": "episodic",
+!             }
+!         content_lower = content.lower()
+!         related = []
+!         for entry in existing_entries:
+!             existing_content = entry.content if hasattr(entry, "content") else entry.get("content", "")
+!             if self._has_semantic_overlap(content_lower, existing_content.lower()):
+!                 entry_id = entry.id if hasattr(entry, "id") else entry.get("id", "")
+!                 related.append(entry_id)
+!         if related:
+!             return {"pass": True, "score": min(1.0, len(related) / 3.0), "related_ids": related}
+!         return {
+!             "pass": False, "score": 0.15, "can_pend": True,
+!             "reason": "未找到语义关联上游, 等待更多上下文",
+!             "suggested_upstream": self._guess_upstream_topic(content),
+!             "fallback_layer": "episodic",
+!         }
+  
+>     def _check_will_alignment(self, content: str, tags: List[str], priority: str) -> float:
+!         score = 0.3
+!         content_lower = content.lower()
+!         for topic, intensity in self._will_tracker.items():
+!             if topic.lower() in content_lower:
+!                 score = max(score, 0.5 + intensity * 0.5)
+!         for tag in tags:
+!             if tag in self._will_tracker:
+!                 score = max(score, 0.5 + self._will_tracker[tag] * 0.5)
+!         priority_bonus = {"critical": 0.3, "high": 0.2, "medium": 0.1, "low": 0.0}
+!         score += priority_bonus.get(priority, 0.0)
+!         return min(1.0, score)
+  
+>     def _check_causal_chain(self, content: str, existing_entries: Optional[List]) -> float:
+!         if not existing_entries:
+!             return 0.3
+!         causal_patterns = [
+!             "因为", "所以", "因此", "由于", "导致", "引起",
+!             "基于", "根据", "参考", "继承", "依赖",
+!             "实现", "定义", "决定", "配置", "构建",
+!         ]
+!         upstream_score = 0.0
+!         downstream_score = 0.0
+!         for entry in existing_entries[:30]:
+!             existing_content = entry.content if hasattr(entry, "content") else entry.get("content", "")
+!             if any(p in content for p in causal_patterns) and any(p in existing_content for p in causal_patterns):
+!                 upstream_score += 0.1
+!         content_lower = content.lower()
+!         lower_entries = [e for e in (existing_entries or [])[:30]]
+!         lower_contents = [
+!             e.content.lower() if hasattr(e, "content") else e.get("content", "").lower()
+!             for e in lower_entries
+!         ]
+!         for lc in lower_contents:
+!             if self._has_semantic_overlap(content_lower, lc) and len(content) > len(lc) * 0.5:
+!                 downstream_score += 0.1
+!         chain_score = min(1.0, (upstream_score + downstream_score) / 2.0)
+!         return max(0.3, chain_score)
+  
+>     def _check_conflict(self, content: str, existing_entries: Optional[List]) -> dict:
+!         if not self.config.conflict_detection_enabled or not existing_entries:
+!             return {"has_conflict": False, "reason": "", "matched_ids": []}
+  
+!         if self._conflict_resolver:
+!             conflicts = []
+!             last_conflict_type = None
+!             for entry in existing_entries[:50]:
+!                 conflict_type = self._conflict_resolver.detect_conflict_by_content(
+!                     content,
+!                     entry.content if hasattr(entry, "content") else entry.get("content", ""),
+!                 )
+!                 if conflict_type is not None:
+!                     entry_id = entry.id if hasattr(entry, "id") else entry.get("id", "")
+!                     conflicts.append(entry_id)
+!                     last_conflict_type = conflict_type
+!             if conflicts:
+!                 ct_label = (
+!                     last_conflict_type.value
+!                     if last_conflict_type and hasattr(last_conflict_type, "value")
+!                     else "未知"
+!                 )
+!                 return {
+!                     "has_conflict": True,
+!                     "reason": f"与{len(conflicts)}条记忆存在{ct_label}冲突",
+!                     "matched_ids": conflicts[:5],
+!                 }
+!             return {"has_conflict": False, "reason": "", "matched_ids": []}
+  
+!         negation_words = ["不", "没有", "错误", "推翻", "废弃", "不再", "删除", "移除", "替换"]
+!         content_has_negation = any(w in content for w in negation_words)
+!         if not content_has_negation:
+!             return {"has_conflict": False, "reason": "", "matched_ids": []}
+!         conflicts = []
+!         for entry in existing_entries[:50]:
+!             existing_content = entry.content if hasattr(entry, "content") else entry.get("content", "")
+!             if self._has_semantic_overlap(content, existing_content) and len(content) > 30:
+!                 entry_id = entry.id if hasattr(entry, "id") else entry.get("id", "")
+!                 conflicts.append(entry_id)
+!         if len(conflicts) > self.config.max_conflict_retention:
+!             return {"has_conflict": True, "reason": f"超过{self.config.max_conflict_retention}个冲突信号", "matched_ids": conflicts[:5]}
+!         if conflicts:
+!             return {"has_conflict": True, "reason": f"与{len(conflicts)}条记忆存在语义冲突", "matched_ids": conflicts[:3]}
+!         return {"has_conflict": False, "reason": "", "matched_ids": []}
+  
+>     @staticmethod
+>     def _char_ngrams(text: str, n: int = 4) -> set:
+!         if len(text) < n:
+!             return {text}
+!         return {text[i:i + n] for i in range(len(text) - n + 1)}
+  
+>     def _check_preference_drift(self, content: str, tags: List[str]) -> dict:
+!         if not self._preference_drift_detector:
+!             return {"has_drift": False, "score": 0.5, "drift_type": "none"}
+!         try:
+!             for tag in tags:
+!                 self._preference_drift_detector.update(tag, 1.0)
+!             signals = self._preference_drift_detector.detect()
+!             if signals:
+!                 strongest = max(signals, key=lambda s: abs(s.delta))
+!                 return {
+!                     "has_drift": True,
+!                     "score": min(1.0, abs(strongest.delta) * 2),
+!                     "drift_type": strongest.drift_type.value,
+!                     "topic": strongest.topic,
+!                     "delta": strongest.delta,
+!                 }
+!         except Exception:
+!             pass
+!         return {"has_drift": False, "score": 0.5, "drift_type": "none"}
+  
+>     def _try_auto_resolve_conflict(
+>         self, content: str, conflict_check: dict, existing_entries: Optional[List]
+>     ) -> bool:
+!         if not self._conflict_resolver:
+!             return False
+!         try:
+!             conflict_ids = conflict_check.get("matched_ids", [])
+!             if not conflict_ids or not existing_entries:
+!                 return False
+!             for entry in existing_entries[:20]:
+!                 entry_id = entry.id if hasattr(entry, "id") else entry.get("id", "")
+!                 if entry_id in conflict_ids:
+!                     existing_content = (
+!                         entry.content
+!                         if hasattr(entry, "content")
+!                         else entry.get("content", "")
+!                     )
+!                     verdict = self._conflict_resolver.resolve(
+!                         new_content=content,
+!                         existing_content=existing_content,
+!                     )
+!                     if (
+!                         verdict
+!                         and hasattr(verdict, "action")
+!                         and verdict.action in ("merge", "update_existing", "supersede")
+!                     ):
+!                         return True
+!             return False
+!         except Exception:
+!             return False
+  
+>     def _determine_fallback(self, layer: str) -> str:
+!         layer_order = ["sensory", "working", "short_term", "episodic", "semantic", "meta"]
+!         if layer in layer_order:
+!             idx = layer_order.index(layer)
+!             if idx > 0:
+!                 return layer_order[idx - 1]
+!         return "working"
+  
+>     def _has_semantic_overlap(self, text1: str, text2: str) -> bool:
+!         words1 = set(text1.split())
+!         words2 = set(text2.split())
+!         if not words1 or not words2:
+!             return False
+!         overlap = len(words1 & words2)
+!         return overlap >= min(2, len(words1) * 0.2)
+  
+>     def _guess_upstream_topic(self, content: str) -> str:
+!         indicators = ["因为", "基于", "根据", "参考", "参见", "关于", "针对"]
+!         for ind in indicators:
+!             if ind in content:
+!                 idx = content.index(ind)
+!                 end = min(idx + 30, len(content))
+!                 return content[idx:end].strip()
+!         return content[:50] + "..."
+  
+>     @staticmethod
+>     def _longest_common_substring(s1: str, s2: str) -> int:
+!         if not s1 or not s2:
+!             return 0
+!         m, n = len(s1), len(s2)
+!         max_len = 0
+!         prev = [0] * (n + 1)
+!         for i in range(1, m + 1):
+!             curr = [0] * (n + 1)
+!             for j in range(1, n + 1):
+!                 if s1[i - 1] == s2[j - 1]:
+!                     curr[j] = prev[j - 1] + 1
+!                     max_len = max(max_len, curr[j])
+!             prev = curr
+!         return max_len
+  
+>     def check_promotion(self, content: str, source_layer: str,
+>                          target_layer: str, tags: List[str] = None,
+>                          priority: str = "medium") -> GateResult:
+>         """
+>         层级转换门禁 — 晋升时额外检查:
+>         1. 内容价值分 ≥ 层级阈值
+>         2. 上游锚点存在性验证
+>         3. 下游需求压力评估
+>         4. 层级跳跃限制 (不可跨层晋升)
+>         """
+!         self._gate_stats["total_checks"] += 1
+!         layer_order = ["sensory", "working", "short_term", "episodic", "semantic", "meta"]
+!         promotion_thresholds = {
+!             ("sensory", "working"): 0.3,
+!             ("working", "short_term"): 0.4,
+!             ("short_term", "episodic"): 0.5,
+!             ("episodic", "semantic"): 0.6,
+!             ("semantic", "meta"): 0.7,
+!         }
+  
+!         if source_layer not in layer_order or target_layer not in layer_order:
+!             return GateResult(
+!                 verdict=GateVerdict.REJECT,
+!                 target_layer=source_layer,
+!                 reason=f"无效层级: {source_layer}→{target_layer}",
+!                 quality_dimensions={"promotion": 0.0},
+!             )
+  
+!         src_idx = layer_order.index(source_layer)
+!         tgt_idx = layer_order.index(target_layer)
+  
+!         if tgt_idx <= src_idx:
+!             return GateResult(
+!                 verdict=GateVerdict.PASS,
+!                 target_layer=target_layer,
+!                 reason="降级/同级操作，无需晋升门禁",
+!                 quality_dimensions={"promotion": 1.0},
+!             )
+  
+!         if tgt_idx > src_idx + 1:
+!             return GateResult(
+!                 verdict=GateVerdict.DOWNGRADE,
+!                 target_layer=layer_order[src_idx + 1],
+!                 reason=f"不可跨层晋升({source_layer}→{target_layer})，先晋升至{layer_order[src_idx + 1]}",
+!                 quality_dimensions={"promotion": 0.2},
+!             )
+  
+!         threshold = promotion_thresholds.get((source_layer, target_layer), 0.5)
+  
+!         value_score = self._calc_promotion_value(content, tags or [], priority)
+  
+!         upstream_ok = self._check_promotion_upstream(content, target_layer)
+  
+!         if value_score < threshold:
+!             self._gate_stats["downgrades"] += 1
+!             return GateResult(
+!                 verdict=GateVerdict.DOWNGRADE,
+!                 target_layer=source_layer,
+!                 reason=f"晋升价值不足({value_score:.2f}<{threshold:.2f})，留在{source_layer}",
+!                 quality_dimensions={"promotion": value_score, "threshold": threshold},
+!             )
+  
+!         if not upstream_ok and source_layer != "sensory":
+!             return GateResult(
+!                 verdict=GateVerdict.PENDING_UPSTREAM,
+!                 target_layer=source_layer,
+!                 reason=f"目标层{target_layer}缺少上游锚点，暂缓晋升",
+!                 suggested_upstream=target_layer,
+!                 quality_dimensions={"promotion": value_score, "upstream": 0.0},
+!             )
+  
+!         self._gate_stats["passes"] += 1
+!         return GateResult(
+!             verdict=GateVerdict.PASS,
+!             target_layer=target_layer,
+!             reason=f"晋升通过: {source_layer}→{target_layer} (价值{value_score:.2f}≥阈值{threshold:.2f})",
+!             quality_dimensions={"promotion": value_score, "threshold": threshold, "upstream": 1.0},
+!         )
+  
+>     def _calc_promotion_value(self, content: str, tags: List[str],
+>                                priority: str) -> float:
+!         length_score = min(len(content) / 500.0, 1.0) * 0.2
+!         structure_score = 0.0
+!         if "```" in content:
+!             structure_score += 0.15
+!         if any(kw in content.lower() for kw in ["架构", "设计", "策略", "规则", "决策"]):
+!             structure_score += 0.2
+!         if "\n" in content and len(content.split("\n")) > 5:
+!             structure_score += 0.1
+!         tag_score = min(len(tags) / 5.0, 1.0) * 0.15
+!         priority_score = {"critical": 0.3, "high": 0.2, "medium": 0.1, "low": 0.0}.get(priority, 0.0)
+!         return min(length_score + structure_score + tag_score + priority_score, 1.0)
+  
+>     def _check_promotion_upstream(self, content: str, target_layer: str) -> bool:
+!         if self._engine is None:
+!             return True
+!         try:
+!             results = self._engine.recall(query=content[:100], limit=3,
+!                                            min_score=0.0, layers=[target_layer])
+!             return len(results) > 0
+!         except Exception:
+!             return True
+  
+>     def get_stats(self) -> Dict[str, Any]:
+!         total = max(self._gate_stats.get("total_checks", 0), 1)
+!         will_topics = []
+!         if hasattr(self, '_will_tracker') and self._will_tracker:
+!             sorted_will = sorted(self._will_tracker.items(), key=lambda x: x[1], reverse=True)
+!             will_topics = [(k, round(v, 3)) for k, v in sorted_will[:5]]
+!         return {
+!             "version": "5.1",
+!             "gate_stats": dict(self._gate_stats),
+!             "rates": {
+!                 "pass_rate": round(self._gate_stats.get("passes", 0) / total, 4),
+!                 "rejection_rate": round(self._gate_stats.get("rejects", 0) / total, 4),
+!                 "downgrade_rate": round(self._gate_stats.get("downgrades", 0) / total, 4),
+!             },
+!             "config_snapshot": {
+!                 "noise_threshold": getattr(getattr(self, 'config', None), 'noise_threshold', 0.3),
+!                 "min_content_length": getattr(getattr(self, 'config', None), 'min_content_length', 20),
+!                 "duplicate_threshold": getattr(getattr(self, 'config', None), 'duplicate_threshold', 0.85),
+!             },
+!             "will_tracker": {
+!                 "active_topics": len(self._will_tracker) if hasattr(self, '_will_tracker') else 0,
+!                 "top_topics": will_topics,
+!             },
+!             "subsystems": {
+!                 "conflict_resolver_available": getattr(self, '_conflict_resolver', None) is not None,
+!                 "drift_detector_available": getattr(self, '_preference_drift_detector', None) is not None,
+!                 "evo_loop_active": getattr(self, '_evo_loop', None) is not None,
+!             },
+!         }
+  
+  
+> class ConsumerAwareAdaptiveGate:
+>     """
+>     Consumer-Aware自适应门禁 — 根据下游消费者需求动态调整阈值
+  
+>     核心逻辑:
+>       - 活跃Consumer需求压力高 → 降低min_value_score，收录更多内容
+>       - 系统负载高 → 提高max_similarity，减少重复写入
+>       - Feedback反馈质量差 → 提高噪音阈值，收紧门禁
+>     """
+>     def __init__(self, gate: QualityGate):
+!         self._gate = gate
+!         self._consumer_pressure: Dict[str, float] = {}
+!         self._system_load: float = 0.5
+!         self._feedback_quality: float = 0.8
+!         self._adjustment_history: List[Dict] = []
+!         self._lock = threading.Lock() if hasattr(threading, 'Lock') else None
+  
+>     def update_consumer_pressure(self, consumer_name: str, pressure: float):
+!         self._consumer_pressure[consumer_name] = max(0.0, min(1.0, pressure))
+  
+>     def update_system_load(self, load: float):
+!         self._system_load = max(0.1, min(1.0, load))
+  
+>     def update_feedback_quality(self, quality: float):
+!         self._feedback_quality = max(0.1, min(1.0, quality))
+  
+>     def get_adaptive_thresholds(self) -> Dict[str, float]:
+!         avg_pressure = sum(self._consumer_pressure.values()) / max(len(self._consumer_pressure), 1)
+!         base_noise = getattr(self._gate.config, 'noise_threshold', 0.3)
+!         base_dup = getattr(self._gate.config, 'duplicate_threshold', 0.85)
+!         base_min_len = getattr(self._gate.config, 'min_content_length', 30)
+!         adjusted_noise = base_noise * (1.0 + (1.0 - self._feedback_quality) * 0.5)
+!         adjusted_noise = min(0.6, max(0.1, adjusted_noise))
+!         adjusted_dup = base_dup * (1.0 - avg_pressure * 0.15)
+!         adjusted_dup = min(0.95, max(0.6, adjusted_dup))
+!         adjusted_min_len = base_min_len * (1.0 - avg_pressure * 0.3)
+!         adjusted_min_len = max(15, int(adjusted_min_len))
+!         return {
+!             "noise_threshold": round(adjusted_noise, 3),
+!             "duplicate_threshold": round(adjusted_dup, 3),
+!             "min_content_length": adjusted_min_len,
+!             "effective_value_score": round(0.3 * (1.0 - avg_pressure * 0.4), 3),
+!             "consumer_pressure": round(avg_pressure, 3),
+!             "system_load": self._system_load,
+!             "feedback_quality": round(self._feedback_quality, 3),
+!         }
+  
+>     def apply(self) -> Dict:
+!         thresholds = self.get_adaptive_thresholds()
+!         old_thresholds = {
+!             "noise_threshold": getattr(self._gate.config, 'noise_threshold', 0.3),
+!             "duplicate_threshold": getattr(self._gate.config, 'duplicate_threshold', 0.85),
+!             "min_content_length": getattr(self._gate.config, 'min_content_length', 30),
+!         }
+!         self._gate.config.noise_threshold = thresholds["noise_threshold"]
+!         self._gate.config.duplicate_threshold = thresholds["duplicate_threshold"]
+!         self._gate.config.min_content_length = thresholds["min_content_length"]
+!         change = {
+!             "timestamp": time.time(),
+!             "old": old_thresholds,
+!             "new": {
+!                 "noise_threshold": thresholds["noise_threshold"],
+!                 "duplicate_threshold": thresholds["duplicate_threshold"],
+!                 "min_content_length": thresholds["min_content_length"],
+!             },
+!             "consumer_pressure": thresholds["consumer_pressure"],
+!         }
+!         self._adjustment_history.append(change)
+!         if len(self._adjustment_history) > 100:
+!             self._adjustment_history = self._adjustment_history[-100:]
+!         return change
+  
+>     def get_stats(self) -> Dict:
+!         return {
+!             "adaptive_enabled": True,
+!             "current_thresholds": self.get_adaptive_thresholds(),
+!             "adjustment_count": len(self._adjustment_history),
+!             "last_adjustment": self._adjustment_history[-1] if self._adjustment_history else None,
+!             "consumer_pressure": dict(self._consumer_pressure),
+!         }
+  
+>     def run_tuning_cycle(self) -> Dict:
+!         result = {"timestamp": time.time(), "action": "tuning_cycle", "adjustments": {}}
+!         old_thresholds = {
+!             "noise_threshold": getattr(self._gate.config, 'noise_threshold', 0.3),
+!             "duplicate_threshold": getattr(self._gate.config, 'duplicate_threshold', 0.85),
+!             "min_content_length": getattr(self._gate.config, 'min_content_length', 30),
+!         }
+!         change = self.apply()
+!         result["adjustments"] = {
+!             "old": old_thresholds,
+!             "new": {
+!                 "noise_threshold": change["new"]["noise_threshold"],
+!                 "duplicate_threshold": change["new"]["duplicate_threshold"],
+!                 "min_content_length": change["new"]["min_content_length"],
+!             },
+!             "consumer_pressure": change["consumer_pressure"],
+!             "delta_noise": round(change["new"]["noise_threshold"] - old_thresholds["noise_threshold"], 4),
+!             "delta_dup": round(change["new"]["duplicate_threshold"] - old_thresholds["duplicate_threshold"], 4),
+!             "delta_min_len": change["new"]["min_content_length"] - old_thresholds["min_content_length"],
+!         }
+!         return result
+  
+>     def get_tuning_history(self, limit: int = 20) -> List[Dict]:
+!         return self._adjustment_history[-limit:]
+  
+>     def get_tuning_summary(self) -> Dict:
+!         history = self._adjustment_history[-50:]
+!         if not history:
+!             return {"total_adjustments": 0}
+!         noise_changes = [h["new"]["noise_threshold"] - h["old"]["noise_threshold"] for h in history]
+!         dup_changes = [h["new"]["duplicate_threshold"] - h["old"]["duplicate_threshold"] for h in history]
+!         return {
+!             "total_adjustments": len(self._adjustment_history),
+!             "recent_adjustments": len(history),
+!             "avg_noise_delta": round(sum(noise_changes) / len(noise_changes), 4),
+!             "avg_dup_delta": round(sum(dup_changes) / len(dup_changes), 4),
+!             "trend": "tightening" if sum(noise_changes) > 0 else "loosening",
+!             "last_adjustment_age_seconds": time.time() - (history[-1]["timestamp"] if history else time.time()),
+!         }
+  
+  
+> class AutoTuningScheduler:
+>     CONSUMERS = [
+>         "dictionary_builder", "knowledge_extractor", "semantic_indexer",
+>         "learning_loop", "evolution_loop", "audit_logger",
+>         "skill_extractor", "insight_engine", "reflection_engine",
+>     ]
+  
+>     def __init__(self, adaptive_gate: ConsumerAwareAdaptiveGate,
+>                  interval_seconds: float = 300.0):
+!         self._gate = adaptive_gate
+!         self._interval = interval_seconds
+!         self._running = False
+!         self._thread: Optional[Any] = None
+!         self._scheduler_lock = threading.Lock() if hasattr(threading, 'Lock') else None
+!         self._cycle_count: int = 0
+!         self._total_tunings: int = 0
+!         self._last_tuning: float = 0.0
+  
+>     def start(self):
+!         if self._running:
+!             return
+!         self._running = True
+!         if hasattr(threading, 'Thread'):
+!             self._thread = threading.Thread(target=self._scheduler_loop, daemon=True, name="tianji-auto-tuning")
+!             self._thread.start()
+  
+>     def stop(self):
+!         self._running = False
+!         if self._thread and self._thread.is_alive():
+!             self._thread.join(timeout=5.0)
+  
+>     def _scheduler_loop(self):
+!         while self._running:
+!             try:
+!                 time.sleep(self._interval)
+!                 if not self._running:
+!                     break
+!                 self._run_single_cycle()
+!             except Exception:
+!                 pass
+  
+>     def _run_single_cycle(self):
+!         self._scan_all_consumers()
+!         self._detect_consumer_pressure()
+!         self._gate.run_tuning_cycle()
+!         self._cycle_count += 1
+!         self._total_tunings += 1
+!         self._last_tuning = time.time()
+  
+>     def _scan_all_consumers(self):
+!         for consumer_name in self.CONSUMERS:
+!             current_pressure = self._gate._consumer_pressure.get(consumer_name, 0.0)
+!             if current_pressure == 0.0:
+!                 simulated = 0.3 + (hash(consumer_name + str(self._cycle_count)) % 100) / 200.0
+!                 self._gate.update_consumer_pressure(consumer_name, min(1.0, simulated))
+  
+>     def _detect_consumer_pressure(self):
+!         pressures = list(self._gate._consumer_pressure.values())
+!         if pressures:
+!             avg = sum(pressures) / len(pressures)
+!             load = 0.3 + avg * 0.5
+!             self._gate.update_system_load(min(0.95, load))
+!             quality = max(0.3, 1.0 - avg * 0.6)
+!             self._gate.update_feedback_quality(min(1.0, quality))
+  
+>     def run_now(self) -> Dict:
+!         result = {}
+!         try:
+!             old_thresholds = self._gate.get_adaptive_thresholds()
+!             self._run_single_cycle()
+!             new_thresholds = self._gate.get_adaptive_thresholds()
+!             result = {
+!                 "status": "completed",
+!                 "cycle": self._cycle_count,
+!                 "total_tunings": self._total_tunings,
+!                 "old_thresholds": old_thresholds,
+!                 "new_thresholds": new_thresholds,
+!                 "consumer_pressures": dict(self._gate._consumer_pressure),
+!                 "system_load": self._gate._system_load,
+!                 "feedback_quality": self._gate._feedback_quality,
+!             }
+!         except Exception as e:
+!             result = {"status": "error", "error": str(e)[:200]}
+!         return result
+  
+>     def get_scheduler_stats(self) -> Dict:
+!         return {
+!             "running": self._running,
+!             "interval_seconds": self._interval,
+!             "cycles_completed": self._cycle_count,
+!             "total_tunings": self._total_tunings,
+!             "last_tuning": self._last_tuning,
+!             "last_tuning_age": time.time() - self._last_tuning if self._last_tuning else -1,
+!             "gate_stats": self._gate.get_stats(),
+!         }
+  
+>     @property
+>     def is_running(self) -> bool:
+!         return self._running

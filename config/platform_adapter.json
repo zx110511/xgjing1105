@@ -1,0 +1,109 @@
+{
+  "version": "1.0.0",
+  "description": "天机多平台适配配置 - 支持Trae、Qoder等AI智能平台",
+
+  "trae": {
+    "display_name": "Trae IDE",
+    "default_agent": "lingxi",
+    "tag_prefix": "trae",
+    "session_prefix": "trae_session",
+
+    "layer_strategy": {
+      "user_input": "sensory",
+      "ai_response": "working",
+      "event": "episodic"
+    },
+
+    "capture_options": {
+      "max_content_length": 10000,
+      "include_mcp_calls": true,
+      "include_file_ops": true,
+      "auto_capture": true,
+      "capture_on_end": true
+    },
+
+    "hooks": {
+      "on_conversation_start": false,
+      "on_conversation_end": true,
+      "on_message_send": false,
+      "on_message_receive": false
+    },
+
+    "metadata_enrichment": {
+      "add_platform_info": true,
+      "add_agent_info": true,
+      "add_session_info": true,
+      "add_timestamp": true
+    }
+  },
+
+  "qoder": {
+    "display_name": "Qoder IDE",
+    "default_agent": "tianshu",
+    "tag_prefix": "qoder",
+    "session_prefix": "qoder_session",
+
+    "layer_strategy": {
+      "user_input": "sensory",
+      "ai_response": "working",
+      "event": "episodic"
+    },
+
+    "capture_options": {
+      "max_content_length": 20000,
+      "include_mcp_calls": true,
+      "include_file_ops": true,
+      "auto_capture": true,
+      "capture_on_end": true
+    },
+
+    "hooks": {
+      "on_conversation_start": false,
+      "on_conversation_end": true,
+      "on_message_send": false,
+      "on_message_receive": false
+    },
+
+    "metadata_enrichment": {
+      "add_platform_info": true,
+      "add_agent_info": true,
+      "add_session_info": true,
+      "add_timestamp": true
+    }
+  },
+
+  "default": {
+    "display_name": "Default Platform",
+    "default_agent": "yiku",
+    "tag_prefix": "default",
+    "session_prefix": "default_session",
+
+    "layer_strategy": {
+      "user_input": "sensory",
+      "ai_response": "working",
+      "event": "episodic"
+    },
+
+    "capture_options": {
+      "max_content_length": 10000,
+      "include_mcp_calls": false,
+      "include_file_ops": false,
+      "auto_capture": false,
+      "capture_on_end": false
+    },
+
+    "hooks": {
+      "on_conversation_start": false,
+      "on_conversation_end": false,
+      "on_message_send": false,
+      "on_message_receive": false
+    },
+
+    "metadata_enrichment": {
+      "add_platform_info": true,
+      "add_agent_info": false,
+      "add_session_info": false,
+      "add_timestamp": true
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "id": "default",
+  "title": "新对话",
+  "messages": [
+    {
+      "id": "msg-b3221906",
+      "role": "user",
+      "content": "hello",
+      "timestamp": 1781730246.934554,
+      "token_count": 5
+    },
+    {
+      "id": "msg-af0e951b",
+      "role": "assistant",
+      "content": "sensory",
+      "timestamp": 1781730248.8655877,
+      "token_count": 7
+    },
+    {
+      "id": "msg-aa027d6e",
+      "role": "user",
+      "content": "测试对话功能",
+      "timestamp": 1782086568.78948,
+      "token_count": 6
+    },
+    {
+      "id": "msg-6c3b767e",
+      "role": "assistant",
+      "content": "sensory",
+      "timestamp": 1782086571.6571527,
+      "token_count": 7
+    }
+  ],
+  "total_tokens": 0,
+  "summary": "",
+  "created_at": 1781730246.9330537,
+  "updated_at": 1782086571.6571527,
+  "message_count": 4,
+  "pinned": false
+}

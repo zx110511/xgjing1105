@@ -1,0 +1,1162 @@
+﻿# 🔗 天机v9.0 SSS级专业化集成与托盘定制指令集 v1.1
+
+---
+
+## 📋 指令模板（每轮集成对话使用此模板，替换 `{集成目标}` 即可）
+
+```
+═══════════════════════════════════════════════════════════════
+  天机v9.0 专业化集成指令 — {集成目标}
+  法定三步集成流程 · 不折不扣 · 绝不跳步
+═══════════════════════════════════════════════════════════════
+
+【集成目标】{模块/服务/Agent/托盘菜单项}
+【集成类型】模块集成 / MCP协议集成 / Agent协同集成 / 托盘定制 / 启动器编排
+【来源定义】d:\元初系统\灵境\灵境研究区\灵境道谱_36地煞72天罡_大道归一_v1.1.md
+【参考架构】
+  · 托盘启动器:  d:\元初系统\天机v9.0\launcher\tianji_launcher.py
+  · MCP协议层:   d:\元初系统\天机v9.0\mcp\tianji_mcp_server.py
+  · Agent注册:   d:\元初系统\天机v9.0\.trae\agents\_AGENT_REGISTRY.json
+  · 启动配置:    d:\元初系统\天机v9.0\.trae\config\launcher.json
+  · MCP配置:     d:\元初系统\天机v9.0\.trae\mcp.json
+  · 天机基石:    d:\元初系统\_archived_天机基石_20260519\core\orchestrator\
+【集成载体】d:\元初系统\天机v9.0\launcher\ / mcp\ / agents\ / .trae\
+【审计标准】d:\元初系统\天机v9.0\天机v9.0科研区\成果\
+
+───────────────────────────────────────────────────────────────
+
+## STEP 1/3: 架构审计——扫描集成现状
+
+1.1 托盘启动器审计:
+   - 读取 d:\元初系统\天机v9.0\launcher\tianji_launcher.py
+   - 审计: 托盘菜单结构(_build_menu) / 模块初始化 / PID管理 / 看门狗 / 备份
+   - 确认: TianjiContainer集成状态 / MCPContainerManager注册列表
+
+1.2 MCP协议层审计:
+   - 读取 d:\元初系统\天机v9.0\mcp\tianji_mcp_server.py
+   - 审计: 24工具清单 / JSON-RPC协议 / EvolutionLoop集成 / record_action
+   - 确认: 工具覆盖率 / 降级路径 / health端点
+
+1.3 Agent注册表审计:
+   - 读取 d:\元初系统\天机v9.0\.trae\agents\_AGENT_REGISTRY.json
+   - 审计: Agent能力映射 / MCP绑定 / 协作伙伴 / 调度层级
+   - 确认: Agent数量 / 层分布 / 输入模式覆盖
+
+1.4 启动配置审计:
+   - 读取 d:\元初系统\天机v9.0\.trae\config\launcher.json
+   - 审计: 端口分配 / 启动序列 / 健康端点 / 废弃端口清理
+   - 确认: 主端口8770 / 废弃端口(8080/8000/8768)已标记
+
+→ 输出: 集成现状审计报告（通过N/M项，缺失项清单，优先级P0/P1/P2）
+
+───────────────────────────────────────────────────────────────
+
+## STEP 2/3: 集成实现——全量集成+闭环验证
+
+2.1 模块集成（新模块加入天机生态）:
+   □ 核心文件: core/{module}.py → 实现完整闭环
+   □ API路由: server/api/{module}_routes.py → 注册到server/main.py
+   □ 托盘菜单: launcher/tianji_launcher.py → _build_menu()添加子菜单
+   □ 容器注册: launcher/tianji_launcher.py → TianjiTray.__init__()初始化
+   □ MCP工具(如需要): mcp/tianji_mcp_server.py → ALL_TOOLS添加定义
+
+2.2 MCP协议集成（新工具/新MCP服务器）:
+   □ 工具定义: TOOL_DEFINITIONS → {name, description, inputSchema}
+   □ 处理函数: _handle_{tool_name}() → 实现业务逻辑
+   □ 降级路径: try/except → 返回友好错误
+   □ 进化闭环: record_action() → 写入操作日志
+   □ 健康检查: /api/health → 包含MCP组件状态
+
+2.3 Agent协同集成（新Agent或协作关系更新）:
+   □ Agent定义: _AGENT_REGISTRY.json → {id, name_cn, capabilities_v3, mcp_bindings}
+   □ 调度层级: L1(感知)/L2(推理)/L3(执行)/L4(运维)
+   □ 协作伙伴: collaboration_partners → 关联Agent列表
+   □ 输入模式: input_patterns → 触发条件描述
+   □ Skill关联: .agents/skills/_manifest.json → 可用Skill列表
+
+2.4 托盘菜单定制（新增/修改右键菜单）:
+   □ 回调方法: TianjiTray.on_{action}() → 实现功能
+   □ 菜单位置: _build_menu() → 选择合适的父菜单
+   □ 状态反馈: 菜单元数据反映实时状态
+   □ 降级处理: 依赖服务不可用时的提示
+
+2.5 启动器编排（启动顺序/端口管理/看门狗）:
+   □ 端口分配: launcher.json → services.ports → 明确状态(primary/deprecated)
+   □ 启动序列: launcher.json → launch_sequence → 按依赖排序
+   □ 健康端点: launcher.json → health_endpoints → 主备端点
+   □ 看门狗: tianji_launcher.py → WatchdogManager → 检查间隔+最大失败+回调
+   □ 单实例锁: _kill_other_launcher_instances() → PID文件+旧进程清理
+
+→ 输出: 新增/修改文件清单 + 集成架构变更说明
+
+───────────────────────────────────────────────────────────────
+
+## STEP 3/3: 集成验证——端到端闭环测试
+
+3.1 启动器级验证:
+   □ 托盘图标正常启动（pystray无报错）
+   □ 托盘悬浮提示实时更新（_build_tooltip_text）
+   □ 右键菜单所有项可点击（不卡死/不闪退）
+   □ 服务启动 → uvicorn进程正常（PID文件+端口监听）
+   □ 端口冲突自动处理（_kill_port_owner）
+   □ 单实例锁生效（不出现多个托盘图标）
+
+3.2 MCP协议级验证:
+   □ JSON-RPC initialize → 返回serverInfo
+   □ JSON-RPC tools/list → 返回完整24工具清单
+   □ memory_remember → 写入成功+返回memory_id
+   □ memory_recall → 检索返回相关结果
+   □ tianji_health → 返回各组件状态
+   □ 异常输入 → 错误响应格式合规
+
+3.3 Agent协同级验证:
+   □ Agent注册表JSON格式有效
+   □ 每个Agent的mcp_bindings → MCP服务器可连接
+   □ 每个Agent的capabilities_v3 → 能力声明完整
+   □ 协作关系无孤立节点（每个Agent至少1个伙伴或为核心Agent）
+
+3.4 服务编排级验证:
+   □ curl http://127.0.0.1:8770/api/health → 200
+   □ curl http://127.0.0.1:8770/api/status/full → 200+完整模块状态
+   □ 看门狗: 手动停服务 → 60s内自动恢复
+   □ 备份: 增量备份/全量备份 → 备份文件完整性
+   □ 容器: TianjiContainer → 所有模块health()可查询
+
+→ 输出: 集成验证报告（通过率X/Y = Z%，未通过项+修复方案）
+
+═══════════════════════════════════════════════════════════════
+  本轮结果: [{集成目标}] 集成完成 ✅ / 部分通过 ⚠️ / 失败 ❌
+  下轮集成: [{下一个集成目标}]
+═══════════════════════════════════════════════════════════════
+```
+
+---
+
+## 🔌 集成架构全景图
+
+### 集成层次总览
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                    天机v9.0 全栈集成架构                                │
+│                                                                      │
+│  ┌────────────────────────────────────────────────────────────────┐  │
+│  │  L4: Trae IDE 集成层                                           │  │
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐         │  │
+│  │  │ MCP Server│ │ Agent调度│ │ Skill调用│ │ 规则执行 │         │  │
+│  │  │ (stdio)  │ │ (L1-L4)  │ │ (20+Skill)│ │ (7法则)  │         │  │
+│  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘         │  │
+│  └────────────────────────────────────────────────────────────────┘  │
+│                              │                                       │
+│  ┌────────────────────────────────────────────────────────────────┐  │
+│  │  L3: 服务编排层 (端口8770)                                     │  │
+│  │  ┌──────────────────────────────────────────────────────────┐  │  │
+│  │  │  TianjiTray (托盘启动器) ─── 系统托盘管理                  │  │  │
+│  │  │  ├─ IntegratedMonitor: 六层记忆监控 (30s间隔)             │  │  │
+│  │  │  ├─ WatchdogManager: 自动恢复看门狗 (60s间隔/3次失败)     │  │  │
+│  │  │  ├─ BackupManager: 增量+全量备份 (WAL checkpoint+vacuum)  │  │  │
+│  │  │  ├─ MCPContainerManager: 7 MCP容器注册+健康检查           │  │  │
+│  │  │  └─ TianjiContainer: 36模块总控容器 (拓扑排序+自愈)       │  │  │
+│  │  └──────────────────────────────────────────────────────────┘  │  │
+│  └────────────────────────────────────────────────────────────────┘  │
+│                              │                                       │
+│  ┌────────────────────────────────────────────────────────────────┐  │
+│  │  L2: MCP协议层 (6 Server)                                      │  │
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐         │  │
+│  │  │tianji-   │ │memory-   │ │agent-    │ │command-  │         │  │
+│  │  │native    │ │engine    │ │framework │ │executor  │         │  │
+│  │  │24工具    │ │global    │ │-global   │ │进程管理  │         │  │
+│  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘         │  │
+│  │  ┌──────────┐ ┌──────────┐                                     │  │
+│  │  │security- │ │perform-  │                                     │  │
+│  │  │scanner   │ │ance-     │                                     │  │
+│  │  │安全审计  │ │profiler  │                                     │  │
+│  │  └──────────┘ └──────────┘                                     │  │
+│  └────────────────────────────────────────────────────────────────┘  │
+│                              │                                       │
+│  ┌────────────────────────────────────────────────────────────────┐  │
+│  │  L1: 核心模块层 (36地煞 + 1工具)                               │  │
+│  │  M1-M14: 14大模块闭环 → M15-M36: 灵境道谱36地煞                │  │
+│  │  ┌────┐┌────┐┌────┐┌────┐┌────┐┌────┐┌────┐┌────┐         │  │
+│  │  │容器││引擎││门禁││进化││编排││守护││知识││配置│  ...     │  │
+│  │  └────┘└────┘└────┘└────┘└────┘└────┘└────┘└────┘         │  │
+│  └────────────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🔢 集成执行队列（按依赖顺序排列）
+
+### A. 启动器篇——托盘启动器定制
+
+| 轮次 | 集成项 | 目标 | 涉及文件 | 说明 |
+|------|--------|------|---------|------|
+| A1 | 托盘菜单新增 | 为新模块添加右键菜单 | `launcher/tianji_launcher.py` | `_build_menu()` + `on_{action}()` |
+| A2 | 托盘悬浮提示 | 实时状态显示 | `launcher/tianji_launcher.py` | `_build_tooltip_text()` |
+| A3 | 启动序列调整 | 模块启动顺序 | `.trae/config/launcher.json` | `launch_sequence` |
+| A4 | 端口管理 | 端口分配/冲突处理 | `launcher/tianji_launcher.py` | `PORT` + `_kill_port_owner()` |
+| A5 | 看门狗配置 | 自动恢复参数 | `launcher/tianji_launcher.py` | `WatchdogManager` |
+| A6 | 备份策略定制 | 备份频率/保留天数 | `launcher/tianji_launcher.py` | `BackupManager` |
+| A7 | MCP容器注册 | 新增MCP服务器节点 | `launcher/tianji_launcher.py` | `MCPContainerManager` |
+| A8 | 容器自愈触发 | 故障模块自动恢复 | `launcher/tianji_launcher.py` | `on_container_self_heal()` |
+
+### B. MCP篇——协议与工具集成
+
+| 轮次 | 集成项 | 目标 | 涉及文件 | 说明 |
+|------|--------|------|---------|------|
+| B1 | 新增MCP工具 | 扩展工具定义 | `mcp/tianji_mcp_server.py` | `TOOL_DEFINITIONS` + `_handle_*()` |
+| B2 | MCP服务器注册 | 独立MCP服务启动 | `.trae/mcp.json` | `mcpServers` |
+| B3 | EvolutionLoop集成 | 工具调用自动记录 | `mcp/tianji_mcp_server.py` | `record_action()` |
+| B4 | 健康检查端点 | MCP组件状态 | `mcp/tianji_mcp_server.py` | `_handle_tianji_health()` |
+| B5 | 降级路径 | API不可用时的回退 | `mcp/tianji_mcp_server.py` | try/except → error response |
+
+### C. Agent篇——协同与调度集成
+
+| 轮次 | 集成项 | 目标 | 涉及文件 | 说明 |
+|------|--------|------|---------|------|
+| C1 | 新Agent注册 | Agent能力声明 | `.trae/agents/_AGENT_REGISTRY.json` | `agents.{id}` |
+| C2 | MCP绑定更新 | Agent → MCP服务器 | `.trae/agents/_AGENT_REGISTRY.json` | `mcp_bindings` |
+| C3 | 协作关系配置 | Agent间协作伙伴 | `.trae/agents/_AGENT_REGISTRY.json` | `collaboration_partners` |
+| C4 | Skill关联 | Agent可用Skill | `.agents/skills/_manifest.json` | Skill → Agent映射 |
+| C5 | 调度层级调整 | L1-L4层级分配 | `.trae/agents/_AGENT_REGISTRY.json` | `layer` + `scheduling` |
+
+---
+
+## 🖥️ 托盘启动器定制详解
+
+### A1: 托盘菜单新增 — `_build_menu()` 定制规范
+
+```python
+# ============================================================
+# 托盘菜单定制模板 — launcher/tianji_launcher.py
+# ============================================================
+
+# 1. 在 TianjiTray 类中添加回调方法
+def on_{action}(self):
+    """{功能描述}"""
+    r = api_get("/api/{module}/health")  # 或 api_post()
+    if r:
+        # 处理成功 → 写文件用notepad展示
+        status_file = LOG_DIR / "{action}_result.txt"
+        status_file.write_text(json.dumps(r, ensure_ascii=False, indent=2), encoding="utf-8")
+        subprocess.Popen(["notepad", str(status_file)])
+        log(f"[菜单] {功能描述}完成")
+    else:
+        log(f"[菜单] {功能描述}失败（服务未就绪）")
+
+# 2. 在 _build_menu() 中按层级插入菜单项
+def _build_menu(self):
+    return (
+        TrayMenuItem("天机记忆系统 v9.0 全能版", None, enabled=False),
+        pystray.Menu.SEPARATOR,
+        # ═══ 一级菜单 ═══
+        TrayMenuItem("📊 系统全貌", self.on_full_status),
+        TrayMenuItem("👁 服务状态", self.on_status),
+        TrayMenuItem("🌐 打开管理界面", self.on_open_web),
+        pystray.Menu.SEPARATOR,
+        # ═══ 二级子菜单 ═══
+        TrayMenuItem("🧠 AI驾驶中心", pystray.Menu(
+            TrayMenuItem("驾驶者状态", self.on_driver_status),
+            TrayMenuItem("⚡ 手动深度思考", self.on_deepseek_trigger),
+            TrayMenuItem("🧬 手动进化反思", self.on_evolution_trigger),
+        )),
+        # ... 更多子菜单 ...
+        # ═══ 新模块菜单（按此模板添加） ═══
+        TrayMenuItem("{菜单图标+标题}", pystray.Menu(
+            TrayMenuItem("{子项1}", self.on_{action1}),
+            TrayMenuItem("{子项2}", self.on_{action2}),
+        )),
+        pystray.Menu.SEPARATOR,
+        TrayMenuItem("⏸ 暂停/恢复", self.on_toggle_pause),
+        TrayMenuItem("🔄 重启服务", self.on_restart),
+        pystray.Menu.SEPARATOR,
+        TrayMenuItem("⏹ 退出天机", self.on_quit),
+    )
+```
+
+**菜单层级规范**:
+
+| 层级 | 菜单组 | 现有子项数 | 集成新模块位置 |
+|------|--------|-----------|-------------|
+| 一级 | 系统操作 | 3 | 系统全貌/服务状态/管理界面 |
+| 二级-驾驶 | AI驾驶中心 | 3 | DeepSeek状态/触发 |
+| 二级-记录 | 强制记录系统 | 3 | 状态/开关/同步 |
+| 二级-调度 | 智能调度 | 2 | 状态/任务列表 |
+| 二级-治理 | 治理运维 | 6 | 健康/审计/清单+运维/异常/自愈 |
+| 二级-容器 | 总控容器 | 3 | 健康/模块/自愈 |
+| 二级-监控 | 记忆监控 | 5 | 六层/进化/学习/MCP/资源 |
+| 一级 | 备份管理 | 2 | 增量/全量备份 |
+| 一级 | 文件浏览 | 3 | 日志/数据/备份目录 |
+| 一级 | 控制操作 | 3 | 暂停/重启/退出 |
+
+---
+
+### A4: 端口管理规范
+
+```
+端口分配表 (launcher.json):
+┌────────────┬───────┬──────────────────────────────┐
+│ 服务名称    │ 端口  │ 状态                         │
+├────────────┼───────┼──────────────────────────────┤
+│ tianji_native │ 8770 │ primary (主服务·唯一活跃)    │
+│ nexus_memory  │ 8768 │ deprecated (废弃)           │
+│ unified_bridge│ 8080 │ deprecated (废弃)           │
+│ trae_runtime  │ 8000 │ deprecated (废弃)           │
+└────────────┴───────┴──────────────────────────────┘
+
+端口冲突处理:
+  1. _get_port_owner_pid(port) → 查找占用PID
+  2. 判断是否为自身PID → 跳过
+  3. _kill_port_owner(port) → taskkill /F /PID
+  4. 等待1秒 → 验证端口已释放
+```
+
+---
+
+## 📡 MCP协议集成详解
+
+### B1: 新增MCP工具模板
+
+```python
+# ============================================================
+# MCP工具新增模板 — mcp/tianji_mcp_server.py
+# ============================================================
+
+# 1. 在 TOOL_DEFINITIONS 中添加工具定义
+{
+    "name": "tianji_{tool_name}",
+    "title": "天机·{工具中文名}",
+    "description": "{功能说明}",
+    "inputSchema": {
+        "type": "object",
+        "properties": {
+            "{param_name}": {
+                "type": "{string/number/boolean/array/object}",
+                "description": "{参数说明}",
+            },
+        },
+        "required": ["{必填参数}"],
+    },
+},
+
+# 2. 在 _handle_method() 中添加路由
+if method == "tianji_{tool_name}":
+    return _handle_{tool_name}(params)
+
+# 3. 实现处理函数（必须含降级+record_action）
+def _handle_{tool_name}(params: dict) -> dict:
+    try:
+        # 核心逻辑
+        result = {核心处理}
+        # EvolutionLoop记录
+        record_action(f"tianji_{tool_name}", {result_summary})
+        return {"success": True, "data": result}
+    except Exception as e:
+        log_error(f"tianji_{tool_name}: {e}")
+        return {"success": False, "error": str(e), "fallback": True}
+```
+
+**24工具分类矩阵**:
+
+| 类别 | 工具数 | 工具名 |
+|------|--------|--------|
+| 核心CRUD | 6 | memory_remember, memory_recall, memory_forget, memory_stats, memory_capacity, memory_consolidate |
+| 语义搜索 | 4 | search_memories, get_memory, list_memories, tianji_semantic_search |
+| 认知处理 | 3 | build_working_representation, run_reflective_cycle, tianji_intercept |
+| 会话管理 | 2 | get_session_digest, tianji_summarize_conversation |
+| LLM增强 | 4 | tianji_classify, tianji_auto_tag, tianji_summarize, tianji_extract_knowledge |
+| 查询扩展 | 1 | tianji_expand_query |
+| 系统管理 | 2 | tianji_health, tianji_help |
+| 数据操作 | 2 | explain_memory_lineage, tianji_export |
+
+---
+
+## 🤖 Agent协同集成详解
+
+### C1: Agent注册模板
+
+```json
+// ============================================================
+// Agent定义模板 — .trae/agents/_AGENT_REGISTRY.json
+// ============================================================
+{
+  "{agent_id}": {
+    "id": "{agent_id}",
+    "name_cn": "{中文名}",
+    "avatar": "{emoji}",
+    "description": "{一句话定位}",
+    "layer": "L{1-4}",
+    "scheduling": {
+      "role": "{调度角色}",
+      "priority": "{high/medium/low}",
+      "max_concurrent": 3
+    },
+    "mcp_bindings": {
+      "servers": {
+        "tianji-native": [],
+        "agent-framework-global": [],
+        "command-executor": []
+      }
+    },
+    "capabilities_v3": [
+      "{能力1}",
+      "{能力2}",
+      "{能力3}"
+    ],
+    "callability": true,
+    "input_patterns": [
+      "{触发条件1}",
+      "{触发条件2}"
+    ],
+    "collaboration_partners": [
+      "{合作伙伴agent_id}"
+    ]
+  }
+}
+```
+
+**调度层级分配规范**:
+
+| 层级 | 中文层名 | 定位 | 现有Agent | 新增Agent归属 |
+|------|---------|------|-----------|-------------|
+| L1 | 感知层 | 意图分析/上下文提取/需求解析 | 洞察(👁️) | 输入处理/语义解析类 |
+| L2 | 推理层 | 规划/设计/知识检索 | 经纬/矿师/文宗/天枢/天算 | 架构设计/数据分析类 |
+| L3 | 执行层 | 技能调用/创作/格式化 | 百巧/妙笔/锦书/灵枢 | 工具调用/内容生产类 |
+| L4 | 运维层 | 部署/测试/安全/监控 | 工造/铁卫/千理/灵犀/追光 | 部署运维/质量保障类 |
+
+**Agent完整清单** (20 Agent):
+
+```
+L1 感知层: 洞察(👁️)
+L2 推理层: 经纬(🏗️) 矿师(⛏️) 文宗(📚) 天枢(⭐) 天算(🧮) 明镜(🪞) 史官(📜) 灵枢(🎯)
+L3 执行层: 百巧(🧩) 妙笔(✍️) 锦书(📄) 镇山(⚓)
+L4 运维层: 工造(🔧) 铁卫(🛡️) 千理(🔍) 灵犀(🕊️) 追光(📈)
+跨层协调: 神算(🧿) 坤舆(🌐)
+```
+
+---
+
+## 🔄 启动编排详解
+
+### 启动序列
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│               天机v9.0 启动序列                                │
+│                                                              │
+│  Step 1: TianjiTray.__init__()                               │
+│  ├─ 初始化MCPContainerManager (7容器注册)                     │
+│  ├─ 初始化TianjiContainer (如可用)                            │
+│  └─ 初始化IntegratedMonitor / BackupManager                  │
+│                                                              │
+│  Step 2: TianjiTray.start()                                  │
+│  ├─ _kill_other_launcher_instances()  ← 单实例锁              │
+│  ├─ is_server_running()? → skip : _start_server_process()    │
+│  │   └─ _kill_port_owner(8770) → uvicorn server.main:app    │
+│  ├─ 等待服务就绪 (20次×0.5s=10s超时)                          │
+│  ├─ TianjiContainer.start(parallel=True)                     │
+│  ├─ IntegratedMonitor.start()                                │
+│  ├─ WatchdogManager.start()                                  │
+│  └─ _run_tray() → pystray.Icon.run()                        │
+│                                                              │
+│  Step 3: 运行时循环                                           │
+│  ├─ _tooltip_updater_loop() → 每5s更新悬浮提示               │
+│  ├─ IntegratedMonitor._monitor_loop() → 每30s采集指标         │
+│  └─ WatchdogManager._watchdog_loop() → 每60s检查服务存活     │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### 启动参数
+
+```bash
+# 完整启动（托盘+服务）
+python tianji_launcher.py
+
+# 仅托盘（不自动启动服务——服务已运行时使用）
+python tianji_launcher.py --no-server
+
+# 状态查询后退出（不启动托盘）
+python tianji_launcher.py --status
+```
+
+---
+
+## 💾 备份与恢复机制
+
+### BackupManager 备份策略
+
+```
+备份类型:
+┌──────────────────────────────────────────────────────────────┐
+│ 增量备份 (incremental_backup):                               │
+│ ├─ 复制: tianji_memory.db + .db-wal + .db-shm               │
+│ ├─ 执行: WAL checkpoint(TRUNCATE) + VACUUM                   │
+│ └─ 输出: backups/incremental_{timestamp}/                    │
+│                                                              │
+│ 全量备份 (full_backup):                                      │
+│ ├─ 复制: DB文件 + WAL/SHM + config目录 + logs目录            │
+│ ├─ 日志过滤: 仅复制 < 10MB 的log文件                         │
+│ ├─ 执行: WAL checkpoint(TRUNCATE) + VACUUM                   │
+│ └─ 输出: backups/full_{timestamp}/                           │
+│                                                              │
+│ 过期清理 (cleanup_old):                                      │
+│ └─ 默认保留30天 → rmtree删除过期备份目录                     │
+└──────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🛡️ 看门狗自愈机制
+
+### WatchdogManager 参数配置
+
+| 参数 | 默认值 | 说明 | 调整建议 |
+|------|--------|------|---------|
+| `_check_interval` | 60s | 健康检查间隔 | 生产环境: 30s; 开发环境: 120s |
+| `_max_failures` | 3 | 最大连续失败 | 稳定服务: 5; 不稳定服务: 2 |
+| `_restart_callback` | `self.restart_server()` | 触发恢复动作 | 可扩展为分级恢复策略 |
+
+### 分级恢复策略（可选扩展）
+
+```
+Level 1: 服务无响应 (1次失败) → 记录日志，等待下次检查
+Level 2: 连续失败 (N次) → 重启服务进程
+Level 3: 重启后仍失败 → 全量重启（包含uvicorn + 容器）
+Level 4: 全量重启仍失败 → 通知用户 + 写诊断报告
+```
+
+---
+
+## 🧪 MCP容器健康矩阵
+
+### 7个MCP容器状态定义
+
+```python
+MCPContainerManager._containers = {
+    "agent-framework-global":   {"role": "智能调度框架",      "port": 8770},
+    "memory-engine-global":     {"role": "记忆引擎核心",      "port": 8770},
+    "tianji-native":            {"role": "天机原生系统",      "port": 8770},
+    "command-executor":         {"role": "进程管理",         "port": 8770},
+    "security-scanner":         {"role": "安全审计",         "port": 8770},
+    "ops-engine":               {"role": "运维引擎",         "port": 8770},
+    "performance-profiler":     {"role": "性能剖析",         "port": 8770},
+}
+```
+
+---
+
+## 📐 灵境道谱集成溯源
+
+> 集成架构可溯源到灵境道谱·36地煞72天罡中的编排体道+容器体道
+
+| 道 | 地煞 | 地煞名 | 集成对应 | 说明 |
+|----|------|--------|---------|------|
+| 道五·编排体 | D5-1 | 多Agent调度煞 | Agent注册表+调度层级 | Agent协同调度 |
+| 道五·编排体 | D5-2 | 工作流DAG煞 | MCP工具链+托盘菜单 | 流程编排 |
+| 道五·编排体 | D5-3 | 意图路由煞 | MCP JSON-RPC路由 | 工具调用路由 |
+| 道五·编排体 | D5-4 | 协作模式煞 | TVP协议+Agent切换 | 协作模式 |
+| 道六·容器体 | D6-1 | 依赖拓扑煞 | TianjiContainer拓扑排序 | 模块依赖管理 |
+| 道六·容器体 | D6-2 | 生命周期煞 | 启动序列+看门狗 | 服务生命周期 |
+| 道六·容器体 | D6-3 | 事件总线煞 | EvolutionBus+MCP事件 | 事件驱动 |
+| 道六·容器体 | D6-4 | 信号网络煞 | MCP协议通信 | 跨模块信号 |
+| 道九·配置体 | D9-4 | 桥接通道煞 | launcher.json+端口管理 | 配置桥接 |
+
+---
+
+## ⚡ 闪电集成示例
+
+```
+═══════════════════════════════════════════════════════════════
+  天机v9.0 专业化集成指令 — 新模块KnowledgeGraph集成到托盘
+  法定三步集成流程 · 不折不扣 · 绝不跳步
+═══════════════════════════════════════════════════════════════
+
+【集成目标】知识图谱模块(KnowledgeGraph) → 托盘右键菜单
+【集成类型】模块集成 + 托盘定制
+【参考架构】launcher/tianji_launcher.py _build_menu()
+【集成载体】launcher/tianji_launcher.py
+
+───────────────────────────────────────────────────────────────
+STEP 1/3: 架构审计
+
+1.1 确认KnowledgeGraph已落地:
+   ✅ core/knowledge_graph.py (M32) — 已完成
+   ✅ server/api/knowledge_routes.py — 已完成
+   ✅ API端点 /api/knowledge/* — 已完成
+
+1.2 托盘现状:
+   □ _build_menu()中暂无知识图谱菜单 → 需新增
+
+→ 审计结论: 模块已就绪，托盘缺失集成 (P1)
+
+───────────────────────────────────────────────────────────────
+STEP 2/3: 集成实现
+
+2.1 新增回调方法:
+   def on_kg_status(self):
+       r = api_get("/api/knowledge/status")
+       if r:
+           status_file = LOG_DIR / "knowledge_status.txt"
+           status_file.write_text(json.dumps(r, ensure_ascii=False, indent=2), encoding="utf-8")
+           subprocess.Popen(["notepad", str(status_file)])
+           log("[菜单] 知识图谱状态已获取")
+       else:
+           log("[菜单] 知识图谱服务未就绪")
+
+2.2 在_build_menu()的监控菜单组中新增:
+   TrayMenuItem("🔬 记忆监控", pystray.Menu(
+       ...现有菜单项...,
+       TrayMenuItem("知识图谱", self.on_kg_status),  ← 新增行
+   )),
+
+→ 集成完成, 新增回调方法 + 菜单项
+
+───────────────────────────────────────────────────────────────
+STEP 3/3: 集成验证
+
+3.1 托盘验证:
+   □ 右击托盘 → 记忆监控 → 知识图谱 → 点击
+   □ notepad弹出knowledge_status.txt → 验证内容
+   □ 托盘日志tray.log → 确认"[菜单] 知识图谱状态已获取"
+
+→ 验证结论: 集成通过 ✅
+
+═══════════════════════════════════════════════════════════════
+  本轮结果: [KnowledgeGraph托盘集成] 集成完成 ✅
+═══════════════════════════════════════════════════════════════
+```
+
+---
+
+## 🛡️ 硬性约束
+
+| 约束 | 说明 |
+|------|------|
+| **三步不走样** | 审计→实现→验证，不可跳过任一步 |
+| **增量不破坏** | 修改托盘菜单/Agent注册表只做追加，不删除已有项 |
+| **降级必达** | 所有API调用必须有try/except+降级处理 |
+| **端口不冲突** | 新端口必须记录到launcher.json+明确状态 |
+| **托盘不卡死** | 所有菜单回调必须非阻塞（耗时操作用线程） |
+| **状态必校验** | 每个集成项必须通过端到端验证（托盘点击→API→结果） |
+| **道谱可溯源** | 每个集成决策关联到灵境道谱的具体地煞编号 |
+| **多源审计** | 集成前必须参考天机基石+天机AI平台化中的相关实现 |
+
+---
+
+## 🔗 配套指令集
+
+| 指令集 | 文件 | 用途 |
+|--------|------|------|
+| **落地开发指令集** | `天机v9.0落地开发通用指令` | 四步流程(搜索→审计→实现→审计) + 37模块开发 |
+| **专业测试员指令集** | `天机v9.0专业测试员通用指令集` | 五级门禁(SG-0~4) + 37模块测试矩阵 |
+| **本指令集** | `天机v9.0专业化集成与托盘定制指令集` | 三步集成 + 托盘/MCP/Agent/跨模块/事件/AMIM/治理/灵境 |
+| **Agent-MCP升级指令集** | `天机v9.0 Agent-MCP集成桥接与体系升级指令集` | AMIM(M37) + 20Agent运行类 + 工具归属映射 |
+| **R-SATIS工具手册** | `core/readme_tracker.py` | 路径索引+摘要+README动态维护 |
+
+---
+
+## 🧩 D. 跨模块集成篇——模块依赖链与拓扑编排
+
+> **v1.1 增量更新 (2026-05-25):** D/E/F/G/H 五篇追加，补全多模块集成化升级路径。
+
+### D1: 模块依赖链注册
+
+每个模块的 `ModuleDef` 声明其依赖关系，由 `ModuleRegistry` 统一管理。集成新模块时必须同步更新依赖声明。
+
+```python
+# core/module_registry.py — 模块依赖声明模板
+TianjiModuleDefinition(
+    module_id="M{编号}",
+    name="{模块名}",
+    version="1.0.0",
+    tier=ModuleTier.CORE,  # CORE / FEATURE / INFRA / TOOL
+    dependencies=[
+        ModuleDependency(
+            target_module="M{依赖模块编号}",
+            dependency_type=DependencyType.REQUIRED,  # REQUIRED / OPTIONAL / SOFT
+            min_version="1.0.0",
+            reason="{依赖原因说明}",
+        ),
+    ],
+    events_published=[
+        EventDef(name="{事件名}", event_type="signal"),
+    ],
+    events_subscribed=[
+        EventDef(name="{订阅事件名}", event_type="signal"),
+    ],
+)
+```
+
+### D2: 依赖拓扑验证
+
+```python
+# 每次集成后必须执行
+registry = ModuleRegistry()
+registry.find_circular_dependencies()  # → 必须返回[]
+registry.validate_dependencies()        # → 必须全部PASS
+```
+
+### D3: 模块生命周期同步
+
+```
+模块生命周期状态机:
+  DEVELOPING ─→ STABLE ─→ DEPRECATED ─→ REMOVED
+       │            │
+       └──→ UNSTABLE (降级)
+```
+
+| 操作 | 依赖模块状态 | 目标模块可执行操作 |
+|------|------------|-----------------|
+| 启动 | 所有 REQUIRED 依赖 = STABLE | ✅ 启动 |
+| 启动 | 任一 REQUIRED 依赖 = DEVELOPING/UNSTABLE | ⚠️ 警告启动 |
+| 启动 | 任一 REQUIRED 依赖 = REMOVED | ❌ 拒绝启动 |
+
+### D4: 集成执行队列
+
+| 轮次 | 集成项 | 目标 | 涉及文件 | 说明 |
+|------|--------|------|---------|------|
+| D1 | 模块依赖声明 | 注册依赖关系 | `core/module_registry.py` | `TianjiModuleDefinition.dependencies` |
+| D2 | 拓扑排序验证 | 无损环检查 | `core/module_registry.py` | `find_circular_dependencies()` |
+| D3 | 生命周期同步 | 状态机联动 | `core/module_registry.py` | `ModuleLifecycleState` 枚举 |
+| D4 | 跨模块命名空间 | 隔离访问 | `core/namespace_manager.py` | `NamespaceManager` |
+| D5 | 模块健康链 | health()级联 | `core/` 各模块 | `health()` 返回依赖模块状态 |
+| D6 | DependencyType配置 | 硬/软/可选依赖 | `core/module_registry.py` | `REQUIRED/OPTIONAL/SOFT` |
+
+### D5: 跨模块集成验证清单
+
+```
+□ 新模块的 dependencies 声明完整（含依赖原因）
+□ 现有模块中依赖新模块的声明已更新
+□ find_circular_dependencies() → []
+□ validate_dependencies() → 全部PASS
+□ 新模块的 health() 包含所有 REQUIRED 依赖的检查
+□ 命名空间隔离：新模块仅能访问其声明的依赖模块
+□ 生命周期联动：依赖模块降级时，新模块自动进入DEGRADED
+```
+
+---
+
+## 📡 E. 事件驱动集成篇——EvolutionBus路由与信号网络
+
+### E1: EvolutionBus 路由表管理
+
+`EvolutionBus` 是跨模块事件通信的唯一通道。每个模块通过 `events_published` 发送信号，通过 `events_subscribed` 接收信号。
+
+```python
+# core/evolution_loop.py — EvolutionBus ROUTING_TABLE 结构
+class EvolutionBus:
+    ROUTING_TABLE: Dict[str, List[str]] = {
+        # {信号类型: [目标模块列表]}
+        "knowledge_updated":     ["M7", "M8", "M34"],   # 知识更新→进化引擎+学习引擎+Agent编排
+        "memory_threshold":      ["M7", "M30"],          # 记忆阈值→进化引擎+天机守护
+        "quality_violation":     ["M13", "M18"],         # 质量违规→强制执行钩子+治理流水线
+        "governance_decision":   ["M13", "M15", "M35"],  # 治理决策→钩子+监控+进化总线
+        "container_health":      ["M30", "M15"],         # 容器健康→守护+监控
+        "evolution_trigger":     ["M7", "M8", "M34"],    # 进化触发→进化+学习+编排
+        "agent_dispatched":      ["M34", "M16"],         # Agent调度→编排+TVP桥接
+        "tool_executed":         ["M29", "M35"],         # 工具执行→MCP服务器+进化总线
+        "backup_completed":      ["M30"],                # 备份完成→守护
+        "module_registered":     ["M15", "M35"],         # 模块注册→监控+进化总线
+    }
+```
+
+### E2: 新模块接入 EvolutionBus 的集成步骤
+
+```
+1. 在 core/evolution_loop.py 的 ROUTING_TABLE 中新增路由条目
+2. 在 core/module_registry.py 中为新模块定义 events_published / events_subscribed
+3. 新模块的 EvolutionLoop 注册到 EvolutionBus
+4. 验证: 发布信号 → 确认目标模块收到
+```
+
+### E3: 信号发布/订阅模板
+
+```python
+# ── 发布端（源模块） ──
+# 在模块的某个操作完成后发布信号
+from core.evolution_loop import EvolutionSignal, EvolutionSignalType
+
+signal = EvolutionSignal(
+    signal_type="your_signal_type",
+    source_module="M{编号}",
+    payload={"key": "value"},
+    timestamp=datetime.now(),
+)
+evolution_loop.emit_signal(signal)
+
+# ── 订阅端（目标模块） ──
+# 在模块 __init__ 中订阅
+evolution_loop.subscribe_signals(self._on_signal)
+
+def _on_signal(self, signal: EvolutionSignal):
+    if signal.signal_type == "your_signal_type":
+        # 处理信号
+        self.handle_event(signal.payload)
+```
+
+### E4: 事件集成执行队列
+
+| 轮次 | 集成项 | 目标 | 涉及文件 | 说明 |
+|------|--------|------|---------|------|
+| E1 | 路由表注册 | 新增信号路由 | `core/evolution_loop.py` | `EvolutionBus.ROUTING_TABLE` |
+| E2 | 发布声明 | 模块事件声明 | `core/module_registry.py` | `events_published` |
+| E3 | 订阅声明 | 模块事件订阅 | `core/module_registry.py` | `events_subscribed` |
+| E4 | EvolutionLoop绑定 | 模块注册到总线上 | `core/evolution_loop.py` | `EvolutionBus.register_loop()` |
+| E5 | 信号因果追溯 | 链路追踪 | `core/evolution_loop.py` | `CausalPairRecorder` |
+
+### E5: 事件驱动集成验证清单
+
+```
+□ 新信号类型在 ROUTING_TABLE 中注册
+□ 发布模块的 events_published 包含新信号
+□ 订阅模块的 events_subscribed 包含新信号（且类型匹配ROUTING_TABLE）
+□ 信号发布→目标模块收到（日志确认 EvolutionBus route: {signal} → {module}）
+□ 因果追溯: CausalPairRecorder 记录完整链路
+□ 信号丢失: 目标模块不可用时 → EvolutionBus 缓存未投递信号
+```
+
+---
+
+## 🌉 F. AMIM桥接集成篇——Agent-MCP-模块三层映射
+
+> **依赖:** 本篇章需先完成 [Agent-MCP集成桥接与体系升级指令集] 的 Block A (AMIM M37)。
+
+### F1: AMIM 在集成架构中的位置
+
+```
+                    ┌──────────────────────────┐
+                    │    AMIM (M37)             │
+                    │    AgentMCPIntegration    │
+                    │    Manager                │
+                    └──────┬───────┬───────────┘
+                           │       │
+              ┌────────────┼───────┼────────────┐
+              ▼            ▼       ▼            ▼
+        Agent层(20)   工具层(24)  模块层(36)  MCP层(6)
+        天枢/文宗/..   memory_*  M1-M36      tianji-native/
+                       tianji_*               agent-framework/
+                                              ...4 more
+```
+
+### F2: AMIM 集成步骤
+
+```python
+# 每次新增/修改Agent或MCP工具后，必须通过AMIM同步
+
+from core.amim import AgentMCPIntegrationManager
+
+amim = AgentMCPIntegrationManager()
+
+# 1. 验证一致性（必须通过）
+issues = amim.validate()
+assert len(issues) == 0, f"AMIM一致性验证失败: {issues}"
+
+# 2. 同步 _AGENT_REGISTRY.json
+registry_json = amim.generate_registry_json()
+with open(".trae/agents/_AGENT_REGISTRY.json", "w", encoding="utf-8") as f:
+    json.dump(registry_json, f, ensure_ascii=False, indent=2)
+
+# 3. 同步 AGENT_CAPABILITY_MATRIX
+matrix_code = amim.generate_capability_matrix()
+# → 替换 core/agent_orchestrator.py 中的 AGENT_CAPABILITY_MATRIX
+
+# 4. 生成灵境服务描述（灵境Phase 1就绪时使用）
+lingjing_services = amim.generate_lingjing_services()
+```
+
+### F3: Agent↔模块 绑定映射
+
+| Agent | 主驱动模块 | 辅助模块 | 说明 |
+|-------|----------|---------|------|
+| 天枢 | M34 (AgentOrchestrator) | M16 (TVPBridge), M29 (MCPServer) | 总调度 |
+| 忆库 | M5/M6 (MemoryCore) | M25 (MemoryStats), M4 (HybridEngine) | 记忆管理 |
+| 洞察 | M3 (ContextAnalyzer) | M21 (StaticAnalyzer), M32 (KnowledgeGraph) | 上下文分析 |
+| 铁卫 | M13 (EnforceHook) | M17/M18 (Governance) | 质量守护 |
+| 千里 | M15 (Monitor) | M30 (TianjiDaemon), M33 (HealthDaemon) | 系统监控 |
+| 百巧 | M12 (SkillManager) | M29 (MCPServer) | 技能代理 |
+| 工造 | M23 (NamespaceManager) | M26 (BridgeChannel), M31 (DeployCoord) | DevOps |
+
+### F4: AMIM集成执行队列
+
+| 轮次 | 集成项 | 目标 | 涉及文件 | 说明 |
+|------|--------|------|---------|------|
+| F1 | AMIM一致性验证 | 0 issues | `core/amim.py` | `amim.validate()` |
+| F2 | Registry同步 | 自动生成 | `.trae/agents/_AGENT_REGISTRY.json` | `amim.generate_registry_json()` |
+| F3 | Capability同步 | 自动同步 | `core/agent_orchestrator.py` | `amim.generate_capability_matrix()` |
+| F4 | Agent→模块绑定 | 映射表 | `core/amim.py` | `AGENT_MODULE_BINDING` |
+| F5 | Tool→模块归属 | 工具归属复查 | `core/amim.py` | `TOOL_AGENT_MAPPING` |
+
+---
+
+## ⚖️ G. 治理集成篇——GovernanceOrchestrator跨模块审计
+
+### G1: 治理集成架构
+
+```
+GovernanceOrchestrator (M17)
+    │
+    ├─→ ModuleRegistry → verify_all_modules()       ← 模块完整性
+    ├─→ StaticAnalyzer  → analyze_cross_module()    ← 跨模块静态分析
+    ├─→ GovernancePipeline → run_audit_chain()      ← 审计流水线
+    └─→ EnforceHook (M13) → enforce_decisions()     ← 执行治理决策
+```
+
+### G2: 跨模块治理集成步骤
+
+```python
+# core/governance_orchestrator.py — 跨模块审计模板
+
+# 1. 依赖拓扑审计
+orchestrator.audit_dependency_graph()
+# 检查: 循环依赖 / 孤立模块 / 版本不兼容
+
+# 2. 事件链路审计
+orchestrator.audit_event_routing()
+# 检查: 已发布但无订阅的事件 / 已订阅但无发布的事件
+
+# 3. 模块健康审计
+orchestrator.audit_module_health_chain()
+# 检查: health()调用链是否完整 / 依赖模块故障时传播是否正确
+
+# 4. 强制执行
+orchestrator.enforce_integration_rules()
+# 检查: 命名规范 / 端口分配 / 依赖声明完整性
+```
+
+### G3: 治理集成执行队列
+
+| 轮次 | 集成项 | 目标 | 涉及文件 | 说明 |
+|------|--------|------|---------|------|
+| G1 | 依赖图审计 | 零循环依赖 | `core/governance_orchestrator.py` | `audit_dependency_graph()` |
+| G2 | 事件链路审计 | 无孤立事件 | `core/governance_orchestrator.py` | `audit_event_routing()` |
+| G3 | 健康链审计 | 完整传播 | `core/governance_orchestrator.py` | `audit_module_health_chain()` |
+| G4 | 强制规则检查 | 全部通过 | `core/governance_pipeline.py` | `enforce_integration_rules()` |
+| G5 | 审计报告集成 | 自动化报告 | `core/governance_orchestrator.py` | 生成集成合规报告 |
+
+### G4: 治理集成验证清单
+
+```
+□ dependency_graph → 无CIRCULAR依赖
+□ dependency_graph → 无ORPHAN模块(无依赖也无被依赖, M1/M2/M30除外)
+□ event_routing → 所有published事件有≥1个subscriber
+□ event_routing → 所有subscribed事件有≥1个publisher
+□ health_chain → 依赖模块故障时, 本模块health()返回DEGRADED
+□ health_chain → 不传播OPTIONAL/SOFT依赖的故障
+□ enforcement → 命名规范合规
+□ enforcement → 端口已注册到launcher.json
+□ enforcement → ReadmeTracker已更新 (R-SATIS工具)
+```
+
+---
+
+## 🌌 H. 灵境兼容集成篇——分布式就绪预埋
+
+### H1: 灵境迁移前置条件检查
+
+升级到灵境架构前，必须完成本指令集 D/E/F/G 四篇的全部集成项 + 以下灵境专项。
+
+### H2: 模块→灵境服务映射
+
+```python
+# 每个模块需要声明其灵境服务映射
+# 此映射在灵境 Phase 1 时激活
+
+LINGJING_SERVICE_MAP = {
+    # {模块: (service_id, port, docker_service)}
+    "M5/M6":  ("svc-memory-core",    8820, "memory-core"),
+    "M3":     ("svc-context-analyzer", 8821, "context-analyzer"),
+    "M13":    ("svc-quality-gate",   8810, "quality-gate"),
+    "M7":     ("svc-evolution-engine", 8830, "evolution-engine"),
+    "M8":     ("svc-learning-engine", 8831, "learning-engine"),
+    "M34":    ("svc-orchestrator",   8800, "agent-orchestrator"),
+    "M29":    ("svc-mcp-server",     8850, "mcp-server"),
+    "M35":    ("svc-event-bus",      8860, "event-bus"),
+    "M32":    ("svc-knowledge-graph", 8840, "knowledge-graph"),
+    "M15":    ("svc-monitor",        8840, "monitor"),
+    "M30":    ("svc-daemon",         8841, "daemon"),
+    "M12":    ("svc-skill-manager",  8832, "skill-manager"),
+    "M16":    ("svc-tvp-bridge",     8870, "tvp-bridge"),
+}
+```
+
+### H3: 灵境兼容集成步骤
+
+```python
+# 1. 模块接口序列化检查
+# 每个模块的公共方法必须可序列化（返回JSON兼容数据）
+assert is_json_serializable(module.health())
+assert is_json_serializable(module.status())
+
+# 2. 跨模块通信预埋
+# 将直接函数调用改为通过 EvolutionBus 事件路由
+# 天机v9.0模式: module_a.call_module_b()
+# 灵境模式: EvolutionBus.publish(event) → module_b.subscribe(event)
+
+# 3. Docker Compose 服务定义
+# 在灵境 Phase 0 搭好的基础设施上注册服务
+services:
+  svc-memory-core:
+    build: ./services/memory-core
+    ports: ["8820:8820"]
+    depends_on: [postgres, redis, kafka]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8820/health/memory"]
+```
+
+### H4: 灵境兼容执行队列
+
+| 轮次 | 集成项 | 目标 | 优先级 | 说明 |
+|------|--------|------|--------|------|
+| H1 | 模块接口序列化 | 公共方法JSON兼容 | P1 | 灵境Phase 0前置 |
+| H2 | 事件通信预埋 | 直接调用→EvolutionBus | P1 | 灵境Phase 1前置 |
+| H3 | 服务依赖拓扑 | Docker Compose编排 | P1 | 灵境Phase 0 |
+| H4 | 健康端点标准化 | /health/{module} | P2 | 灵境Phase 1 |
+| H5 | 配置外部化 | 环境变量替代硬编码 | P2 | 灵境Phase 2 |
+| H6 | 数据迁移预案 | SQLite→PostgreSQL | P2 | 灵境Phase 1 |
+
+### H5: 灵境兼容验证清单
+
+```
+□ 所有模块的 health() 返回可JSON序列化的dict
+□ 所有模块的 status() 返回可JSON序列化的dict
+□ 跨模块调用路径均通过 EvolutionBus 可路由
+□ Docker Compose 服务依赖无循环
+□ 每个灵境服务有独立健康端点
+□ 配置项已从硬编码迁移到环境变量(TIANJI_*前缀)
+□ 数据库连接串支持环境变量覆盖(SQLITE_PATH → DATABASE_URL)
+```
+
+---
+
+## 📊 集成全览矩阵（v1.1 更新）
+
+```
+集成维度总览:
+  A. 启动器   (A1-A8)  ← 托盘/端口/看门狗/备份/容器       [v1.0]
+  B. MCP协议  (B1-B5)  ← 工具/服务器/EvoLoop/健康/降级     [v1.0]
+  C. Agent协同(C1-C5)  ← 注册/绑定/协作/Skill/层级         [v1.0]
+  D. 跨模块   (D1-D6)  ← 依赖链/拓扑/生命周期/命名空间     [v1.1 🆕]
+  E. 事件驱动 (E1-E5)  ← 路由表/发布订阅/信号因果          [v1.1 🆕]
+  F. AMIM桥接 (F1-F5)  ← Agent-Tool-Module三层映射         [v1.1 🆕]
+  G. 治理集成 (G1-G5)  ← 依赖图/事件链路/健康链/强制执行    [v1.1 🆕]
+  H. 灵境兼容 (H1-H6)  ← 序列化/事件预埋/服务拓扑/配置外化  [v1.1 🆕]
+
+集成项总计: A(8) + B(5) + C(5) + D(6) + E(5) + F(5) + G(5) + H(6) = 45项
+```
+
+---
+
+## 📜 灵境道谱集成溯源（v1.1 补全）
+
+| 道 | 地煞 | 地煞名 | 集成对应 | 所属篇章 |
+|----|------|--------|---------|---------|
+| 道五·编排体 | D5-1 | 多Agent调度煞 | Agent注册表+AMIM | C + F |
+| 道五·编排体 | D5-2 | 工作流DAG煞 | 依赖拓扑排序 | D |
+| 道五·编排体 | D5-3 | 意图路由煞 | MCPServerRouter | B + F |
+| 道五·编排体 | D5-4 | 协作模式煞 | TVP桥接+EvolutionBus | E + F |
+| 道六·容器体 | D6-1 | 依赖拓扑煞 | ModuleRegistry+循环检测 | D |
+| 道六·容器体 | D6-2 | 生命周期煞 | 启动序列+看门狗+状态机 | A + D |
+| 道六·容器体 | D6-3 | 事件总线煞 | EvolutionBus路由表 | E |
+| 道六·容器体 | D6-4 | 信号网络煞 | 发布/订阅+因果追溯 | E |
+| 道七·治理体 | D7-1 | 静态分析煞 | StaticAnalyzer跨模块 | G |
+| 道七·治理体 | D7-2 | 门禁流水煞 | GovernancePipeline | G |
+| 道七·治理体 | D7-3 | 强制执行煞 | EnforceHook(M13) | G |
+| 道八·通信体 | D8-2 | MCP工具煞 | TOOL_AGENT_MAPPING | F |
+| 道八·通信体 | D8-3 | 事件总线煞 | MCPServerRouter灵境模式 | H |
+| 道九·配置体 | D9-2 | Δ阈值配置煞 | 环境变量外部化 | H |
+| 道九·配置体 | D9-4 | 桥接通道煞 | Docker Compose服务拓扑 | H |
+
+---
+
+## ⚡ 跨模块集成闪电示例
+
+```
+═══════════════════════════════════════════════════════════════
+  天机v9.0 专业化集成指令 — DeepSeekDriver → EvolutionBus 事件集成
+  法定三步集成流程 · 不折不扣 · 绝不跳步
+═══════════════════════════════════════════════════════════════
+
+【集成目标】DeepSeekDriver模块 → EvolutionBus事件发布/订阅
+【集成类型】事件驱动集成 (E篇)
+【参考架构】core/evolution_loop.py EvolutionBus.ROUTING_TABLE
+【集成载体】core/deepseek_driver.py + core/evolution_loop.py
+
+───────────────────────────────────────────────────────────────
+STEP 1/3: 架构审计 (D+E篇)
+
+1.1 模块依赖审计 (D篇):
+   □ DeepSeekDriver.dependencies → 是否声明依赖M7(EvolutionEngine)?
+   □ find_circular_dependencies() → 是否有DeepSeekDriver相关循环?
+
+1.2 事件路由审计 (E篇):
+   □ DeepSeekDriver.events_published → 发布哪些信号?
+   □ EvolutionBus.ROUTING_TABLE → 是否有对应路由?
+   □ 订阅模块(M7/M8/M34)的events_subscribed → 是否匹配?
+
+→ 审计结论: DeepSeekDriver发布 evolution_trigger信号
+           路由表中已注册→M7/M8/M34
+           但M34(AgentOrchestrator)的订阅处理函数未实现 (P1)
+
+───────────────────────────────────────────────────────────────
+STEP 2/3: 集成实现
+
+2.1 补全M34的信号订阅 (E3):
+   # agents/orchestrator.py 或 core/agent_orchestrator.py
+   evolution_loop.subscribe_signals(self._on_evolution_signal)
+
+   def _on_evolution_signal(self, signal):
+       if signal.signal_type == "evolution_trigger":
+           # 进化触发→重新评估Agent权重
+           self.reevaluate_agent_weights(signal.payload)
+
+2.2 验证ROUTING_TABLE完整性 (E1):
+   ✅ evolution_trigger → ["M7", "M8", "M34"] — 已存在
+
+2.3 事件链路审计 (G2):
+   ✅ evolution_trigger: published by DeepSeekDriver
+                        subscribed by M7/M8/M34
+                        → 无孤立事件
+
+→ 集成完成，新增M34事件订阅处理
+
+───────────────────────────────────────────────────────────────
+STEP 3/3: 集成验证
+
+3.1 事件驱动验证 (E5):
+   □ 触发DeepSeekDriver反思 → 检查EvolutionBus日志
+   □ 确认: "EvolutionBus route: evolution_trigger → M7,M8,M34"
+   □ 确认: M34收到信号 → reevaluate_agent_weights()被调用
+
+3.2 治理验证 (G4):
+   □ event_routing → evolution_trigger有发布者和订阅者
+   □ dependency_graph → DeepSeekDriver→M7依赖完整
+   □ health_chain → M7故障时DeepSeekDriver health()返回DEGRADED?
+
+→ 验证结论: 集成通过 ✅
+
+═══════════════════════════════════════════════════════════════
+  本轮结果: [DeepSeekDriver→EvolutionBus事件集成] 集成完成 ✅
+═══════════════════════════════════════════════════════════════
+```
+
+---
+
+<!-- AUTO-START -->
+## 📁 文件夹索引
+
+- ./成果/
+
+## 📄 文件索引
+
+- ./天机v9.0落地开发通用指令
+- ./天机v9.0专业测试员通用指令集
+- ./天机v9.0专业化集成与托盘定制指令集
+- ./天机v9.0 Agent-MCP集成桥接与体系升级指令集
+
+## 🔖 文件摘要映射
+
+| 文件路径 | 摘要 |
+|---------|------|
+| ./天机v9.0专业化集成与托盘定制指令集 | v1.1 增量更新 · 八篇45集成项 · SHA-256: `动态更新` |
+<!-- AUTO-END -->

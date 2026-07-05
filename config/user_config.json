@@ -1,0 +1,21 @@
+{
+    "memory": {
+        "auto_capture_enabled": true,
+        "backup_interval_minutes": 30,
+        "max_backup_count": 12
+    },
+    "llm": {
+        "temperature": 0.7,
+        "max_tokens": 8000,
+        "top_p": 1,
+        "api_key": "sk-db2f6ebde2a34ef68d74c4d1446658fc",
+        "base_url": "https://api.deepseek.com/v1",
+        "model": "deepseek-v4-flash",
+        "features": {
+            "classify": true,
+            "auto_tag": true,
+            "summarize": true,
+            "extract_knowledge": true
+        }
+    }
+}

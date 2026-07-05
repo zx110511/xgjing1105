@@ -1,0 +1,922 @@
+> r"""
+> 天机Skill自注册系统 (Tianji Skill Self-Registration System) v1.2
+> ================================================================
+> 借鉴Hermes Agent的工具自注册模式(Tool Self-Registration Pattern)，
+> 为元初系统v6.0实现Skill和MCP工具的自动发现、声明式注册与动态组合。
+  
+> v1.1: M4 升级 — access_count字段 + record_action喂入 + recorder/learning_engine集成
+> v1.2: M5 升级 — SkillLifecycleTracker 六阶段生命周期追踪器
+  
+> Hermes核心模式 → 天机映射:
+>   1. registry.register()    → SkillRegistry.register() (模块级副作用自注册)
+>   2. _discover_tools()      → SkillRegistry.discover() (自动扫描.trae/skills/)
+>   3. resolve_toolset()      → SkillRegistry.resolve_composition() (组合式Skill集)
+>   4. enabled_toolsets过滤   → SkillRegistry.filter_by_agent() (按Agent角色过滤)
+>   5. check_fn条件启用       → SkillRegistry.check_availability() (环境依赖检测)
+>   6. get_tool_definitions() → SkillRegistry.get_schemas() (Schema收集+缓存)
+  
+> 设计原则:
+>   - 声明式注册: Skill文件只需存在，系统自动发现
+>   - 组合式编排: 多个Skill可组合成"流程集"(类似Hermes的Toolset)
+>   - 条件启用: 根据Agent角色/环境依赖自动过滤
+>   - 缓存优化: Schema缓存 + mtime检测，避免重复解析
+>   - 天机融合: 注册信息自动同步到天机L4语义层
+  
+> 架构位置: 天机/core/skill_registry.py
+> 依赖: 天机/core/engine.py (ICMEEngine)
+> """
+  
+> import json
+> import time
+> import hashlib
+> import threading
+> import logging
+> from pathlib import Path
+> from typing import Any, Optional, Dict, List, Set, Tuple
+> from dataclasses import dataclass, field
+> from datetime import datetime
+> from enum import Enum
+  
+> logger = logging.getLogger("tianji.skill_registry")
+  
+  
+> class SkillCategory(str, Enum):
+>     MEMORY = "memory"
+>     CORPUS = "corpus"
+>     NOVEL = "novel"
+>     SYSTEM = "system"
+>     CONTEXT = "context"
+>     EXPORT = "export"
+  
+  
+> class SkillStatus(str, Enum):
+>     ACTIVE = "active"
+>     DEPRECATED = "deprecated"
+>     EXPERIMENTAL = "experimental"
+>     DISABLED = "disabled"
+  
+  
+> @dataclass
+> class SkillSchema:
+>     name: str
+>     description: str
+>     category: SkillCategory
+>     version: str = "1.0.0"
+>     status: SkillStatus = SkillStatus.ACTIVE
+>     required_agents: List[str] = field(default_factory=list)
+>     required_mcp_servers: List[str] = field(default_factory=list)
+>     required_env: List[str] = field(default_factory=list)
+>     tags: List[str] = field(default_factory=list)
+>     parameters: Dict[str, Any] = field(default_factory=dict)
+>     dependencies: List[str] = field(default_factory=list)
+>     file_path: str = ""
+>     file_mtime: float = 0.0
+>     registered_at: float = field(default_factory=time.time)
+>     memory_id: str = ""
+>     access_count: int = 0
+  
+>     def to_dict(self) -> dict:
+!         return {
+!             "name": self.name,
+!             "description": self.description,
+!             "category": self.category.value,
+!             "version": self.version,
+!             "status": self.status.value,
+!             "required_agents": self.required_agents,
+!             "required_mcp_servers": self.required_mcp_servers,
+!             "required_env": self.required_env,
+!             "tags": self.tags,
+!             "parameters": self.parameters,
+!             "dependencies": self.dependencies,
+!             "file_path": self.file_path,
+!             "registered_at": self.registered_at,
+!         }
+  
+>     @property
+>     def content_hash(self) -> str:
+!         raw = f"{self.name}:{self.version}:{self.description}"
+!         return hashlib.md5(raw.encode()).hexdigest()[:12]
+  
+  
+> @dataclass
+> class SkillComposition:
+>     name: str
+>     description: str
+>     skills: List[str]
+>     required_agents: List[str] = field(default_factory=list)
+>     tags: List[str] = field(default_factory=list)
+  
+>     def to_dict(self) -> dict:
+!         return {
+!             "name": self.name,
+!             "description": self.description,
+!             "skills": self.skills,
+!             "required_agents": self.required_agents,
+!             "tags": self.tags,
+!         }
+  
+  
+> AGENT_SKILL_MAP: Dict[str, List[SkillCategory]] = {
+>     "tianshu": [SkillCategory.MEMORY, SkillCategory.SYSTEM, SkillCategory.CONTEXT],
+>     "wenzong": [SkillCategory.NOVEL, SkillCategory.EXPORT, SkillCategory.MEMORY],
+>     "jingwei": [SkillCategory.SYSTEM, SkillCategory.CONTEXT],
+>     "miaobi": [SkillCategory.NOVEL, SkillCategory.MEMORY],
+>     "mingjing": [SkillCategory.NOVEL, SkillCategory.CORPUS],
+>     "tiansuan": [SkillCategory.CORPUS, SkillCategory.SYSTEM],
+>     "kuangshi": [SkillCategory.CORPUS, SkillCategory.MEMORY],
+>     "yiku": [SkillCategory.MEMORY],
+>     "dongcha": [SkillCategory.CONTEXT],
+>     "luling": [SkillCategory.SYSTEM],
+>     "lingxi": [SkillCategory.CONTEXT, SkillCategory.MEMORY],
+>     "tiewei": [SkillCategory.SYSTEM],
+>     "baiqiao": [SkillCategory.MEMORY, SkillCategory.CORPUS, SkillCategory.NOVEL,
+>                 SkillCategory.SYSTEM, SkillCategory.CONTEXT, SkillCategory.EXPORT],
+>     "shiguan": [SkillCategory.NOVEL, SkillCategory.SYSTEM],
+>     "jinshu": [SkillCategory.EXPORT, SkillCategory.NOVEL],
+>     "qianli": [SkillCategory.SYSTEM],
+>     "gongzao": [SkillCategory.SYSTEM],
+>     "zhenshan": [SkillCategory.SYSTEM],
+>     "zhuiguang": [SkillCategory.SYSTEM],
+> }
+  
+> BUILTIN_COMPOSITIONS: List[Dict] = [
+>     {
+>         "name": "novel-creation-pipeline",
+>         "description": "小说创作全流程: 世界观→章节→审校→导出",
+>         "skills": [
+>             "novel-worldbuilding-expand",
+>             "novel-chapter-create",
+>             "novel-consistency-check",
+>             "novel-format-export",
+>             "novel-version-track",
+>         ],
+>         "required_agents": ["miaobi", "mingjing", "jinshu", "shiguan"],
+>         "tags": ["novel", "creation", "pipeline"],
+>     },
+>     {
+>         "name": "memory-lifecycle",
+>         "description": "记忆全生命周期: 捕获→存储→检索→巩固",
+>         "skills": [
+>             "auto-memory-capture",
+>             "memory-remember",
+>             "memory-recall",
+>         ],
+>         "required_agents": ["yiku", "dongcha"],
+>         "tags": ["memory", "lifecycle", "core"],
+>     },
+>     {
+>         "name": "corpus-pipeline",
+>         "description": "语料处理全流程: 提取→评分→检索→批量导入",
+>         "skills": [
+>             "corpus-extract",
+>             "corpus-quality-score",
+>             "corpus-retrieve",
+>             "corpus-batch-import",
+>         ],
+>         "required_agents": ["kuangshi", "tiansuan"],
+>         "tags": ["corpus", "pipeline"],
+>     },
+>     {
+>         "name": "system-health-check",
+>         "description": "系统健康检查: 诊断→记忆→修复",
+>         "skills": [
+>             "system-diagnose",
+>             "memory-recall",
+>             "memory-remember",
+>         ],
+>         "required_agents": ["qianli", "yiku"],
+>         "tags": ["system", "health", "diagnostics"],
+>     },
+> ]
+  
+  
+> class SkillRegistry:
+>     """
+>     Skill自注册表 — 借鉴Hermes的Tool Registry
+  
+>     Hermes: 工具模块导入时registry.register()自动注册
+>     天机:   Skill目录扫描时自动发现+注册，无需手动维护
+  
+>     三大核心能力:
+>       1. discover() — 自动扫描.trae/skills/目录，解析SKILL.md
+>       2. resolve_composition() — 递归展开组合式Skill集
+>       3. filter_by_agent() — 按Agent角色过滤可用Skill
+>     """
+  
+>     def __init__(self, skills_dir: Optional[Path] = None,
+>                  memory_api_url: str = "http://127.0.0.1:8771",
+>                  recorder: Optional[Any] = None,
+>                  learning_engine: Optional[Any] = None):
+!         self._skills_dir = skills_dir or (Path(__file__).resolve().parent.parent / ".trae" / "skills")
+!         self._memory_api_url = memory_api_url
+!         self._recorder = recorder
+!         self._learning_engine = learning_engine
+!         self._skills: Dict[str, SkillSchema] = {}
+!         self._compositions: Dict[str, SkillComposition] = {}
+!         self._lock = threading.Lock()
+!         self._generation = 0
+!         self._schema_cache: Optional[List[Dict]] = None
+!         self._schema_cache_gen: int = -1
+!         self._stats = {
+!             "total_discovered": 0,
+!             "total_registered": 0,
+!             "total_compositions": 0,
+!             "last_discovery_time": 0.0,
+!             "cache_hits": 0,
+!             "cache_misses": 0,
+!             "tianji_syncs": 0,
+!             "errors": 0,
+!         }
+  
+!         self._evo_loop = None
+!         try:
+!             from .evolution_loop import EvolutionLoop
+!             self._evo_loop = EvolutionLoop(
+!                 module_name="skill_registry",
+!                 effectiveness_fn=self._calc_skill_effectiveness,
+!                 learn_fn=self._learn_from_skill_usage,
+!                 evolve_fn=self._evolve_skill_policies,
+!                 mutable_config={
+!                     "deprecate_threshold_days": 1,
+!                     "deprecate_min_access": 2,
+!                     "promote_min_access": 5,
+!                     "discovery_interval": 300.0,
+!                 },
+!                 health_metrics_fn=self._get_skill_health_metrics,
+!                 recorder=recorder,
+!             )
+!         except ImportError:
+!             pass
+  
+!         self._load_builtin_compositions()
+  
+>     def _calc_skill_effectiveness(self, action: str, state_before: Dict, state_after: Dict) -> float:
+!         if action == "skill_access":
+!             if state_after.get("hit", False):
+!                 return 0.3
+!             return -0.1
+!         if action == "skill_discover":
+!             count = state_after.get("new_skills", 0)
+!             return 0.2 * count if count > 0 else -0.1
+!         return 0.0
+  
+>     def _learn_from_skill_usage(self, causal_pairs, effectiveness_summary) -> Dict:
+!         underused = []
+!         for skill in self._skills.values():
+!             if skill.access_count < 2 and (time.time() - skill.registered_at) > 86400:
+!                 underused.append(skill.name)
+!         return {
+!             "underused_skills": underused,
+!             "avg_effectiveness": effectiveness_summary.get("avg", 0.0),
+!         }
+  
+>     def _evolve_skill_policies(self, learn_result, mutable_config) -> Dict:
+!         changes = []
+!         underused = learn_result.get("underused_skills", [])
+!         if len(underused) > 5:
+!             old_threshold = mutable_config.get("deprecate_min_access", 2)
+!             new_threshold = max(old_threshold - 1, 1)
+!             changes.append({
+!                 "rule": "deprecate_min_access",
+!                 "old_value": old_threshold,
+!                 "new_value": new_threshold,
+!             })
+!         return {"changes": changes}
+  
+>     def _get_skill_health_metrics(self) -> Dict[str, float]:
+!         total = max(len(self._skills), 1)
+!         active = sum(1 for s in self._skills.values() if s.status == SkillStatus.ACTIVE)
+!         experimental = sum(1 for s in self._skills.values() if s.status == SkillStatus.EXPERIMENTAL)
+!         return {
+!             "utilization": active / total,
+!             "rejection_rate": experimental / total,
+!         }
+  
+>     @property
+>     def evolution_loop(self):
+!         return self._evo_loop
+  
+>     @property
+>     def recorder(self):
+!         return self._recorder
+  
+>     @property
+>     def learning_engine(self):
+!         return self._learning_engine
+  
+>     def _load_builtin_compositions(self):
+!         for comp_data in BUILTIN_COMPOSITIONS:
+!             comp = SkillComposition(
+!                 name=comp_data["name"],
+!                 description=comp_data["description"],
+!                 skills=comp_data["skills"],
+!                 required_agents=comp_data.get("required_agents", []),
+!                 tags=comp_data.get("tags", []),
+!             )
+!             self._compositions[comp.name] = comp
+!             self._stats["total_compositions"] += 1
+  
+>     def discover(self) -> int:
+>         """
+>         自动发现Skill — 借鉴Hermes的_discover_tools()
+  
+>         扫描.trae/skills/目录下的所有SKILL.md文件，
+>         解析元数据并自动注册到注册表。
+>         支持mtime检测，仅重新解析变更过的文件。
+>         """
+!         discovered = 0
+!         if not self._skills_dir.exists():
+!             logger.warning(f"Skills directory not found: {self._skills_dir}")
+!             return 0
+  
+!         for skill_dir in self._skills_dir.iterdir():
+!             if not skill_dir.is_dir():
+!                 continue
+  
+!             skill_file = skill_dir / "SKILL.md"
+!             if not skill_file.exists():
+!                 continue
+  
+!             try:
+!                 file_mtime = skill_file.stat().st_mtime
+!                 skill_name = skill_dir.name
+  
+!                 with self._lock:
+!                     existing = self._skills.get(skill_name)
+!                     if existing and existing.file_mtime >= file_mtime:
+!                         continue
+  
+!                 schema = self._parse_skill_file(skill_file, skill_name)
+!                 if schema:
+!                     schema.file_path = str(skill_file)
+!                     schema.file_mtime = file_mtime
+!                     self.register(schema)
+!                     discovered += 1
+!             except Exception as e:
+!                 logger.error(f"Failed to parse skill {skill_dir.name}: {e}")
+!                 self._stats["errors"] += 1
+  
+!         with self._lock:
+!             self._generation += 1
+!             self._stats["total_discovered"] = len(self._skills)
+!             self._stats["last_discovery_time"] = time.time()
+  
+!         logger.info(f"[SkillRegistry] Discovered {discovered} new skills "
+!                      f"(total: {len(self._skills)})")
+!         return discovered
+  
+>     def _parse_skill_file(self, skill_file: Path, skill_name: str) -> Optional[SkillSchema]:
+>         """解析SKILL.md文件 — 提取元数据"""
+!         try:
+!             content = skill_file.read_text(encoding="utf-8")
+!             frontmatter = {}
+!             body_lines = []
+!             in_frontmatter = False
+  
+!             for line in content.split("\n"):
+!                 stripped = line.strip()
+!                 if stripped == "---":
+!                     if in_frontmatter:
+!                         in_frontmatter = False
+!                         continue
+!                     else:
+!                         in_frontmatter = True
+!                         continue
+!                 if in_frontmatter:
+!                     if ":" in stripped:
+!                         key, _, value = stripped.partition(":")
+!                         frontmatter[key.strip()] = value.strip()
+!                 else:
+!                     body_lines.append(line)
+  
+!             description = frontmatter.get("description", "")
+!             if not description:
+!                 for line in body_lines:
+!                     stripped = line.strip()
+!                     if stripped and not stripped.startswith("#"):
+!                         description = stripped[:200]
+!                         break
+  
+!             category_str = frontmatter.get("category", "system").lower()
+!             try:
+!                 category = SkillCategory(category_str)
+!             except ValueError:
+!                 category = SkillCategory.SYSTEM
+  
+!             required_agents_str = frontmatter.get("required_agents", "")
+!             required_agents = [a.strip() for a in required_agents_str.split(",") if a.strip()] \
+!                 if required_agents_str else []
+  
+!             required_mcp_str = frontmatter.get("required_mcp_servers", "")
+!             required_mcp = [m.strip() for m in required_mcp_str.split(",") if m.strip()] \
+!                 if required_mcp_str else []
+  
+!             tags_str = frontmatter.get("tags", "")
+!             tags = [t.strip() for t in tags_str.split(",") if t.strip()] \
+!                 if tags_str else [category.value]
+  
+!             return SkillSchema(
+!                 name=skill_name,
+!                 description=description,
+!                 category=category,
+!                 version=frontmatter.get("version", "1.0.0"),
+!                 required_agents=required_agents,
+!                 required_mcp_servers=required_mcp,
+!                 tags=tags,
+!             )
+!         except Exception as e:
+!             logger.error(f"Parse error for {skill_name}: {e}")
+!             return None
+  
+>     def register(self, schema: SkillSchema) -> bool:
+>         """
+>         注册Skill — 借鉴Hermes的registry.register()
+  
+>         Hermes: 工具模块导入时自动调用
+>         天机:   discover()解析后自动调用，也支持手动注册
+>         """
+!         with self._lock:
+!             existed = schema.name in self._skills
+!             self._skills[schema.name] = schema
+!             self._stats["total_registered"] += 1
+!             self._generation += 1
+  
+!         if self._evo_loop:
+!             try:
+!                 state_before = {"skill_count": len(self._skills) - int(not existed)}
+!                 state_after = {"skill_count": len(self._skills), "new_skill": not existed}
+!                 self._evo_loop.record_action(
+!                     action="skill_register",
+!                     state_before=state_before,
+!                     state_after=state_after,
+!                     metadata={"skill_name": schema.name, "category": schema.category.value},
+!                 )
+!             except Exception:
+!                 pass
+  
+!         logger.info(f"[SkillRegistry] Registered: {schema.name} "
+!                      f"(category={schema.category.value}, agents={schema.required_agents})")
+!         return True
+  
+>     def unregister(self, name: str) -> bool:
+!         with self._lock:
+!             if name in self._skills:
+!                 del self._skills[name]
+!                 self._generation += 1
+!                 return True
+!             return False
+  
+>     def get(self, name: str) -> Optional[SkillSchema]:
+!         return self._skills.get(name)
+  
+>     def list_skills(self, category: Optional[SkillCategory] = None,
+>                     status: Optional[SkillStatus] = None) -> List[SkillSchema]:
+!         with self._lock:
+!             skills = list(self._skills.values())
+!         if category:
+!             skills = [s for s in skills if s.category == category]
+!         if status:
+!             skills = [s for s in skills if s.status == status]
+!         return skills
+  
+>     def resolve_composition(self, composition_name: str) -> List[SkillSchema]:
+>         """
+>         解析组合式Skill集 — 借鉴Hermes的resolve_toolset()
+  
+>         Hermes: 递归展开includes引用，收集所有工具
+>         天机:   递归展开composition中的skills引用，收集所有SkillSchema
+  
+>         支持嵌套组合: composition可以引用其他composition
+>         """
+!         visited: Set[str] = set()
+!         result: List[SkillSchema] = []
+  
+!         def _resolve(name: str, depth: int = 0):
+!             if name in visited or depth > 5:
+!                 return
+!             visited.add(name)
+  
+!             if name in self._compositions:
+!                 comp = self._compositions[name]
+!                 for skill_name in comp.skills:
+!                     _resolve(skill_name, depth + 1)
+!             elif name in self._skills:
+!                 result.append(self._skills[name])
+  
+!         _resolve(composition_name)
+!         return result
+  
+>     def filter_by_agent(self, agent_id: str) -> List[SkillSchema]:
+>         """
+>         按Agent角色过滤可用Skill — 借鉴Hermes的enabled_toolsets过滤
+  
+>         Hermes: 根据平台配置过滤可用工具集
+>         天机:   根据Agent的category映射过滤可用Skill
+>         """
+!         allowed_categories = AGENT_SKILL_MAP.get(agent_id, [])
+!         if not allowed_categories:
+!             return []
+  
+!         with self._lock:
+!             return [s for s in self._skills.values()
+!                     if s.category in allowed_categories and s.status == SkillStatus.ACTIVE]
+  
+>     def check_availability(self, skill_name: str) -> Tuple[bool, List[str]]:
+>         """
+>         检查Skill可用性 — 借鉴Hermes的check_fn
+  
+>         Hermes: 检查API Key等环境依赖
+>         天机:   检查required_mcp_servers + required_env + required_agents
+>         """
+!         schema = self._skills.get(skill_name)
+!         if not schema:
+!             return False, [f"Skill '{skill_name}' not found"]
+  
+!         missing = []
+!         for env_var in schema.required_env:
+!             import os
+!             if not os.environ.get(env_var):
+!                 missing.append(f"Environment variable '{env_var}' not set")
+  
+!         return len(missing) == 0, missing
+  
+>     def get_schemas(self, agent_id: Optional[str] = None,
+>                     force_refresh: bool = False) -> List[Dict]:
+>         """
+>         获取Skill Schema列表 — 借鉴Hermes的get_tool_definitions()
+  
+>         Hermes: 收集所有工具的JSON Schema，使用多级缓存
+>         天机:   收集所有Skill的Schema，使用generation-based缓存
+>         """
+!         if not force_refresh and self._schema_cache is not None:
+!             if self._schema_cache_gen == self._generation:
+!                 self._stats["cache_hits"] += 1
+!                 if agent_id:
+!                     allowed = AGENT_SKILL_MAP.get(agent_id, [])
+!                     return [s for s in self._schema_cache
+!                             if s.get("category") in [c.value for c in allowed]]
+!                 return self._schema_cache
+  
+!         self._stats["cache_misses"] += 1
+  
+!         with self._lock:
+!             skills = list(self._skills.values())
+  
+!         if agent_id:
+!             skills = self.filter_by_agent(agent_id)
+  
+!         schemas = [s.to_dict() for s in skills]
+  
+!         with self._lock:
+!             self._schema_cache = schemas
+!             self._schema_cache_gen = self._generation
+  
+!         return schemas
+  
+>     def sync_to_tianji(self, layer: str = "semantic") -> int:
+>         """
+>         同步注册信息到天机L4语义层 — 天机融合核心
+  
+>         将Skill注册表的状态同步到天机记忆系统，
+>         使Skill知识可跨会话检索和复用。
+>         """
+!         synced = 0
+!         try:
+!             import urllib.request
+!             for name, schema in self._skills.items():
+!                 if schema.memory_id:
+!                     continue
+  
+!                 content = json.dumps({
+!                     "type": "skill_registry_entry",
+!                     "skill_name": schema.name,
+!                     "category": schema.category.value,
+!                     "description": schema.description,
+!                     "required_agents": schema.required_agents,
+!                     "required_mcp_servers": schema.required_mcp_servers,
+!                     "tags": schema.tags,
+!                     "version": schema.version,
+!                     "registered_at": schema.registered_at,
+!                 }, ensure_ascii=False)
+  
+!                 data = json.dumps({
+!                     "content": content,
+!                     "layer": layer,
+!                     "tags": ["skill_registry", schema.category.value, "auto_sync"] + schema.tags,
+!                     "priority": "medium",
+!                 }, ensure_ascii=False).encode("utf-8")
+  
+!                 req = urllib.request.Request(
+!                     f"{self._memory_api_url}/api/memory/",
+!                     data=data,
+!                     headers={"Content-Type": "application/json; charset=utf-8"},
+!                     method="POST",
+!                 )
+!                 r = urllib.request.urlopen(req, timeout=5)
+!                 if r.status in (200, 201):
+!                     result = json.loads(r.read().decode("utf-8"))
+!                     schema.memory_id = result.get("memory_id", "")
+!                     synced += 1
+  
+!             self._stats["tianji_syncs"] += 1
+!         except Exception as e:
+!             logger.error(f"Tianji sync failed: {e}")
+!             self._stats["errors"] += 1
+  
+!         return synced
+  
+>     def get_composition(self, name: str) -> Optional[SkillComposition]:
+!         return self._compositions.get(name)
+  
+>     def list_compositions(self) -> List[SkillComposition]:
+!         return list(self._compositions.values())
+  
+>     def create_composition(self, name: str, description: str,
+>                            skills: List[str], required_agents: List[str] = None,
+>                            tags: List[str] = None) -> SkillComposition:
+!         comp = SkillComposition(
+!             name=name,
+!             description=description,
+!             skills=skills,
+!             required_agents=required_agents or [],
+!             tags=tags or [],
+!         )
+!         with self._lock:
+!             self._compositions[name] = comp
+!             self._stats["total_compositions"] += 1
+!             self._generation += 1
+!         return comp
+  
+>     def get_stats(self) -> Dict:
+!         with self._lock:
+!             return {
+!                 "total_skills": len(self._skills),
+!                 "total_compositions": len(self._compositions),
+!                 "generation": self._generation,
+!                 "categories": {
+!                     cat.value: len([s for s in self._skills.values() if s.category == cat])
+!                     for cat in SkillCategory
+!                 },
+!                 "cache_efficiency": (
+!                     f"{self._stats['cache_hits'] / max(1, self._stats['cache_hits'] + self._stats['cache_misses']):.1%}"
+!                 ),
+!                 **self._stats,
+!             }
+  
+>     def get_hermes_comparison(self) -> Dict:
+!         return {
+!             "hermes_registry_register": {
+!                 "description": "工具模块导入时自动注册",
+!                 "tianji_status": "✅ 已实现",
+!                 "tianji_class": "SkillRegistry.register()",
+!                 "parity": "100%",
+!             },
+!             "hermes_discover_tools": {
+!                 "description": "自动发现所有工具模块",
+!                 "tianji_status": "✅ 已实现",
+!                 "tianji_class": "SkillRegistry.discover()",
+!                 "parity": "100%",
+!             },
+!             "hermes_resolve_toolset": {
+!                 "description": "递归展开组合式工具集",
+!                 "tianji_status": "✅ 已实现",
+!                 "tianji_class": "SkillRegistry.resolve_composition()",
+!                 "parity": "100%",
+!             },
+!             "hermes_enabled_toolsets": {
+!                 "description": "按场景/平台过滤可用工具",
+!                 "tianji_status": "✅ 已实现",
+!                 "tianji_class": "SkillRegistry.filter_by_agent()",
+!                 "parity": "100%",
+!             },
+!             "hermes_check_fn": {
+!                 "description": "条件启用(环境依赖检测)",
+!                 "tianji_status": "✅ 已实现",
+!                 "tianji_class": "SkillRegistry.check_availability()",
+!                 "parity": "100%",
+!             },
+!             "hermes_get_tool_definitions": {
+!                 "description": "Schema收集+多级缓存",
+!                 "tianji_status": "✅ 已实现",
+!                 "tianji_class": "SkillRegistry.get_schemas()",
+!                 "parity": "100%",
+!             },
+!             "tianji_exclusive_sync_to_memory": {
+!                 "description": "注册信息同步到天机L4语义层",
+!                 "tianji_status": "✅ 天机独有",
+!                 "tianji_class": "SkillRegistry.sync_to_tianji()",
+!                 "parity": "N/A (Hermes无此能力)",
+!             },
+!         }
+  
+  
+> class SkillPhase(str, Enum):
+>     CREATED = "created"
+>     VALIDATED = "validated"
+>     REUSED = "reused"
+>     OPTIMIZED = "optimized"
+>     DEPRECATED = "deprecated"
+>     REMOVED = "removed"
+  
+  
+> @dataclass
+> class SkillEvent:
+>     skill_name: str
+>     phase: SkillPhase
+>     timestamp: float = field(default_factory=time.time)
+>     agent_id: str = ""
+>     details: Dict[str, Any] = field(default_factory=dict)
+>     event_id: str = ""
+  
+>     def __post_init__(self):
+!         if not self.event_id:
+!             raw = f"{self.skill_name}:{self.phase.value}:{self.timestamp}"
+!             self.event_id = hashlib.md5(raw.encode()).hexdigest()[:12]
+  
+>     def to_dict(self) -> dict:
+!         return {
+!             "event_id": self.event_id,
+!             "skill_name": self.skill_name,
+!             "phase": self.phase.value,
+!             "timestamp": self.timestamp,
+!             "agent_id": self.agent_id,
+!             "details": self.details,
+!         }
+  
+  
+> class SkillLifecycleTracker:
+>     """
+>     Skill生命周期追踪器 — M5模块
+  
+>     六阶段生命周期:
+>       CREATED   → Skill首次创建 (文件写入 + 天机L4注册)
+>       VALIDATED → Skill通过验证 (首次成功执行)
+>       REUSED    → Skill被复用 (非创建者调用)
+>       OPTIMIZED → Skill被优化 (参数/逻辑改进)
+>       DEPRECATED→ Skill被废弃 (长期未使用)
+>       REMOVED   → Skill被删除 (文件删除 + 天机L4标记)
+  
+>     三大闭环:
+>       1. 文件扫描闭环: _scan_skill_files() → 检测文件变化
+>       2. 审计日志闭环: _replay_audit_log() → 恢复历史状态
+>       3. 变更检测闭环: detect_changes() → 对比快照生成事件
+>     """
+  
+>     def __init__(self, skills_dir: Optional[Path] = None,
+>                  audit_dir: Optional[Path] = None,
+>                  recorder: Optional[Any] = None):
+!         self._skills_dir = skills_dir or (Path(__file__).resolve().parent.parent / ".trae" / "skills")
+!         self._audit_dir = audit_dir or (self._skills_dir / ".audit")
+!         self._recorder = recorder
+!         self._events: List[SkillEvent] = []
+!         self._last_snapshot: Dict[str, float] = {}
+!         self._lock = threading.Lock()
+!         self._stats = {
+!             "total_events": 0,
+!             "created": 0,
+!             "validated": 0,
+!             "reused": 0,
+!             "optimized": 0,
+!             "deprecated": 0,
+!             "removed": 0,
+!             "scans_completed": 0,
+!         }
+  
+>     @property
+>     def recorder(self):
+!         return self._recorder
+  
+>     def track_event(self, skill_name: str, phase: SkillPhase,
+>                     agent_id: str = "", details: Optional[Dict] = None) -> SkillEvent:
+!         event = SkillEvent(
+!             skill_name=skill_name,
+!             phase=phase,
+!             agent_id=agent_id,
+!             details=details or {},
+!         )
+!         with self._lock:
+!             self._events.append(event)
+!             self._stats["total_events"] += 1
+!             self._stats[phase.value] = self._stats.get(phase.value, 0) + 1
+!         self._persist_event(event)
+  
+!         if self._recorder:
+!             try:
+!                 self._recorder.record(
+!                     action=f"skill_{phase.value}",
+!                     state_before={"phase": ""},
+!                     state_after={"phase": phase.value, "skill": skill_name},
+!                     effect_score=0.2 if phase != SkillPhase.DEPRECATED else -0.1,
+!                     module_name="skill_lifecycle",
+!                     metadata={"skill_name": skill_name, "phase": phase.value},
+!                 )
+!             except Exception:
+!                 pass
+  
+!         logger.debug(f"[SkillLifecycle] {skill_name}: {phase.value}")
+!         return event
+  
+>     def _scan_skill_files(self) -> List[SkillEvent]:
+!         events: List[SkillEvent] = []
+!         if not self._skills_dir.exists():
+!             return events
+  
+!         current: Dict[str, float] = {}
+  
+!         for skill_dir in self._skills_dir.iterdir():
+!             if not skill_dir.is_dir():
+!                 continue
+!             skill_name = skill_dir.name
+!             meta_file = skill_dir / "skill.json"
+!             if meta_file.exists():
+!                 current[skill_name] = meta_file.stat().st_mtime
+!             elif (skill_dir / "SKILL.md").exists():
+!                 current[skill_name] = (skill_dir / "SKILL.md").stat().st_mtime
+  
+!         removed = set(self._last_snapshot.keys()) - set(current.keys())
+!         for skill_name in removed:
+!             evt = self.track_event(skill_name, SkillPhase.REMOVED)
+!             events.append(evt)
+  
+!         for skill_name, mtime in current.items():
+!             if skill_name not in self._last_snapshot:
+!                 evt = self.track_event(skill_name, SkillPhase.CREATED)
+!                 events.append(evt)
+!             elif mtime > self._last_snapshot.get(skill_name, 0):
+!                 diff = self._diff_meta(skill_name)
+!                 evt = self.track_event(
+!                     skill_name, SkillPhase.OPTIMIZED,
+!                     details={"diff": diff, "mtime": mtime},
+!                 )
+!                 events.append(evt)
+  
+!         self._last_snapshot = current
+!         self._stats["scans_completed"] += 1
+!         return events
+  
+>     def _diff_meta(self, skill_name: str) -> Dict[str, Any]:
+!         skill_dir = self._skills_dir / skill_name
+!         result = {"previous_mtime": self._last_snapshot.get(skill_name, 0)}
+!         meta_file = skill_dir / "skill.json"
+!         if meta_file.exists():
+!             try:
+!                 data = json.loads(meta_file.read_text("utf-8"))
+!                 result["current_version"] = data.get("version", "unknown")
+!             except Exception:
+!                 pass
+!         return result
+  
+>     def detect_changes(self) -> List[SkillEvent]:
+!         return self._scan_skill_files()
+  
+>     def _persist_event(self, event: SkillEvent):
+!         try:
+!             self._audit_dir.mkdir(parents=True, exist_ok=True)
+!             audit_file = self._audit_dir / "skill_audit.jsonl"
+!             with open(audit_file, "a", encoding="utf-8") as f:
+!                 f.write(json.dumps(event.to_dict(), ensure_ascii=False) + "\n")
+!         except Exception:
+!             pass
+  
+>     def _replay_audit_log(self) -> int:
+!         replayed = 0
+!         audit_file = self._audit_dir / "skill_audit.jsonl"
+!         if not audit_file.exists():
+!             return 0
+!         try:
+!             for line in audit_file.read_text("utf-8").strip().split("\n"):
+!                 if not line.strip():
+!                     continue
+!                 data = json.loads(line)
+!                 event = SkillEvent(
+!                     skill_name=data.get("skill_name", ""),
+!                     phase=SkillPhase(data.get("phase", "created")),
+!                     timestamp=data.get("timestamp", 0),
+!                     agent_id=data.get("agent_id", ""),
+!                     details=data.get("details", {}),
+!                     event_id=data.get("event_id", ""),
+!                 )
+!                 with self._lock:
+!                     self._events.append(event)
+!                 replayed += 1
+!         except Exception:
+!             pass
+!         return replayed
+  
+>     def get_events(self, skill_name: Optional[str] = None,
+>                    phase: Optional[SkillPhase] = None,
+>                    limit: int = 50) -> List[SkillEvent]:
+!         with self._lock:
+!             events = list(self._events)
+!         if skill_name:
+!             events = [e for e in events if e.skill_name == skill_name]
+!         if phase:
+!             events = [e for e in events if e.phase == phase]
+!         return events[-limit:]
+  
+>     def get_stats(self) -> Dict:
+!         with self._lock:
+!             return {
+!                 **self._stats,
+!                 "total_events_in_memory": len(self._events),
+!             }

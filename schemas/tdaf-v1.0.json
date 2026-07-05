@@ -1,0 +1,92 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://tianji.memory/schema/tdaf-v1.0.json",
+  "title": "Tianji Digital Asset Format v1.0",
+  "description": "天机数字资产格式 - JSON-LD兼容的跨平台可移植格式",
+  "type": "object",
+  "required": ["tdaf_version", "export_timestamp", "asset_manifest"],
+  "properties": {
+    "@context": {
+      "type": "object",
+      "description": "JSON-LD上下文"
+    },
+    "tdaf_version": {
+      "type": "string",
+      "const": "1.0",
+      "description": "TDAF格式版本"
+    },
+    "export_timestamp": {
+      "type": "number",
+      "description": "导出时间戳(UNIX)"
+    },
+    "export_type": {
+      "type": "string",
+      "enum": ["full", "incremental"],
+      "description": "导出类型: 全量或增量"
+    },
+    "since_timestamp": {
+      "type": "number",
+      "description": "增量导出的起始时间戳"
+    },
+    "asset_manifest": {
+      "type": "object",
+      "required": ["total_assets", "total_size_bytes"],
+      "properties": {
+        "total_assets": {"type": "integer"},
+        "total_size_bytes": {"type": "integer"},
+        "by_layer": {
+          "type": "object",
+          "additionalProperties": {"type": "integer"}
+        },
+        "by_content_type": {
+          "type": "object",
+          "additionalProperties": {"type": "integer"}
+        },
+        "by_status": {
+          "type": "object",
+          "additionalProperties": {"type": "integer"}
+        }
+      }
+    },
+    "assets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["asset_id", "memory_id", "layer", "content_hash"],
+        "properties": {
+          "asset_id": {"type": "string"},
+          "memory_id": {"type": "string"},
+          "layer": {"type": "string"},
+          "content_type": {"type": "string"},
+          "content": {"type": "string"},
+          "content_hash": {"type": "string"},
+          "version": {"type": "integer"},
+          "parent_version_id": {"type": "string"},
+          "provenance": {"type": "object"},
+          "tags": {"type": "array", "items": {"type": "string"}},
+          "triples": {"type": "array", "items": {"type": "object"}},
+          "references": {"type": "array", "items": {"type": "string"}},
+          "referenced_by": {"type": "array", "items": {"type": "string"}},
+          "status": {"type": "string"},
+          "created_at": {"type": "number"},
+          "updated_at": {"type": "number"}
+        }
+      }
+    },
+    "knowledge_graph": {
+      "type": "object",
+      "properties": {
+        "nodes": {"type": "array"},
+        "edges": {"type": "array"}
+      }
+    },
+    "directory_indexes": {
+      "type": "array",
+      "items": {"type": "object"}
+    },
+    "change_log": {
+      "type": "array",
+      "items": {"type": "object"}
+    }
+  }
+}

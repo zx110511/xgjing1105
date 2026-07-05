@@ -1,0 +1,897 @@
+﻿{
+  "novel_production": {
+    "domain_name": "小说工业化生产",
+    "owner_agent": "wenzong/miaobi/mingjing",
+    "domain": "novel_creation",
+    "skills": [
+      {
+        "skill_id": "novel-chapter-create",
+        "purpose": "基于世界观设定和前文内容，创作指定章节的完整正文。",
+        "triggers": [
+          "用户要求\"创作第X章\"、\"写章节正文\"、\"生成章节内容\"",
+          "@writer Agent被调度执行创作任务时",
+          "进入工业化生产流水线的\"创作\"阶段"
+        ],
+        "steps": [
+          {
+            "step": "Step 1: 准备工作 (必须完成)",
+            "item": "`{chapter_number}章相关内容`"
+          },
+          {
+            "step": "Step 1: 准备工作 (必须完成)",
+            "item": "`前文章节摘要`"
+          },
+          {
+            "step": "Step 1: 准备工作 (必须完成)",
+            "item": "`最近创作记录`"
+          },
+          {
+            "step": "Step 1: 准备工作 (必须完成)",
+            "item": "`世界观设定` + `力量体系`"
+          },
+          {
+            "step": "Step 1: 准备工作 (必须完成)",
+            "item": "`{character_names} 人物设定`"
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chapter_number",
+            "type": "integer",
+            "required": "✅",
+            "default": "-",
+            "description": "章节编号"
+          },
+          {
+            "name": "chapter_title",
+            "type": "string",
+            "required": "❌",
+            "default": "自动生成",
+            "description": "章节标题"
+          },
+          {
+            "name": "word_count",
+            "type": "integer",
+            "required": "❌",
+            "default": "5000",
+            "description": "目标字数"
+          },
+          {
+            "name": "style",
+            "type": "enum",
+            "required": "❌",
+            "default": "科幻悬疑",
+            "description": "写作风格"
+          },
+          {
+            "name": "pov",
+            "type": "enum",
+            "required": "❌",
+            "default": "第三人称有限",
+            "description": "叙事视角"
+          },
+          {
+            "name": "characters",
+            "type": "array",
+            "required": "❌",
+            "default": "自动检测",
+            "description": "出场人物列表"
+          }
+        ],
+        "output_format": "",
+        "best_practices": [],
+        "bound_agents": [
+          "@writer (写手)"
+        ],
+        "partners": [
+          "@planner (大纲参考) | @reviewer (审校) | @memory-architect (存储)"
+        ],
+        "rules": [],
+        "full_content": "# 章节创作 (novel/chapter-create)\n\n## 目的\n基于世界观设定和前文内容，创作指定章节的完整正文。\n\n## 触发场景\n- 用户要求\"创作第X章\"、\"写章节正文\"、\"生成章节内容\"\n- @writer Agent被调度执行创作任务时\n- 进入工业化生产流水线的\"创作\"阶段\n\n## 执行步骤\n\n### Step 1: 准备工作 (必须完成)\n1. 调用 `memory_recall` 查询:\n   - `{chapter_number}章相关内容`\n   - `前文章节摘要`\n   - `最近创作记录`\n2. 调用 `memory_recall` 加载:\n   - `世界观设定` + `力量体系`\n   - `{character_names} 人物设定`\n\n### Step 2: 内容创作\n1. 确认章节编号和标题（如未提供则自动生成）\n2. 遵循写作风格指南（默认: 科幻悬疑）\n3. 应用叙事视角（默认: 第三人称有限）\n4. 控制字数在目标范围内（默认: 5000字）\n\n### Step 3: 质量检查\n1. 自检: 与前文衔接是否自然\n2. 自检: 人物行为是否符合角色卡设定\n3. 自检: 世界观元素是否一致\n\n### Step 4: 记忆存储\n1. 调用 `memory_remember` 存储新章节到 episodic 层\n2. 更新章节摘要到 semantic 层\n3. 标记版本信息\n\n## 参数说明\n| 参数 | 类型 | 必填 | 默认值 | 说明 |\n|------|------|------|--------|------|\n| chapter_number | integer | ✅ | - | 章节编号 |\n| chapter_title | string | ❌ | 自动生成 | 章节标题 |\n| word_count | integer | ❌ | 5000 | 目标字数 |\n| style | enum | ❌ | 科幻悬疑 | 写作风格 |\n| pov | enum | ❌ | 第三人称有限 | 叙事视角 |\n| characters | array | ❌ | 自动检测 | 出场人物列表 |\n\n## 输出格式\n```markdown\n# 第{chapter_number}章 {chapter_title}\n\n[正文内容...]\n\n---\n*本章字数: {actual_word_count} | 版本: v{version} | 创作时间: {timestamp}*\n```\n\n## 绑定Agent\n@writer (写手)\n\n## 协作伙伴\n@planner (大纲参考) | @reviewer (审校) | @memory-architect (存储)\n"
+      },
+      {
+        "skill_id": "novel-consistency-check",
+        "purpose": "检查小说内容的内部一致性，包括设定冲突、人物行为逻辑、时间线错误等。",
+        "triggers": [
+          "用户要求\"检查一致性\"、\"校验错误\"、\"审校\"",
+          "@reviewer Agent执行质量审校任务时",
+          "创作完成后进入审校阶段时"
+        ],
+        "steps": [
+          {
+            "step": "Step 1: 加载基线数据",
+            "item": "世界观设定基线"
+          },
+          {
+            "step": "Step 1: 加载基线数据",
+            "item": "人物角色卡(所有出场人物)"
+          },
+          {
+            "step": "Step 1: 加载基线数据",
+            "item": "力量体系规则"
+          },
+          {
+            "step": "Step 1: 加载基线数据",
+            "item": "前文章节摘要"
+          },
+          {
+            "step": "Step 1: 加载基线数据",
+            "item": "版本追踪记录"
+          },
+          {
+            "step": "Step 2: 多维度检查",
+            "item": "[ ] 力量体系使用是否符合规则"
+          },
+          {
+            "step": "Step 2: 多维度检查",
+            "item": "[ ] 设定元素是否前后矛盾"
+          },
+          {
+            "step": "Step 2: 多维度检查",
+            "item": "[ ] 科技/魔法水平是否统一"
+          },
+          {
+            "step": "Step 2: 多维度检查",
+            "item": "[ ] 社会/政治结构是否一致"
+          },
+          {
+            "step": "Step 2: 多维度检查",
+            "item": "[ ] 人物性格是否符合角色卡"
+          },
+          {
+            "step": "Step 2: 多维度检查",
+            "item": "[ ] 行为动机是否合理"
+          },
+          {
+            "step": "Step 2: 多维度检查",
+            "item": "[ ] 能力范围是否超出设定"
+          },
+          {
+            "step": "Step 2: 多维度检查",
+            "item": "[ ] 人际关系是否连贯"
+          },
+          {
+            "step": "Step 2: 多维度检查",
+            "item": "[ ] 成长轨迹是否自然"
+          },
+          {
+            "step": "Step 2: 多维度检查",
+            "item": "[ ] 时间顺序是否正确"
+          },
+          {
+            "step": "Step 2: 多维度检查",
+            "item": "[ ] 事件因果关系是否合理"
+          },
+          {
+            "step": "Step 2: 多维度检查",
+            "item": "[ ] 年龄/时间跨度是否准确"
+          },
+          {
+            "step": "Step 2: 多维度检查",
+            "item": "[ ] 季节/天气是否连续"
+          },
+          {
+            "step": "Step 2: 多维度检查",
+            "item": "[ ] 人物称呼是否统一"
+          },
+          {
+            "step": "Step 2: 多维度检查",
+            "item": "[ ] 地名/物品名拼写一致"
+          },
+          {
+            "step": "Step 2: 多维度检查",
+            "item": "[ ] 数值/数据前后吻合"
+          },
+          {
+            "step": "Step 2: 多维度检查",
+            "item": "[ ] 标点符号规范使用"
+          }
+        ],
+        "parameters": [
+          {
+            "name": "target_chapters",
+            "type": "array",
+            "required": "✅",
+            "default": "-",
+            "description": "待检查的章节列表"
+          },
+          {
+            "name": "check_depth",
+            "type": "enum",
+            "required": "❌",
+            "default": "standard",
+            "description": "quick/standard/deep"
+          },
+          {
+            "name": "baseline_version",
+            "type": "string",
+            "required": "❌",
+            "default": "latest",
+            "description": "设定基线版本"
+          }
+        ],
+        "output_format": "",
+        "best_practices": [],
+        "bound_agents": [
+          "@reviewer (主要) | @version-keeper (版本对比)"
+        ],
+        "partners": [
+          "@writer (接收修改建议) | @planner (设定咨询) | @memory-architect (基线查询)"
+        ],
+        "rules": [],
+        "full_content": "# 一致性检查 (novel/consistency-check)\n\n## 目的\n检查小说内容的内部一致性，包括设定冲突、人物行为逻辑、时间线错误等。\n\n## 触发场景\n- 用户要求\"检查一致性\"、\"校验错误\"、\"审校\"\n- @reviewer Agent执行质量审校任务时\n- 创作完成后进入审校阶段时\n\n## 执行步骤\n\n### Step 1: 加载基线数据\n1. 调用 `memory_recall` 查询:\n   - 世界观设定基线\n   - 人物角色卡(所有出场人物)\n   - 力量体系规则\n   - 前文章节摘要\n   - 版本追踪记录\n\n### Step 2: 多维度检查\n\n#### 2.1 世界观一致性\n- [ ] 力量体系使用是否符合规则\n- [ ] 设定元素是否前后矛盾\n- [ ] 科技/魔法水平是否统一\n- [ ] 社会/政治结构是否一致\n\n#### 2.2 人物一致性\n- [ ] 人物性格是否符合角色卡\n- [ ] 行为动机是否合理\n- [ ] 能力范围是否超出设定\n- [ ] 人际关系是否连贯\n- [ ] 成长轨迹是否自然\n\n#### 2.3 时间线一致性\n- [ ] 时间顺序是否正确\n- [ ] 事件因果关系是否合理\n- [ ] 年龄/时间跨度是否准确\n- [ ] 季节/天气是否连续\n\n#### 2.4 文字一致性\n- [ ] 人物称呼是否统一\n- [ ] 地名/物品名拼写一致\n- [ ] 数值/数据前后吻合\n- [ ] 标点符号规范使用\n\n### Step 3: 问题分级报告\n```json\n{\n  \"check_id\": \"cc-{timestamp}\",\n  \"scope\": \"{chapter_range}\",\n  \"summary\": {\n    \"total_issues\": N,\n    \"critical\": 0,\n    \"major\": 2,\n    \"minor\": 5,\n    \"suggestion\": 3\n  },\n  \"issues\": [\n    {\n      \"id\": \"ISSUE-001\",\n      \"severity\": \"major\",\n      \"category\": \"worldbuilding\",\n      \"location\": \"第15章 第3段\",\n      \"description\": \"力量体系使用不符合设定\",\n      \"baseline_ref\": \"规则v2.0-第3条\",\n      \"suggestion\": \"修改为符合L3级能力描述\"\n    }\n  ],\n  \"pass_rate\": 0.85\n}\n```\n\n## 参数说明\n| 参数 | 类型 | 必填 | 默认值 | 说明 |\n|------|------|------|--------|------|\n| target_chapters | array | ✅ | - | 待检查的章节列表 |\n| check_depth | enum | ❌ | standard | quick/standard/deep |\n| baseline_version | string | ❌ | latest | 设定基线版本 |\n\n## 输出格式\n- JSON结构化报告 (详细版)\n- Markdown摘要 (快速版)\n\n## 严重度定义\n| 级别 | 定义 | 示例 |\n|------|------|------|\n| 🔴 critical | 导致剧情无法自洽 | 主角死亡后又出现 |\n| 🟠 major | 明显矛盾需修正 | 能力突然提升无解释 |\n| 🟡 minor | 小瑕疵可后续处理 | 称呼不统一 |\n| 🔵 suggestion | 优化建议非错误 | 表达可更精炼 |\n\n## 绑定Agent\n@reviewer (主要) | @version-keeper (版本对比)\n\n## 协作伙伴\n@writer (接收修改建议) | @planner (设定咨询) | @memory-architect (基线查询)\n\n## 质量标准\n- **通过标准**: critical=0, major≤2, pass_rate≥90%\n- **优秀标准**: critical=0, major=0, pass_rate≥95%\n- **不通过**: 需返回@writer修改后重新提交\n"
+      },
+      {
+        "skill_id": "novel-format-export",
+        "purpose": "将创作文本转化为出版级成品，支持多格式导出。",
+        "triggers": [
+          "用户要求\"排版\"、\"导出\"、\"生成EPUB/DOCX\"",
+          "@novel-formatter Agent被调度时",
+          "工业化生产流水线的最后阶段(第⑩步)"
+        ],
+        "steps": [],
+        "parameters": [
+          {
+            "name": "input_source",
+            "type": "string/path",
+            "required": "✅",
+            "default": "-",
+            "description": "输入文件或目录"
+          },
+          {
+            "name": "output_format",
+            "type": "enum",
+            "required": "❌",
+            "default": "TXT",
+            "description": "TXT/MD/EPUB/DOCX"
+          },
+          {
+            "name": "output_path",
+            "type": "string",
+            "required": "❌",
+            "default": "./output/",
+            "description": "输出目录"
+          },
+          {
+            "name": "generate_toc",
+            "type": "boolean",
+            "required": "❌",
+            "default": "true",
+            "description": "是否生成目录"
+          },
+          {
+            "name": "generate_index",
+            "type": "boolean",
+            "required": "❌",
+            "default": "true",
+            "description": "是否生成索引"
+          }
+        ],
+        "output_format": "",
+        "best_practices": [],
+        "bound_agents": [
+          "@novel-formatter (成品匠)"
+        ],
+        "partners": [
+          "@writer (原始文本) | @reviewer (格式审校) | @version-keeper (版本对齐) | @editor (交付确认)"
+        ],
+        "rules": [],
+        "full_content": "# 成品格式化导出 (novel/format-export)\n\n## 目的\n将创作文本转化为出版级成品，支持多格式导出。\n\n## 触发场景\n- 用户要求\"排版\"、\"导出\"、\"生成EPUB/DOCX\"\n- @novel-formatter Agent被调度时\n- 工业化生产流水线的最后阶段(第⑩步)\n\n## 支持的输出格式\n\n### 1. TXT (纯文本)\n- 换行规范统一\n- 段落缩进2个全角字符\n- 对话独立段落，双引号包裹\n\n### 2. Markdown\n- 标题层级语法 (# ## ###)\n- 列表、引用、代码块\n- 保持原始结构清晰\n\n### 3. EPUB (电子书)\n- 章节自动分割\n- 目录(TOC)生成\n- 元数据嵌入(书名/作者/ISBN占位)\n- CSS样式美化\n\n### 4. DOCX (Word文档)\n- 样式应用(标题/正文/对话)\n- 页眉页脚设置\n- 自动页码\n- 打印优化排版\n\n## 执行流程\n\n### Phase 1: 标准化预处理\n1. **标题规范化**\n   - 居中对齐\n   - 「第X章」格式统一\n2. **段落格式化**\n   - 首行缩进2个全角字符\n   - 段间距统一\n3. **对话格式统一**\n   - 独立段落\n   - 双引号包裹\n   - 说话人标签可选\n\n### Phase 2: 注释与强调处理\n1. 注释格式: `[注X]` 上标\n2. 专有名词: 《》包裹\n3. 场景切换: 空行 + 分隔符(※或---)\n\n### Phase 3: 质量检查\n1. ✅ 页码连续性验证\n2. ✅ 断行规范检查\n3. ✅ 标点符号一致性\n4. ✅ 编码正确性确认(UTF-8 BOM)\n\n### Phase 4: 导出生成\n1. 选择目标格式\n2. 应用对应模板\n3. 生成索引文件:\n   - 人物索引\n   - 地名索引\n   - 设定术语索引\n4. 输出到指定路径\n\n## 参数说明\n| 参数 | 类型 | 必填 | 默认值 | 说明 |\n|------|------|------|--------|------|\n| input_source | string/path | ✅ | - | 输入文件或目录 |\n| output_format | enum | ❌ | TXT | TXT/MD/EPUB/DOCX |\n| output_path | string | ❌ | ./output/ | 输出目录 |\n| generate_toc | boolean | ❌ | true | 是否生成目录 |\n| generate_index | boolean | ❌ | true | 是否生成索引 |\n\n## 输出结构示例\n```\noutput/\n├── novel_title.epub        # 电子书\n├── novel_title.docx         # Word文档\n├── novel_title.txt          # 纯文本\n├── TOC.md                   # 目录\n├── index_characters.md      # 人物索引\n├── index_locations.md       # 地名索引\n└── quality_report.md        # 质量报告\n```\n\n## 绑定Agent\n@novel-formatter (成品匠)\n\n## 协作伙伴\n@writer (原始文本) | @reviewer (格式审校) | @version-keeper (版本对齐) | @editor (交付确认)\n\n## 出版级质量标准\n- 标点错误率 < 0.1%\n- 格式一致性 > 99%\n- 编码正确性 100%\n- 可直接提交出版社/平台\n"
+      },
+      {
+        "skill_id": "novel-multi-schedule",
+        "purpose": "协调多个小说项目的并行创作进度，管理资源分配与优先级冲突。",
+        "triggers": [
+          "用户同时推进多部小说作品",
+          "需要跨项目统一世界观或角色设定",
+          "资源（时间、Agent算力）冲突需要仲裁"
+        ],
+        "steps": [],
+        "parameters": [],
+        "output_format": "",
+        "best_practices": [],
+        "bound_agents": [
+          "@tianshu (主要) | @wenzong (进度统筹)"
+        ],
+        "partners": [
+          "@jingwei (架构) | @miaobi (创作) | @shiguan (版本)"
+        ],
+        "rules": [],
+        "full_content": "# 多小说并行调度 (novel/multi-schedule)\n\n## 目的\n协调多个小说项目的并行创作进度，管理资源分配与优先级冲突。\n\n## 触发场景\n- 用户同时推进多部小说作品\n- 需要跨项目统一世界观或角色设定\n- 资源（时间、Agent算力）冲突需要仲裁\n\n## 执行步骤\n\n### Step 1: 项目扫描\n1. 检索天机 L4 中所有 `novel:project:*` 标签的记忆\n2. 汇总各项目当前进度、最近更新、阻塞项\n\n### Step 2: 优先级评估\n1. 根据用户设定的截止日期计算紧急度\n2. 根据项目规模计算所需Agent资源\n3. 识别跨项目依赖（共享世界观、角色联动）\n\n### Step 3: 调度编排\n1. 为每个项目分配创作时间窗口\n2. 协调共享资源（如世界观设定需先由@jingwei完成）\n3. 生成周/日级别的创作计划\n\n## 输出格式\n```json\n{\n  \"schedule_id\": \"sch-{timestamp}\",\n  \"projects\": [\n    {\n      \"project_id\": \"proj-001\",\n      \"name\": \"小说A\",\n      \"priority\": 1,\n      \"assigned_slots\": [\"周一上午\", \"周三全天\"],\n      \"next_milestone\": \"第15章完稿\",\n      \"blocking\": null\n    }\n  ],\n  \"shared_resources\": [\n    {\"resource\": \"世界观设定V3\", \"owner\": \"proj-001\", \"consumers\": [\"proj-002\"]}\n  ]\n}\n```\n\n## 绑定Agent\n@tianshu (主要) | @wenzong (进度统筹)\n\n## 协作伙伴\n@jingwei (架构) | @miaobi (创作) | @shiguan (版本)\n"
+      },
+      {
+        "skill_id": "novel-setting-consistency-deep",
+        "purpose": "对小说世界观、角色、时间线进行深度跨卷一致性检查，识别隐形矛盾。",
+        "triggers": [
+          "长篇小说跨越50章以上",
+          "世界观设定复杂（多势力、多时间线）",
+          "发现疑似矛盾需要根因定位"
+        ],
+        "steps": [],
+        "parameters": [],
+        "output_format": "",
+        "best_practices": [],
+        "bound_agents": [
+          "@mingjing (主要) | @dongcha (上下文分析)"
+        ],
+        "partners": [
+          "@yiku (记忆检索) | @tiansuan (数据统计)"
+        ],
+        "rules": [],
+        "full_content": "# 深度设定一致性检查 (novel/setting-consistency-deep)\n\n## 目的\n对小说世界观、角色、时间线进行深度跨卷一致性检查，识别隐形矛盾。\n\n## 触发场景\n- 长篇小说跨越50章以上\n- 世界观设定复杂（多势力、多时间线）\n- 发现疑似矛盾需要根因定位\n\n## 执行步骤\n\n### Step 1: 设定萃取\n1. 从天机 L4 Semantic 层提取所有 `worldbuilding:*` 和 `character:*` 标签\n2. 按类别归类：地理、历史、势力、角色能力、时间线\n\n### Step 2: 关系图谱构建\n1. 构建设定项之间的依赖关系图\n2. 标记\"高影响设定\"（修改会连锁影响多处）\n\n### Step 3: 矛盾检测\n1. 时间线冲突：同一角色在同一时间出现在两个地点\n2. 能力冲突：角色能力描述前后不一致\n3. 规则冲突：世界观规则被违反\n4. 情感冲突：角色关系跳跃缺乏过渡\n\n### Step 4: 影响评估\n1. 对每个矛盾标记修复难度\n2. 生成最小化修改建议（改一处解决多处）\n\n## 输出报告\n```json\n{\n  \"check_id\": \"csd-{timestamp}\",\n  \"novel_id\": \"novel-001\",\n  \"consistency_score\": 87,\n  \"issues\": [\n    {\n      \"severity\": \"high\",\n      \"type\": \"timeline_conflict\",\n      \"location\": \"第32章 vs 第45章\",\n      \"description\": \"角色林远同时在京城和江南\",\n      \"suggested_fix\": \"将第45章事件延后3天\"\n    }\n  ]\n}\n```\n\n## 绑定Agent\n@mingjing (主要) | @dongcha (上下文分析)\n\n## 协作伙伴\n@yiku (记忆检索) | @tiansuan (数据统计)\n"
+      },
+      {
+        "skill_id": "novel-version-track",
+        "purpose": "追踪和管理小说设定的版本变更，确保设定一致性和可追溯性。",
+        "triggers": [
+          "设定发生修改/扩展时",
+          "@version-keeper Agent被调度时",
+          "需要回溯某个时间点的设定状态时"
+        ],
+        "steps": [],
+        "parameters": [],
+        "output_format": "",
+        "best_practices": [],
+        "bound_agents": [
+          "@version-keeper (主要) | @memory-architect (存储)"
+        ],
+        "partners": [
+          "@planner (发起变更) | @reviewer (一致性检查) | @writer (应用新设定)"
+        ],
+        "rules": [],
+        "full_content": "# 版本追踪 (novel/version-track)\n\n## 目的\n追踪和管理小说设定的版本变更，确保设定一致性和可追溯性。\n\n## 触发场景\n- 设定发生修改/扩展时\n- @version-keeper Agent被调度时\n- 需要回溯某个时间点的设定状态时\n\n## 追踪对象\n\n### 1. 世界观设定基线\n- 力量体系规则变更\n- 世界架构调整\n- 历史/传说修订\n\n### 2. 人物角色卡\n- 新增人物\n- 人物属性修改\n- 人物关系变化\n\n### 3. 力量体系细节\n- 能力等级定义更新\n- 技能/招式增删\n- 限制条件调整\n\n### 4. 章节内容变更\n- 正文修改记录\n- 情节走向调整\n- 删除/重写标记\n\n## 执行流程\n\n### Step 1: 变更检测\n1. 对比当前版本与上一版本\n2. 识别差异点 (diff)\n3. 分类变更类型:\n   - 🆕 **新增** (Addition)\n   - ✏️ **修改** (Modification)\n   - ❌ **删除** (Deletion)\n   - 🔀 **重构** (Restructure)\n\n### Step 2: 变更记录\n```json\n{\n  \"version_id\": \"v{major}.{minor}.{patch}\",\n  \"timestamp\": \"ISO8601\",\n  \"author_agent\": \"@{agent_name}\",\n  \"change_category\": \"worldbuilding|character|power_system|chapter\",\n  \"changes\": [\n    {\n      \"type\": \"modification\",\n      \"target\": \"{具体设定项}\",\n      \"old_value\": \"...\",\n      \"new_value\": \"...\",\n      \"reason\": \"{变更原因}\",\n      \"impact_assessment\": {\n        \"affected_chapters\": [\"第X章\", \"第Y章\"],\n        \"affected_agents\": [\"@writer\", \"@reviewer\"],\n        \"consistency_risk\": \"low|medium|high\"\n      }\n    }\n  ],\n  \"baseline_checksum\": \"hash_value\"\n}\n```\n\n### Step 3: 影响分析\n1. 识别受影响的章节和情节\n2. 评估一致性风险等级\n3. 生成需通知的Agent列表\n4. 标记需要回溯修改的内容\n\n### Step 4: 存储与通知\n1. 调用 `memory_remember` 存储到 episodic 层\n2. 更新semantic层的基线引用\n3. 向相关Agent发送变更通知\n4. 更新版本索引\n\n## 版本号规范\n- **主版本 (Major)**: 重大架构变更/推翻重写\n- **次版本 (Minor)**: 重要功能新增/重要设定修改\n- **修订版 (Patch)**: 小修正/错别字/表述优化\n\n示例: v2.1.3 → 第2大版, 第1次重要更新, 第3次小修复\n\n## 回溯能力\n支持查询任意历史版本的设定状态:\n```\nmemory_recall(query=\"设定基线 version:v2.0.0\")\n→ 返回v2.0.0时刻的完整快照\n```\n\n## 绑定Agent\n@version-keeper (主要) | @memory-architect (存储)\n\n## 协作伙伴\n@planner (发起变更) | @reviewer (一致性检查) | @writer (应用新设定)\n\n## 安全机制\n- ⚠️ 高风险变更(high consistency_risk)需@editor确认\n- ⚠️ 已被多章节引用的设定修改需特别谨慎\n- ✅ 所有变更可回溯，支持rollback到任意版本\n- ✅ 自动生成变更日志供审计\n"
+      },
+      {
+        "skill_id": "novel-worldbuilding-expand",
+        "purpose": "基于现有世界观设定进行深度扩展，完善力量体系、社会结构、历史背景等。",
+        "triggers": [
+          "用户要求\"扩展设定\"、\"丰富世界\"、\"增加细节\"",
+          "@planner Agent执行架构设计任务时",
+          "发现设定空白或不完整时"
+        ],
+        "steps": [],
+        "parameters": [],
+        "output_format": "",
+        "best_practices": [],
+        "bound_agents": [
+          "@planner (主要) | @version-keeper (版本管理)"
+        ],
+        "partners": [
+          "@writer (使用新设定) | @reviewer (审核一致性) | @editor (规划整合)"
+        ],
+        "rules": [],
+        "full_content": "# 世界观扩展 (novel/worldbuilding-expand)\n\n## 目的\n基于现有世界观设定进行深度扩展，完善力量体系、社会结构、历史背景等。\n\n## 触发场景\n- 用户要求\"扩展设定\"、\"丰富世界\"、\"增加细节\"\n- @planner Agent执行架构设计任务时\n- 发现设定空白或不完整时\n\n## 扩展维度框架\n\n### 维度1: 力量体系深化\n- [ ] 能力等级划分细化\n- [ ] 获取/修炼方式补充\n- [ ] 限制与代价机制\n- [ ] 特殊能力变体设计\n- [ ] 战斗/应用场景示例\n\n### 维度2: 世界架构扩展\n- [ ] 地理环境详图 (地形/气候/资源)\n- [ ] 政治/势力格局\n- [ ] 经济体系运作\n- [ ] 历史/传说背景\n- [ ] 文化/宗教习俗\n\n### 维度3: 社会生态构建\n- [ ] 种族/族群分类\n- [ ] 社会阶层结构\n- [ ] 教育/培养体系\n- [ ] 法律/道德规范\n- [ ] 日常生活方式\n\n### 维度4: 技术水平设定\n- [ ] 科技树发展程度\n- [ ] 特殊技术/发明\n- [ ] 物品/装备体系\n- [ ] 交通/通讯方式\n- [ ] 医疗/生命科学\n\n## 执行流程\n\n### Phase 1: 现状分析\n1. 加载现有设定 (`memory_recall` → \"世界观设定\")\n2. 识别已完善的领域\n3. 定位空白/模糊区域\n4. 优先级排序\n\n### Phase 2: 扩展设计\n1. 选择目标扩展维度\n2. 设计具体内容 (遵循内部一致性)\n3. 多方案对比选优\n4. 与现有设定的融合验证\n\n### Phase 3: 质量验证\n1. 自检: 是否引入矛盾\n2. 自检: 是否过于复杂\n3. 自检: 是否有足够的故事潜力\n4. 标记版本号\n\n### Phase 4: 入库存储\n1. 调用 `memory_remember` 存储到 semantic 层\n2. 更新版本追踪记录\n3. 通知相关Agent (@writer/@reviewer)\n\n## 输出格式\n```markdown\n## {扩展维度} v{version}\n\n### 核心设定\n[详细描述...]\n\n### 子项目清单\n1. **{子项1}**: [说明]\n2. **{子项2}**: [说明]\n...\n\n### 与现有设定的关系\n- 关联: {已有设定ID}\n- 冲突: 无 ✓\n- 影响范围: {受影响的章节/情节}\n\n### 故事潜力点\n- 可用于: {潜在情节}\n- 冲突种子: {可能的矛盾点}\n---\n\n*创建时间: {timestamp} | 版本: v{version} | 状态: 待审核*\n```\n\n## 设计原则\n1. **一致性优先**: 新设定不能与已有设定矛盾\n2. **适度留白**: 不必一次性完善所有细节\n3. **故事驱动**: 设定应为情节服务，而非堆砌\n4. **可演进性**: 预留未来扩展空间\n\n## 绑定Agent\n@planner (主要) | @version-keeper (版本管理)\n\n## 协作伙伴\n@writer (使用新设定) | @reviewer (审核一致性) | @editor (规划整合)\n\n## 注意事项\n- ⚠️ 重大设定变更需先通知@editor和@version-keeper\n- ⚠️ 已被引用的历史设定修改需特别谨慎\n- ✅ 建议采用\"增量迭代\"而非\"推倒重来\"\n"
+      },
+      {
+        "skill_id": "dialogue-quality",
+        "purpose": "",
+        "triggers": [],
+        "steps": [],
+        "parameters": [],
+        "output_format": "",
+        "best_practices": [],
+        "bound_agents": [],
+        "partners": [],
+        "rules": [],
+        "full_content": "# 对话质量检查 (Dialogue Quality) — @lingxi\n\n## 触发条件\n\n- 每次用户对话后\n- 对话历史审计\n- Agent输出质量评估\n\n## 执行流程\n\n1. **对话捕获**：trae_capture → 完整对话上下文\n2. **质量评分**：多维度量化评估\n3. **问题标记**：幻觉、遗漏、歧义、冗余\n4. **反馈闭环**：质量低 → L5元认知调整策略\n5. **改进建议**：给对应Agent的优化方向\n\n## MCP 工具\n\n- `memory-engine-global`: memory_query\n- `knowledge-graph-global`: kg_query, kg_validate\n- `agent-framework-global`: agent_capability\n\n## 评估维度\n\n```yaml\naccuracy: # 准确性\n  - 事实正确率\n  - 代码可运行率\n  - MCP调用正确率\ncompleteness: # 完整性\n  - 任务覆盖率\n  - 边界条件考虑\nefficiency: # 效率\n  - 工具调用次数\n  - 对话轮次\nsafety: # 安全性\n  - 无敏感信息泄露\n  - 无危险操作\n```\n\n## 联动 Agent\n\n- @wenzong (文宗) — 内容审查协同\n- @inshu (因树) — 知识验证\n- @evolver (进化) — 质量反馈输入\n"
+      }
+    ],
+    "skill_count": 8
+  },
+  "corpus_management": {
+    "domain_name": "语料库管理",
+    "owner_agent": "kuangshi",
+    "domain": "corpus_management",
+    "skills": [
+      {
+        "skill_id": "corpus-batch-import",
+        "purpose": "批量导入TXT小说文件并进行智能分块、编码检测和结构化处理。",
+        "triggers": [
+          "用户提到\"导入小说\"、\"TXT转语料\"、\"批量处理TXT\"",
+          "@corpus-miner Agent被调度执行采集任务时",
+          "新增语料库资源时"
+        ],
+        "steps": [
+          {
+            "step": "Step 5: 质量评分",
+            "item": "completeness (完整性)"
+          },
+          {
+            "step": "Step 5: 质量评分",
+            "item": "accuracy (准确性)"
+          },
+          {
+            "step": "Step 5: 质量评分",
+            "item": "uniqueness (独特性)"
+          },
+          {
+            "step": "Step 5: 质量评分",
+            "item": "usability (可用性)"
+          },
+          {
+            "step": "Step 5: 质量评分",
+            "item": "diversity (多样性)"
+          }
+        ],
+        "parameters": [
+          {
+            "name": "source_path",
+            "type": "string",
+            "required": "✅",
+            "default": "-",
+            "description": "源文件/目录路径"
+          },
+          {
+            "name": "encoding",
+            "type": "string",
+            "required": "❌",
+            "default": "auto-detect",
+            "description": "文件编码"
+          },
+          {
+            "name": "chunk_size",
+            "type": "integer",
+            "required": "❌",
+            "default": "8000",
+            "description": "分块大小(字符)"
+          },
+          {
+            "name": "quality_threshold",
+            "type": "float",
+            "required": "❌",
+            "default": "0.7",
+            "description": "质量评分阈值"
+          }
+        ],
+        "output_format": "",
+        "best_practices": [],
+        "bound_agents": [
+          "@corpus-miner (语料矿工)"
+        ],
+        "partners": [
+          "@analyzer (统计分析) | @memory-architect (入库) | @planner (策略规划)"
+        ],
+        "rules": [],
+        "full_content": "# 语料批量导入 (corpus/batch-import)\n\n## 目的\n批量导入TXT小说文件并进行智能分块、编码检测和结构化处理。\n\n## 触发场景\n- 用户提到\"导入小说\"、\"TXT转语料\"、\"批量处理TXT\"\n- @corpus-miner Agent被调度执行采集任务时\n- 新增语料库资源时\n\n## 执行步骤\n\n### Step 1: 资源定位\n1. 识别输入源（本地文件/百度网盘同步目录/用户指定路径）\n2. 扫描目标目录获取所有.txt文件列表\n3. 自动检测文件编码（UTF-8/GBK/GB2312/BIG5等）\n\n### Step 2: 智能分块\n1. 识别章节分割标记（\"第X章\"/\"Chapter X\"/\"第X回\"等）\n2. 按章节边界切分文本\n3. 对无明确分章的长文本按字数智能切分（建议5K-10K/块）\n\n### Step 3: 元数据提取\n1. 提取书名、作者（从文件名或正文开头）\n2. 统计总字数、章节数\n3. 评估文本质量（完整度/乱码率）\n\n### Step 4: 结构化入库\n1. 为每个章节生成唯一ID\n2. 调用 `memory_remember` 存储到 episodic 层\n3. 构建语料索引（书名→章节→内容的映射）\n4. 更新语料库统计信息\n\n### Step 5: 质量评分\n1. 执行5维度质量评分:\n   - completeness (完整性)\n   - accuracy (准确性)\n   - uniqueness (独特性)\n   - usability (可用性)\n   - diversity (多样性)\n2. 生成质量报告\n3. 标记低质量章节需人工审核\n\n## 参数说明\n| 参数 | 类型 | 必填 | 默认值 | 说明 |\n|------|------|------|--------|------|\n| source_path | string | ✅ | - | 源文件/目录路径 |\n| encoding | string | ❌ | auto-detect | 文件编码 |\n| chunk_size | integer | ❌ | 8000 | 分块大小(字符) |\n| quality_threshold | float | ❌ | 0.7 | 质量评分阈值 |\n\n## 输出格式\n```json\n{\n  \"import_id\": \"batch-{timestamp}\",\n  \"source\": \"{source_path}\",\n  \"stats\": {\n    \"total_files\": N,\n    \"total_chapters\": M,\n    \"total_words\": X,\n    \"encoding_detected\": \"UTF-8\"\n  },\n  \"quality_report\": {\n    \"avg_score\": 0.85,\n    \"chapters_needing_review\": [...]\n  },\n  \"storage_locations\": {\n    \"episodic_entries\": M,\n    \"index_updated\": true\n  }\n}\n```\n\n## 绑定Agent\n@corpus-miner (语料矿工)\n\n## 协作伙伴\n@analyzer (统计分析) | @memory-architect (入库) | @planner (策略规划)\n\n## 注意事项\n- ⚠️ 大文件(>50MB)需分批处理避免内存溢出\n- ⚠️ 编码检测失败时尝试多种编码并人工确认\n- ✅ 支持百度网盘本地同步目录作为输入源\n"
+      },
+      {
+        "skill_id": "corpus-extract",
+        "purpose": "从原始文本中提取结构化信息，支持元数据提取、内容分块和语义标注。",
+        "triggers": [
+          "用户要求\"提取信息\"、\"分析文本\"、\"结构化处理\"",
+          "@analyzer Agent执行数据分析任务时",
+          "@corpus-miner完成导入后进行后处理时"
+        ],
+        "steps": [
+          {
+            "step": "Step 2: 元数据提取",
+            "item": "书名/标题识别"
+          },
+          {
+            "step": "Step 2: 元数据提取",
+            "item": "作者信息提取"
+          },
+          {
+            "step": "Step 2: 元数据提取",
+            "item": "创建/修改时间戳"
+          },
+          {
+            "step": "Step 2: 元数据提取",
+            "item": "文件大小统计"
+          },
+          {
+            "step": "Step 2: 元数据提取",
+            "item": "章节标题识别 (\"第X章\"/\"Chapter X\"等模式)"
+          },
+          {
+            "step": "Step 2: 元数据提取",
+            "item": "人物名称提取 (基于常见命名规则)"
+          },
+          {
+            "step": "Step 2: 元数据提取",
+            "item": "地点/场景标记"
+          },
+          {
+            "step": "Step 2: 元数据提取",
+            "item": "对话段落识别"
+          }
+        ],
+        "parameters": [
+          {
+            "name": "input_text",
+            "type": "string",
+            "required": "✅",
+            "default": "-",
+            "description": "待提取的原始文本"
+          },
+          {
+            "name": "extract_type",
+            "type": "enum",
+            "required": "❌",
+            "default": "full",
+            "description": "full/metadata/chunks/entities"
+          },
+          {
+            "name": "chunk_size",
+            "type": "integer",
+            "required": "❌",
+            "default": "5000",
+            "description": "分块大小(字符)"
+          },
+          {
+            "name": "language",
+            "type": "string",
+            "required": "❌",
+            "default": "auto-detect",
+            "description": "文本语言"
+          }
+        ],
+        "output_format": "",
+        "best_practices": [],
+        "bound_agents": [
+          "@analyzer (主要) | @corpus-miner (辅助)"
+        ],
+        "partners": [
+          "@memory-architect (存储结果) | @planner (设定参考)"
+        ],
+        "rules": [],
+        "full_content": "# 语料提取与结构化 (corpus/extract)\n\n## 目的\n从原始文本中提取结构化信息，支持元数据提取、内容分块和语义标注。\n\n## 触发场景\n- 用户要求\"提取信息\"、\"分析文本\"、\"结构化处理\"\n- @analyzer Agent执行数据分析任务时\n- @corpus-miner完成导入后进行后处理时\n\n## 执行步骤\n\n### Step 1: 文本预处理\n1. 编码标准化 (UTF-8)\n2. 去除特殊字符和乱码\n3. 统一换行符\n4. 段落边界识别\n\n### Step 2: 元数据提取\n1. **基础元数据**\n   - 书名/标题识别\n   - 作者信息提取\n   - 创建/修改时间戳\n   - 文件大小统计\n\n2. **内容元数据**\n   - 章节标题识别 (\"第X章\"/\"Chapter X\"等模式)\n   - 人物名称提取 (基于常见命名规则)\n   - 地点/场景标记\n   - 对话段落识别\n\n### Step 3: 智能分块\n1. 按章节边界切分（优先）\n2. 无明确分章时按语义段落切分\n3. 控制块大小在合理范围 (建议2K-8K字符)\n4. 保持上下文连贯性\n\n### Step 4: 结构化输出\n```json\n{\n  \"extract_id\": \"ext-{timestamp}\",\n  \"source_file\": \"{filename}\",\n  \"metadata\": {\n    \"title\": \"...\",\n    \"author\": \"...\",\n    \"chapter_count\": N,\n    \"total_chars\": M,\n    \"language\": \"zh-CN\"\n  },\n  \"chunks\": [\n    {\n      \"chunk_id\": \"chunk-001\",\n      \"type\": \"chapter|prologue|epilogue\",\n      \"title\": \"第一章 XXX\",\n      \"content_preview\": \"...\",\n      \"char_count\": 5000,\n      \"entities_detected\": [\"人物A\", \"地点B\"]\n    }\n  ],\n  \"quality_metrics\": {\n    \"completeness\": 0.95,\n    \"encoding_valid\": true,\n    \"structure_detected\": true\n  }\n}\n```\n\n## 参数说明\n| 参数 | 类型 | 必填 | 默认值 | 说明 |\n|------|------|------|--------|------|\n| input_text | string | ✅ | - | 待提取的原始文本 |\n| extract_type | enum | ❌ | full | full/metadata/chunks/entities |\n| chunk_size | integer | ❌ | 5000 | 分块大小(字符) |\n| language | string | ❌ | auto-detect | 文本语言 |\n\n## 输出格式\n- JSON结构化数据 (默认)\n- Markdown摘要报告 (可选)\n\n## 绑定Agent\n@analyzer (主要) | @corpus-miner (辅助)\n\n## 协作伙伴\n@memory-architect (存储结果) | @planner (设定参考)\n\n## 注意事项\n- ⚠️ 大文本(>100KB)需流式处理避免内存溢出\n- ⚠️ 编码检测失败时尝试GBK/GB2312/BIG5回退\n- ✅ 支持批量处理多个文件\n"
+      },
+      {
+        "skill_id": "corpus-quality-score",
+        "purpose": "对语料库中的条目进行多维度质量评分，支持批量评分、趋势分析和低质量标记",
+        "triggers": [
+          "导入新语料后需要评估质量",
+          "定期语料库健康检查",
+          "识别需清理的低质量条目",
+          "分析语料质量分布趋势"
+        ],
+        "steps": [
+          {
+            "step": "Step 2: 多维度评分",
+            "item": "[ ] 必填字段是否完整"
+          },
+          {
+            "step": "Step 2: 多维度评分",
+            "item": "[ ] 内容长度是否达标"
+          },
+          {
+            "step": "Step 2: 多维度评分",
+            "item": "[ ] 元数据是否齐全"
+          },
+          {
+            "step": "Step 2: 多维度评分",
+            "item": "[ ] 内容是否符合类别定义"
+          },
+          {
+            "step": "Step 2: 多维度评分",
+            "item": "[ ] 标签是否正确"
+          },
+          {
+            "step": "Step 2: 多维度评分",
+            "item": "[ ] 引用是否有效"
+          },
+          {
+            "step": "Step 2: 多维度评分",
+            "item": "[ ] 与其他条目重复率"
+          },
+          {
+            "step": "Step 2: 多维度评分",
+            "item": "[ ] 信息增量价值"
+          },
+          {
+            "step": "Step 2: 多维度评分",
+            "item": "[ ] 原创性评估"
+          },
+          {
+            "step": "Step 2: 多维度评分",
+            "item": "[ ] 格式规范程度"
+          },
+          {
+            "step": "Step 2: 多维度评分",
+            "item": "[ ] 可读性评分"
+          },
+          {
+            "step": "Step 2: 多维度评分",
+            "item": "[ ] 集成便利性"
+          },
+          {
+            "step": "Step 2: 多维度评分",
+            "item": "[ ] 类型分布均衡性"
+          },
+          {
+            "step": "Step 2: 多维度评分",
+            "item": "[ ] 风格覆盖广度"
+          },
+          {
+            "step": "Step 2: 多维度评分",
+            "item": "[ ] 来源多样性"
+          }
+        ],
+        "parameters": [
+          {
+            "name": "target",
+            "type": "string",
+            "required": "❌",
+            "default": "all",
+            "description": "评分范围: all/by_source/by_dimension/by_tag"
+          },
+          {
+            "name": "dimensions",
+            "type": "array",
+            "required": "❌",
+            "default": "全部5维",
+            "description": "评分维度列表"
+          },
+          {
+            "name": "min_score",
+            "type": "number",
+            "required": "❌",
+            "default": "0.0",
+            "description": "最低评分阈值"
+          },
+          {
+            "name": "generate_report",
+            "type": "boolean",
+            "required": "❌",
+            "default": "true",
+            "description": "是否生成详细报告"
+          }
+        ],
+        "output_format": "",
+        "best_practices": [],
+        "bound_agents": [
+          "@corpus-miner"
+        ],
+        "partners": [
+          "@analyzer | @writer"
+        ],
+        "rules": [],
+        "full_content": "# 语料质量评分 (corpus/quality-score)\n\n## 目的\n对语料库中的条目进行多维度质量评分，支持批量评分、趋势分析和低质量标记\n\n## 触发场景\n- 导入新语料后需要评估质量\n- 定期语料库健康检查\n- 识别需清理的低质量条目\n- 分析语料质量分布趋势\n\n## 执行步骤\n### Step 1: 确定评分范围\n1. 解析target参数(all/by_source/by_dimension/by_tag)\n2. 确定待评分条目集合\n3. 加载维度配置(dimensions)\n\n### Step 2: 多维度评分\n#### 2.1 完整性 (completeness)\n- [ ] 必填字段是否完整\n- [ ] 内容长度是否达标\n- [ ] 元数据是否齐全\n\n#### 2.2 准确性 (accuracy)\n- [ ] 内容是否符合类别定义\n- [ ] 标签是否正确\n- [ ] 引用是否有效\n\n#### 2.3 独特性 (uniqueness)\n- [ ] 与其他条目重复率\n- [ ] 信息增量价值\n- [ ] 原创性评估\n\n#### 2.4 可用性 (usability)\n- [ ] 格式规范程度\n- [ ] 可读性评分\n- [ ] 集成便利性\n\n#### 2.5 多样性 (diversity)\n- [ ] 类型分布均衡性\n- [ ] 风格覆盖广度\n- [ ] 来源多样性\n\n### Step 3: 生成报告\n1. 计算综合得分(加权平均)\n2. 标记低于min_score的条目\n3. 生成趋势分析图表数据\n4. 输出改进建议\n\n## 参数说明\n| 参数 | 类型 | 必填 | 默认值 | 说明 |\n|------|------|------|--------|------|\n| target | string | ❌ | all | 评分范围: all/by_source/by_dimension/by_tag |\n| dimensions | array | ❌ | 全部5维 | 评分维度列表 |\n| min_score | number | ❌ | 0.0 | 最低评分阈值 |\n| generate_report | boolean | ❌ | true | 是否生成详细报告 |\n\n## 输出格式\n```json\n{\n  \"score_id\": \"qs-{timestamp}\",\n  \"scope\": \"{target}\",\n  \"summary\": {\n    \"total_items\": N,\n    \"avg_score\": 0.75,\n    \"high_quality\": N,  // >=0.8\n    \"medium_quality\": N, // 0.5-0.8\n    \"low_quality\": N     // <0.5 (需清理)\n  },\n  \"dimension_scores\": {\n    \"completeness\": 0.82,\n    \"accuracy\": 0.78,\n    \"uniqueness\": 0.71,\n    \"usability\": 0.76,\n    \"diversity\": 0.68\n  },\n  \"low_quality_items\": [\n    {\n      \"id\": \"corp-{id}\",\n      \"score\": 0.35,\n      \"issues\": [\"字段缺失\", \"内容过短\"]\n    }\n  ],\n  \"trends\": {\n    \"vs_last_week\": \"+0.05\",\n    \"quality_direction\": \"improving\"\n  },\n  \"recommendations\": [\n    \"建议清理15个低质量条目\",\n    \"补充emotion类语料(当前仅占8%)\"\n  ]\n}\n```\n\n## 绑定Agent\n@corpus-miner\n\n## 协作伙伴\n@analyzer | @writer\n\n## 质量标准\n- 评分覆盖率达到100%\n- 维度权重配置合理\n- 报告生成时间 < 30s\n"
+      },
+      {
+        "skill_id": "corpus-retrieve",
+        "purpose": "从语料库中检索特定类型和风格的语料元素，支持语义匹配和精准过滤",
+        "triggers": [
+          "用户需要查找特定类型的语料素材",
+          "创作时需要参考已有风格或设定",
+          "需要按类别筛选高质量语料"
+        ],
+        "steps": [],
+        "parameters": [
+          {
+            "name": "query",
+            "type": "string",
+            "required": "✅",
+            "default": "-",
+            "description": "检索查询词"
+          },
+          {
+            "name": "category",
+            "type": "string",
+            "required": "❌",
+            "default": "all",
+            "description": "类别: character/world/plot/style/emotion/dialogue/mechanics"
+          },
+          {
+            "name": "subcategory",
+            "type": "string",
+            "required": "❌",
+            "default": "-",
+            "description": "子类别限定"
+          },
+          {
+            "name": "limit",
+            "type": "integer",
+            "required": "❌",
+            "default": "20",
+            "description": "返回数量上限"
+          },
+          {
+            "name": "min_quality",
+            "type": "number",
+            "required": "❌",
+            "default": "0.6",
+            "description": "最低质量分(0-1)"
+          }
+        ],
+        "output_format": "",
+        "best_practices": [],
+        "bound_agents": [
+          "@analyzer"
+        ],
+        "partners": [
+          "@corpus-miner | @writer | @planner"
+        ],
+        "rules": [],
+        "full_content": "# 语料检索 (corpus/retrieve)\n\n## 目的\n从语料库中检索特定类型和风格的语料元素，支持语义匹配和精准过滤\n\n## 触发场景\n- 用户需要查找特定类型的语料素材\n- 创作时需要参考已有风格或设定\n- 需要按类别筛选高质量语料\n\n## 执行步骤\n### Step 1: 解析查询意图\n1. 分析用户query的关键词和语义\n2. 识别检索目标(人物/世界观/情节/风格/情感/对话/机制)\n3. 确定匹配策略(精确匹配/模糊匹配/语义相似)\n\n### Step 2: 执行检索\n1. 调用memory_recall或本地语料索引\n2. 应用category/subcategory过滤\n3. 按min_quality阈值过滤低质量条目\n4. 限制返回数量(limit参数)\n\n### Step 3: 结果整理\n1. 按相关度排序返回结果\n2. 标注每个结果的来源和质量分\n3. 提供摘要统计信息\n\n## 参数说明\n| 参数 | 类型 | 必填 | 默认值 | 说明 |\n|------|------|------|--------|------|\n| query | string | ✅ | - | 检索查询词 |\n| category | string | ❌ | all | 类别: character/world/plot/style/emotion/dialogue/mechanics |\n| subcategory | string | ❌ | - | 子类别限定 |\n| limit | integer | ❌ | 20 | 返回数量上限 |\n| min_quality | number | ❌ | 0.6 | 最低质量分(0-1) |\n\n## 输出格式\n```json\n{\n  \"retrieve_id\": \"ret-{timestamp}\",\n  \"query\": \"{original_query}\",\n  \"total_found\": N,\n  \"returned\": N,\n  \"results\": [\n    {\n      \"id\": \"corp-{id}\",\n      \"type\": \"{category}\",\n      \"content_preview\": \"...\",\n      \"quality_score\": 0.85,\n      \"source\": \"{file_ref}\",\n      \"tags\": [\"tag1\", \"tag2\"]\n    }\n  ],\n  \"statistics\": {\n    \"by_category\": {},\n    \"avg_quality\": 0.78,\n    \"top_categories\": []\n  }\n}\n```\n\n## 绑定Agent\n@analyzer\n\n## 协作伙伴\n@corpus-miner | @writer | @planner\n\n## 质量标准\n- 检索准确率 >= 80%\n- 返回结果质量分 >= min_quality\n- 响应时间 < 10s\n"
+      }
+    ],
+    "skill_count": 4
+  },
+  "system_governance": {
+    "domain_name": "系统治理",
+    "owner_agent": "zhenshan/qianli/tianshu",
+    "domain": "system_governance",
+    "skills": [
+      {
+        "skill_id": "system-audit",
+        "purpose": "",
+        "triggers": [],
+        "steps": [],
+        "parameters": [],
+        "output_format": "",
+        "best_practices": [],
+        "bound_agents": [],
+        "partners": [],
+        "rules": [],
+        "full_content": "---\nname: system-audit\ndescription: \"用户请求审计、检查、诊断天机系统状态; 系统发生异常需要追溯; 定期健康检查\"\n---\n\n# 天机审计技能 (Tianji Audit Skill)\n\n## 触发条件\n\n- 用户请求审计、检查、诊断天机系统状态\n- 系统发生异常需要追溯\n- 定期健康检查\n\n## 执行流程\n\n1. 扫描天机 v8.1 核心模块完整性\n2. 校验 ICME 六层记忆层数据一致性\n3. 检查 MCP 服务器连接状态\n4. 输出审计报告\n\n## 审计范围\n\n- `core/` — 核心引擎模块 (86 files)\n- `agents/` — 28 Agent 代码\n- `mcp/` — 6 MCP 服务器\n- `server/` — API 服务 (port 8771)\n- `.trae/agents/` — 23 Agent 配置\n- `.trae/rules/` — 8 规则\n- `.trae/skills/` — 18 技能\n- `data/.memory/` — ICME 持久化数据\n\n## 输出格式\n\n```json\n{\n  \"audit_time\": \"ISO8601\",\n  \"modules\": {\n    \"core\": {\"count\": N, \"status\": \"...\"},\n    \"agents_code\": {\"count\": N, \"status\": \"...\"},\n    \"agents_config\": {\"count\": N, \"status\": \"...\"},\n    \"mcp\": {\"count\": N, \"status\": \"...\"},\n    \"skills\": {\"count\": N, \"status\": \"...\"}\n  },\n  \"memory_health\": {\n    \"L0_Sensory\": \"...\",\n    \"L1_Working\": \"...\",\n    \"L2_ShortTerm\": \"...\",\n    \"L3_Episodic\": \"...\",\n    \"L4_Semantic\": \"...\",\n    \"L5_Meta\": \"...\"\n  },\n  \"issues\": [],\n  \"score\": \"0-10\"\n}\n```\n"
+      },
+      {
+        "skill_id": "memory-audit",
+        "purpose": "对天机v9.1 ICME六层记忆系统进行深度审计，超越 system-audit 的模块级扫描，深入到记忆数据的完整性、一致性和质量层面。",
+        "triggers": [
+          "用户请求\"审计记忆\"、\"检查记忆一致性\"",
+          "每次 memory_consolidate 整合操作后 (自动触发)",
+          "每日定时巡检 (配合 system-diagnose)",
+          "发现数据异常后根因追溯"
+        ],
+        "steps": [],
+        "parameters": [],
+        "output_format": "",
+        "best_practices": [],
+        "bound_agents": [
+          "@yiku (主要) | @mingjing (质量审校)"
+        ],
+        "partners": [
+          "@tiansuan (趋势分析) | @qianli (容量告警)"
+        ],
+        "rules": [],
+        "full_content": "---\nname: memory-audit\ndescription: \"天机v9.1深度记忆审计：CRUD闭环验证、跨层一致性检查、容量趋势分析、质量评分、孤儿记忆发现。\"\n---\n\n# 记忆系统审计 (Memory Audit) — 天机v9.1\n\n## 目的\n对天机v9.1 ICME六层记忆系统进行深度审计，超越 system-audit 的模块级扫描，深入到记忆数据的完整性、一致性和质量层面。\n\n## 触发场景\n- 用户请求\"审计记忆\"、\"检查记忆一致性\"\n- 每次 memory_consolidate 整合操作后 (自动触发)\n- 每日定时巡检 (配合 system-diagnose)\n- 发现数据异常后根因追溯\n\n## 审计维度\n\n### 维度1: CRUD闭环验证\n```\n写入验证:\n  写入 N 条测试数据 → memory_recall 检索 → 比对原文一致性\n  ├─ 内容完整性: 写入内容 == 检索内容 (逐字比对)\n  ├─ 标签完整性: 写入标签 == 检索标签\n  ├─ 层级正确性: 写入layer == 检索layer\n  └─ 时间戳有效性: 写入时间 <= 检索时间 (单调性)\n\n更新验证:\n  更新条目 → 检索旧版本 → 检索新版本 → 比对差异\n\n删除验证:\n  软删除条目 → memory_recall 应不再命中\n```\n\n### 维度2: 跨层一致性检查\n```\n跨层引用完整性:\n  ├─ L3→L1: 文件记录的parent_message_id对应L1中存在\n  ├─ L4→L3: 知识引用的源文件记录存在\n  ├─ L5→L4: 策略引用的架构决策记录存在\n  └─ 反向: L0→L3 的消息→文件追溯链完整\n\n数据矛盾检测:\n  ├─ 同标签不同层出现冲突内容\n  ├─ 同名文件不同hash无版本关联\n  └─ 时间戳倒序 (后写入的timestamp早于先写入)\n```\n\n### 维度3: 容量趋势分析\n调用 `memory_stats` + `memory_capacity`:\n```\n六层使用率:\n  L0 Sensory: {used}/{capacity} ({percent}%)\n  L1 Working: {used}/{capacity} ({percent}%)\n  L2 Short-Term: {used}/{capacity} ({percent}%)\n  L3 Episodic: {used}/{capacity} ({percent}%)\n  L4 Semantic: {used}/{capacity} ({percent}%)\n  L5 Meta: {used}/{capacity} ({percent}%)\n\n增长预测:\n  基于最近7天趋势 → 预测何时达到阈值\n  超标告警: 使用率 > 85%\n```\n\n### 维度4: 质量评分\n\n| 质量指标 | 计算方式 | 目标 |\n|----------|----------|------|\n| 标签覆盖率 | tagged_entries / total_entries | ≥95% |\n| 重复率 | duplicate_entries / total_entries | <5% |\n| 孤儿率 | orphan_entries / total_entries | <1% |\n| 过期率 | expired_entries / total_entries | <10% |\n| 空值率 | empty_content / total_entries | 0% |\n\n### 维度5: 审计合规\n- 检查写入操作是否都有 operation_header\n- 检查异常是否都记录到 L3 Episodic\n- 检查 L4/L5 写入是否有二次确认\n- 检查软删除是否遵循 retain_forever 策略\n\n## 执行流程\n\n### Phase 1: 快速扫描 (<30s)\n1. memory_stats → 六层容量快照\n2. memory_capacity → 使用率/阈值\n3. 抽样检查(每层随机10条) → 格式完整性\n4. 生成初步评分\n\n### Phase 2: 深度审计 (按需, <5min)\n1. CRUD闭环测试(每层2条)\n2. 跨层引用完整性扫描\n3. 矛盾/孤儿/重复检测\n4. 合规性检查\n\n### Phase 3: 修复建议\n1. 自动修复: 标签补全 / 孤儿关联 / 过期清理\n2. 半自动: 矛盾确认 / 版本合并\n3. 手动: 策略调整 / 架构决策修正\n\n## MCP工具链\n\n| 工具 | 用途 | 调用时机 |\n|------|------|---------|\n| memory_stats | 六层统计 | Phase 1 |\n| memory_capacity | 容量监控 | Phase 1 |\n| memory_recall | 抽样检索+闭环验证 | Phase 1+2 |\n| search_memories | 语义搜索 | Phase 2 |\n| get_memory | 精确获取 | Phase 2 |\n| list_memories | 批量列表 | Phase 2 |\n| memory_forget | 过期清理 | Phase 3 |\n| explain_memory_lineage | 血缘追溯 | Phase 2 |\n\n## 输出报告格式\n```json\n{\n  \"audit_id\": \"ma-{timestamp}\",\n  \"audit_type\": \"quick|deep\",\n  \"overall_score\": 92,\n  \"grade\": \"A|B|C|D|F\",\n  \"dimensions\": {\n    \"crud_integrity\": {\"score\": 98, \"issues\": 0},\n    \"cross_layer_consistency\": {\"score\": 85, \"issues\": 3},\n    \"capacity_health\": {\"score\": 90, \"warnings\": [\"L0 at 87%\"]},\n    \"quality_metrics\": {\n      \"tag_coverage\": 0.96,\n      \"duplicate_rate\": 0.03,\n      \"orphan_rate\": 0.01,\n      \"expiry_rate\": 0.05,\n      \"empty_rate\": 0.0\n    },\n    \"compliance\": {\"score\": 95, \"violations\": 1}\n  },\n  \"issues\": [\n    {\n      \"id\": \"AUDIT-001\",\n      \"severity\": \"warning\",\n      \"dimension\": \"cross_layer\",\n      \"description\": \"L3 entry-xxx引用的L1 parent不存在\"\n    }\n  ],\n  \"recommendations\": [\n    \"执行 memory_consolidate(L0→L1) 释放Sensory空间\",\n    \"清理15条过期L2条目\",\n    \"修复3处跨层引用断裂\"\n  ]\n}\n```\n\n## 健康等级\n| 分数 | 等级 | 含义 |\n|------|------|------|\n| 95-100 | A | 记忆系统健康, 数据完整 |\n| 85-94 | B | 有轻微问题, 建议修复 |\n| 70-84 | C | 存在需关注问题 |\n| 50-69 | D | 数据完整性受损 |\n| <50 | F | 严重故障, 需立即处理 |\n\n## 绑定Agent\n@yiku (主要) | @mingjing (质量审校)\n\n## 协作伙伴\n@tiansuan (趋势分析) | @qianli (容量告警)\n\n## 执行频率\n- 快速扫描: 每24小时自动\n- 深度审计: 每周一次 / consolidate后\n- 手动触发: 用户请求 / 异常发生后\n\n---\n\n**版本**: 1.0.0 | **体系**: 天机v9.1 | **维护**: @yiku + @mingjing\n"
+      },
+      {
+        "skill_id": "memory-test",
+        "purpose": "使用真实MCP工具调用验证天机v9.1 ICME记忆系统的功能完整性、数据一致性和性能表现。作为 Stage Gate SG-3 (MCP集成) 的核心测试组件。",
+        "triggers": [
+          "每次 memory-engine-global MCP服务重启后 (健康检查)",
+          "Stage Gate SG-3 门禁流程中 (强制)",
+          "用户请求\"测试记忆系统\"",
+          "记忆系统版本升级后 (回归测试)"
+        ],
+        "steps": [],
+        "parameters": [],
+        "output_format": "",
+        "best_practices": [],
+        "bound_agents": [
+          "@tiewei (主要, 测试门禁) | @yiku (辅助, 记忆验证)"
+        ],
+        "partners": [
+          "@zhuiguang (性能基准) | @qianli (MCP可用性)"
+        ],
+        "rules": [],
+        "full_content": "---\nname: memory-test\ndescription: \"天机v9.1记忆系统专业化测试：使用真实MCP工具调用执行CRUD闭环测试、异常测试、性能基准测试，验证记忆系统功能完整性。\"\n---\n\n# 记忆系统测试 (Memory Test) — 天机v9.1\n\n## 目的\n使用真实MCP工具调用验证天机v9.1 ICME记忆系统的功能完整性、数据一致性和性能表现。作为 Stage Gate SG-3 (MCP集成) 的核心测试组件。\n\n## 触发场景\n- 每次 memory-engine-global MCP服务重启后 (健康检查)\n- Stage Gate SG-3 门禁流程中 (强制)\n- 用户请求\"测试记忆系统\"\n- 记忆系统版本升级后 (回归测试)\n\n## 测试套件\n\n### Test Suite 1: CRUD基础操作\n\n#### TC-1.1: 写入验证 (memory_remember)\n```\n对六层各写入1条测试数据:\n  L0: \"测试-L0-{timestamp}\" + tags: [test, crud, l0]\n  L1: \"测试-L1-{timestamp}\" + tags: [test, crud, l1]\n  L2: \"测试-L2-{timestamp}\" + tags: [test, crud, l2]\n  L3: \"测试-L3-{timestamp}\" + tags: [test, crud, l3]\n  L4: \"测试-L4-{timestamp}\" + tags: [test, crud, l4]\n  L5: \"测试-L5-{timestamp}\" + tags: [test, crud, l5]\n\n期望: 6/6 返回有效 entry_id\n```\n\n#### TC-1.2: 检索验证 (memory_recall)\n```\n按标签检索: query=\"测试\" + layers=[all] + tags=[test]\n期望: 返回≥6条结果, 所有entry_id与写入一致\n```\n\n#### TC-1.3: 精确获取 (get_memory)\n```\n用 entry_id 逐一精确获取\n期望: 内容完全匹配写入原文 (逐字比对)\n```\n\n#### TC-1.4: 更新验证 (memory_remember + 同entry覆盖)\n```\n更新 L1 条目: 追加 \" - Updated\" 到原文\n检索验证: 新内容 == 旧内容 + \" - Updated\"\n```\n\n#### TC-1.5: 软删除验证 (memory_forget)\n```\n软删除 L0 测试条目\n检索验证: memory_recall 应不再命中该条目\n硬验证: get_memory 返回 deleted=true\n```\n\n### Test Suite 2: 跨层操作\n\n#### TC-2.1: 跨层搜索\n```\n分别按单层和跨层搜索 \"测试\"\n期望: 单层搜索仅返回该层结果, 跨层搜索返回所有层结果\n```\n\n#### TC-2.2: 语义搜索 (search_memories)\n```\n语义搜索: \"记忆系统功能验证\"\n期望: 返回相关结果, 关联度按score排序\n```\n\n#### TC-2.3: 记忆血缘 (explain_memory_lineage)\n```\n查询 L3 测试条目的血缘\n期望: 返回创建时间/修改记录/关联条目\n```\n\n### Test Suite 3: 异常与边界\n\n#### TC-3.1: 超大内容\n```\n写入100KB内容到 L3\n期望: 返回错误或截断提示 (非崩溃)\n```\n\n#### TC-3.2: 空内容\n```\n写入 content=\"\" 到 L0\n期望: 返回参数校验错误\n```\n\n#### TC-3.3: 非法layer\n```\n写入 content=\"test\" layer=\"invalid_layer\"\n期望: 返回 layer不支持 错误\n```\n\n#### TC-3.4: 重复标签\n```\n写入相同content两次, 不同tags\n期望: 两次都成功, 但去重检测标记为 duplicate\n```\n\n#### TC-3.5: 并发写入\n```\n连续快速写入5条 (不等待返回)\n期望: 5/5 成功, 无数据丢失\n```\n\n### Test Suite 4: 聚合与统计\n\n#### TC-4.1: 记忆统计 (memory_stats)\n```\n调用 memory_stats\n期望: 返回六层计数/容量/使用率, 所有字段非空\n```\n\n#### TC-4.2: 容量查询 (memory_capacity)\n```\n调用 memory_capacity\n期望: 返回各层 capacity/used/percent, 数值递增合理\n```\n\n#### TC-4.3: 会话摘要 (get_session_digest)\n```\n调用 get_session_digest\n期望: 返回当前会话的操作摘要\n```\n\n### Test Suite 5: 性能基准\n\n#### TC-5.1: 写入延迟\n```\n连续写入10条, 测量P50/P99延迟\n期望: P50 < 100ms, P99 < 500ms\n```\n\n#### TC-5.2: 检索延迟\n```\nquery=\"test\", layers=[all], 测量响应时间\n期望: P50 < 200ms\n```\n\n#### TC-5.3: 批量写入吞吐\n```\n30秒内持续写入, 统计成功率\n期望: ≥95%成功率\n```\n\n## 测试数据设计\n\n### 测试标签体系\n```\n所有测试数据使用统一前缀标签:\n  - test (标记为测试数据)\n  - test:crud|test:cross|test:edge|test:perf (测试套件)\n  - session:test-{timestamp} (测试会话ID)\n  - auto-cleanup (标记可自动清理)\n```\n\n### 测试数据清理\n```\n测试完成后:\n1. memory_forget 所有 test 标签条目 (软删除)\n2. 验证清理完整性: memory_recall test → 返回0条\n3. 如清理失败, 保留标记供下次审计自动清理\n```\n\n## MCP工具链\n\n| 工具 | 测试套件 | 调用次数(估计) |\n|------|----------|---------------|\n| memory_remember | TC-1.1/1.4/3.1-3.5 | ~20 |\n| memory_recall | TC-1.2/2.1/5.2 | ~15 |\n| get_memory | TC-1.3/1.5 | ~10 |\n| memory_forget | TC-1.5/清理 | ~8 |\n| search_memories | TC-2.2 | ~3 |\n| explain_memory_lineage | TC-2.3 | ~2 |\n| memory_stats | TC-4.1 | ~3 |\n| memory_capacity | TC-4.2 | ~2 |\n| get_session_digest | TC-4.3 | ~1 |\n\n## 输出报告格式\n```json\n{\n  \"test_id\": \"mt-{timestamp}\",\n  \"test_duration_ms\": 4500,\n  \"summary\": {\n    \"total\": 20,\n    \"passed\": 19,\n    \"failed\": 1,\n    \"skipped\": 0,\n    \"pass_rate\": 0.95\n  },\n  \"suites\": {\n    \"crud_basic\": {\"total\": 5, \"passed\": 5, \"failed\": 0},\n    \"cross_layer\": {\"total\": 3, \"passed\": 3, \"failed\": 0},\n    \"edge_cases\": {\"total\": 5, \"passed\": 5, \"failed\": 0},\n    \"aggregation\": {\"total\": 3, \"passed\": 3, \"failed\": 0},\n    \"performance\": {\"total\": 4, \"passed\": 3, \"failed\": 1}\n  },\n  \"failures\": [\n    {\n      \"tc_id\": \"TC-5.1\",\n      \"reason\": \"P99延迟 620ms 超阈值 500ms\",\n      \"severity\": \"minor\"\n    }\n  ],\n  \"performance_baseline\": {\n    \"write_p50_ms\": 45,\n    \"write_p99_ms\": 380,\n    \"recall_p50_ms\": 85,\n    \"throughput_30s\": 142\n  },\n  \"verdict\": \"PASS|BLOCK\",\n  \"stage_gate\": \"SG-3 MCP Integration\"\n}\n```\n\n## 通过标准\n\n| 测试套件 | 最低通过率 | 阻断条件 |\n|----------|-----------|---------|\n| CRUD基础 | 100% | 任何失败 → BLOCK |\n| 跨层操作 | 100% | 任何失败 → BLOCK |\n| 异常边界 | 100% | 崩溃 → BLOCK |\n| 聚合统计 | 100% | 数据异常 → BLOCK |\n| 性能基准 | 90% | P99 > 2s → BLOCK |\n\n## 绑定Agent\n@tiewei (主要, 测试门禁) | @yiku (辅助, 记忆验证)\n\n## 协作伙伴\n@zhuiguang (性能基准) | @qianli (MCP可用性)\n\n## Stage Gate 集成\n- **SG-3 (MCP集成)**: memory-test 是必过项\n- 测试失败 → SG-3 BLOCK → 必须修复后重新提交\n- 性能退化 >10% → 记录到 L5 Meta + 通知 @zhuiguang\n\n## 测试数据管理\n- 所有测试数据使用 `test` 标签\n- 测试完成后自动清理 (Soft Delete)\n- 清理失败条目在下次 memory-audit 中标记为 orphan\n- 测试结果写入 L3 Episodic (永久保留)\n\n---\n\n**版本**: 1.0.0 | **体系**: 天机v9.1 | **维护**: @tiewei + @yiku\n"
+      },
+      {
+        "skill_id": "editor-review",
+        "purpose": "",
+        "triggers": [],
+        "steps": [],
+        "parameters": [],
+        "output_format": "",
+        "best_practices": [],
+        "bound_agents": [],
+        "partners": [],
+        "rules": [],
+        "full_content": "# 编辑器审查 (Editor Review) — @wenzong (L1)\n\n## 触发条件\n\n- 代码/文档写入前\n- 内容规范检查\n- 发布前审查\n\n## 执行流程\n\n1. **内容读取**：获取待审查内容\n2. **规范匹配**：对比编码规范/文档规范\n3. **问题标记**：语法错误、风格违规、安全风险\n4. **自动修复**：可自动修复的直接修正\n5. **审查报告**：不可自动修复的 → 标注建议\n\n## MCP 工具\n\n- `memory-engine-global`: memory_query（规范查询）\n- `knowledge-graph-global`: kg_validate\n- `security-scanner`: scan_file\n\n## 审查维度\n\n```yaml\ncode_review:\n  - Python: PEP8, type hints, docstring\n  - JS/TS: ESLint, TypeScript strict\n  - SQL: 注入防护, 索引优化\n  - Config: JSON/YAML格式, 环境变量\ndoc_review:\n  - Markdown: 标题层级, 链接有效\n  - 中文: 统一术语, 无歧义\n  - 图示: Mermaid语法\n```\n\n## 联动 Agent\n\n- @jingwei (经纬) — 代码质量协同\n- @luling (规则) — 规则合规\n- @zhenshan (安全) — 安全审查\n- @lingxi (对话) — 对话质量协同\n"
+      },
+      {
+        "skill_id": "agent-transparent-dispatch",
+        "purpose": "将多Agent协作过程以TVP协议可视化呈现，确保调度100%透明可追溯。",
+        "triggers": [
+          "复杂任务涉及3个以上Agent协作",
+          "需要向用户展示决策过程与Agent分工",
+          "事后审计与复盘"
+        ],
+        "steps": [],
+        "parameters": [],
+        "output_format": "",
+        "best_practices": [],
+        "bound_agents": [
+          "@tianshu (主要) | @qianli (监控数据)"
+        ],
+        "partners": [],
+        "rules": [],
+        "full_content": "# 透明调度可视化 (agent/transparent-dispatch)\n\n## 目的\n将多Agent协作过程以TVP协议可视化呈现，确保调度100%透明可追溯。\n\n## 触发场景\n- 复杂任务涉及3个以上Agent协作\n- 需要向用户展示决策过程与Agent分工\n- 事后审计与复盘\n\n## 执行步骤\n\n### Step 1: 调度计划生成\n1. 解析任务依赖图（哪些步骤必须顺序，哪些可并行）\n2. 生成甘特图式调度计划\n3. 标记关键路径与风险点\n\n### Step 2: 实时追踪\n1. 每个Agent开始/完成时输出TVP事件\n2. 收集执行耗时、工具调用次数、记忆读写次数\n3. 检测异常（超时、错误、重复调用）\n\n### Step 3: 可视化输出\n```\n[TVP-Timeline] 任务: proj-001\n06:14:23 🎯@天枢(tianshu)  START  plan\n06:14:25 🔎@洞察(dongcha)  SWITCH 意图分析 (45ms)\n06:14:28 🎯@天枢(tianshu)  SWITCH 方案评估 (12ms)\n06:14:30 ✍️@妙笔(miaobi)   SWITCH 内容创作 (2.3s)\n06:14:33 🔍@明镜(mingjing) SWITCH 质量审校 (1.1s)\n06:14:35 🎯@天枢(tianshu)  END    总耗时 12s\n```\n\n### Step 4: 归档\n1. 完整调度记录存入天机 L3 Episodic\n2. 生成调度效率报告（Agent利用率、等待时间、瓶颈识别）\n\n## 绑定Agent\n@tianshu (主要) | @qianli (监控数据)\n\n## 规范要求\n- TVP格式：`[TVP] {emoji}@{name}({id}) → {action} | {detail}`\n- 时间戳精确到毫秒\n- 必须包含：Agent标识、动作类型、耗时、状态\n- 违规标记：未声明切换高亮为 🔴\n"
+      },
+      {
+        "skill_id": "tianji-orchestrate",
+        "purpose": "",
+        "triggers": [],
+        "steps": [],
+        "parameters": [],
+        "output_format": "",
+        "best_practices": [],
+        "bound_agents": [],
+        "partners": [],
+        "rules": [],
+        "full_content": "# 天机总控调度 (Tianji Orchestrate) — @tianji (L0)\n\n## 触发条件\n\n- 系统启动/重启\n- 全局任务调度\n- 架构级决策\n\n## 执行流程\n\n1. **全系统健康扫描**：6 MCP服务器 + ICME六层 + 23 Agent\n2. **优先级仲裁**：L5(Meta) > L0(Sensory) > L1(Working)\n3. **Agent编排决策**：TVP协议路由到天枢(@tianshu)\n4. **资源分配**：根据负载动态调整\n5. **策略自优化**：L5 Meta → 学习闭环\n\n## MCP 工具\n\n- `memory-engine-global`: tianji_health, memory_stats, memory_capacity\n- `agent-framework-global`: agent_dispatch, agent_status, agent_list, agent_capability\n- `ops-engine`: health_check, resource_monitor\n\n## 调度优先级\n\n```yaml\nP0_CRITICAL:\n  - 天机8771服务存活\n  - ICME数据完整性\n  - MCP全链路可用\nP1_HIGH:\n  - Agent响应延迟<500ms\n  - 记忆写入成功率>99%\nP2_NORMAL:\n  - 进化闭环周期执行\n  - 日志归档\n```\n\n## 联动 Agent\n\n- @tianshu (天枢) — L2任务调度转发\n- @yiku (忆库) — 记忆策略决策\n- @qianli (运维) — 降级触发\n"
+      }
+    ],
+    "skill_count": 6
+  },
+  "lingjing_framework": {
+    "domain_name": "灵境概念体系",
+    "owner_agent": "tianshu/jingwei",
+    "domain": "lingjing_framework",
+    "skills": [
+      {
+        "skill_id": "lingjing-14questions",
+        "purpose": "",
+        "triggers": [],
+        "steps": [],
+        "parameters": [],
+        "output_format": "",
+        "best_practices": [],
+        "bound_agents": [],
+        "partners": [],
+        "rules": [],
+        "full_content": "---\nname: lingjing-14questions\ndescription: \"新功能开发启动; 架构变更提案; 代码审查\"\n---\n\n# 拷问驱动开发 (14-Question Driven Dev) — 灵境·质\n\n## 触发条件\n- 新功能开发启动\n- 架构变更提案\n- 代码审查\n\n## 十四拷问流程\n1. **灵境拷问 (前7问·设计阶段)**：\n   - Q1: 此功能对应道谱哪一道？\n   - Q2: 涉及哪些地煞点？需要新增吗？\n   - Q3: 触发哪些天罡点？需要调整吗？\n   - Q4: 三链（体验→业务→技术）影响分析？\n   - Q5: 是否需要新地煞定义？\n   - Q6: 是否需要新天罡定义？\n   - Q7: 九道完整性是否受影响？\n\n2. **天机拷问 (后7问·实现阶段)**：\n   - Q8: ICME六层记忆影响？\n   - Q9: TVP透明调度链路是否完整？\n   - Q10: Agent能力矩阵是否需要更新？\n   - Q11: Skill映射是否需要新增？\n   - Q12: MCP工具是否需要新增？\n   - Q13: 天机修复法则是否被违反？\n   - Q14: 进化闭环是否需要调整？\n\n## MCP 工具\n- `agent-framework-global`: rule_evaluate, system_status, context_extract\n- `memory-engine-global`: memory_recall, search_memories\n- `knowledge-graph-global`: kg_query, kg_validate\n\n## 输出格式\n```json\n{\n  \"feature\": \"新功能描述\",\n  \"lingjing_questions\": [{\"Q\":\"Q1\",\"answer\":\"...\",\"pass\":true},...],\n  \"tianji_questions\": [{\"Q\":\"Q8\",\"answer\":\"...\",\"pass\":true},...],\n  \"verdict\": \"PASS|REVISE|BLOCK\",\n  \"missing_elements\": [],\n  \"suggestions\": []\n}\n```\n"
+      },
+      {
+        "skill_id": "lingjing-9dao-orchestrate",
+        "purpose": "",
+        "triggers": [],
+        "steps": [],
+        "parameters": [],
+        "output_format": "",
+        "best_practices": [],
+        "bound_agents": [],
+        "partners": [],
+        "rules": [],
+        "full_content": "---\nname: lingjing-9dao-orchestrate\ndescription: \"灵境任务调度; 道谱变更; 系统启动\"\n---\n\n# 灵境九道编排 (LingJing 9-Dao Orchestration) — 灵境·枢\n\n## 触发条件\n- 灵境任务调度\n- 道谱变更\n- 系统启动\n\n## 九道调度图\n```\n始道(道一) → 核心原则锚定 ← @luling 规则守护\n  ↓\n生道(道二) → 双链验证打通 ← @tianshu 天枢调度\n  ↓\n化道(道三) → 三维透视完备 ← @dongcha 洞察分析\n  ↓\n成道(道四) → 持续进化闭环 ← @huasheng 化生进化\n  ↓\n正道(道五) → 纠偏恢复    ← @tiewei 铁卫守护\n  ↓\n合道(道六) → 跨系统融合   ← @tianji 天机总控\n  ↓\n传道(道七) → 知识传递     ← @mingjing 明镜审校\n  ↓\n护道(道八) → 安全防御     ← @zhenshan 镇山守护\n  ↓\n明道(道九) → 可观测性     ← @qianli 千里监控\n```\n\n## 执行流程\n1. **道谱状态扫描**：检查每道的健康状态\n2. **依赖解析**：按九道依赖关系编排\n3. **Agent分配**：每道分配对应Agent\n4. **并行优化**：无依赖的道可并行\n5. **闭环反馈**：成道(道四)收集反馈驱动进化\n\n## MCP 工具\n- `agent-framework-global`: agent_dispatch, agent_status, agent_list, agent_capability\n- `memory-engine-global`: tianji_health, memory_stats\n- `ops-engine`: health_check, resource_monitor\n\n## 道谱状态模板\n```yaml\n九道状态:\n  始道: {status: HEALTHY, last_check: \"...\"}\n  生道: {status: HEALTHY, last_check: \"...\"}\n  化道: {status: DEGRADED, issue: \"三维透视缺失体验维\"}\n  成道: {status: EVOLVING, cycles: 42}\n  正道: {status: HEALTHY}\n  合道: {status: PENDING, depends: \"天机8771\"}\n  传道: {status: HEALTHY}\n  护道: {status: HEALTHY}\n  明道: {status: WARNING, issue: \"L5元认知指标掉线\"}\n```\n"
+      },
+      {
+        "skill_id": "lingjing-dao-compliance",
+        "purpose": "",
+        "triggers": [],
+        "steps": [],
+        "parameters": [],
+        "output_format": "",
+        "best_practices": [],
+        "bound_agents": [],
+        "partners": [],
+        "rules": [],
+        "full_content": "---\nname: lingjing-dao-compliance\ndescription: \"灵境代码变更; 架构提案; 天机修复法则升级\"\n---\n\n# 道谱合规 (Dao Spectrum Compliance) — 灵境·证\n\n## 触发条件\n- 灵境代码变更\n- 架构提案\n- 天机修复法则升级\n\n## 执行流程\n1. **九道校验**：\n   - 道一·始道 — 核心原则锚定\n   - 道二·生道 — 双链验证打通\n   - 道三·化道 — 三维透视完备\n   - 道四·成道 — 持续进化闭环\n   - 道五·正道 — 纠偏恢复机制\n   - 道六·合道 — 跨系统融合\n   - 道七·传道 — 知识传递完整性\n   - 道八·护道 — 安全防御体系\n   - 道九·明道 — 可观测性全链路\n2. **三十六地煞检查**：每个地煞点逐一核对\n3. **七十二天罡验证**：每个天罡点逐一核对\n4. **合规报告**：生成道谱合规矩阵\n\n## MCP 工具\n- `security-scanner`: scan_vulnerabilities, check_compliance, get_security_report\n- `agent-framework-global`: rule_evaluate, system_status\n- `knowledge-graph-global`: kg_query, kg_validate\n\n## 合规等级\n```yaml\n九道:\n  始道: HARD_BLOCK # 核心原则必须满足\n  生道: HARD_BLOCK # 双链必须打通\n  化道: SOFT_WARN  # 三维可以有缺失\n  成道: INFO       # 进化可以持续\n  正道: SOFT_WARN  # 纠偏机制建议有\n  合道: SOFT_WARN  # 跨系统融合建议\n  传道: INFO       # 知识传递非必须\n  护道: HARD_BLOCK # 安全防御必须\n  明道: SOFT_WARN  # 可观测性建议\n\n地煞(36): 逐项检查，缺失>5 → BLOCK\n天罡(72): 逐项检查，缺失>10 → WARN\n```\n\n## 联动 Agent\n- @luling (律令) — 天机规则对接\n- @zhenshan (镇山) — 安全合规协同\n"
+      },
+      {
+        "skill_id": "lingjing-memory",
+        "purpose": "",
+        "triggers": [],
+        "steps": [],
+        "parameters": [],
+        "output_format": "",
+        "best_practices": [],
+        "bound_agents": [
+          "@lianli (知识图谱) | @yiku (记忆中枢)"
+        ],
+        "partners": [],
+        "rules": [],
+        "full_content": "---\nname: lingjing-memory\ndescription: \"灵境任务执行后; 道谱状态变更; 三链协调分析后\"\n---\n\n# 灵境记忆系统 (LingJing Memory System) — 灵境·识\n\n## 触发条件\n- 灵境任务执行后\n- 道谱状态变更\n- 三链协调分析后\n\n## 灵境记忆分层 (ICME扩展)\n```\n灵境L6 — 道谱记忆 (Dao Spectrum Memory)\n  ├─ 九道当前状态快照\n  ├─ 三十六地煞检查清单历史\n  ├─ 七十二天罡验证记录\n  └─ 道谱演化路径\n\n灵境L5 — 元认知记忆 (共享天机L5)\n  ├─ 道谱进化策略\n  ├─ 三链协调学习模式\n  └─ 拷问驱动经验积累\n\n灵境L4 — 模式记忆 (共享天机L4)\n  ├─ 道谱合规模式\n  ├─ 三链冲突模式\n  └─ 拷问通过/失败模式\n```\n\n## 执行流程\n1. **道谱快照**：定期保存九道状态\n2. **地煞/天罡追踪**：每次检查后记录结果\n3. **三链历史**：保存三链协调分析结果\n4. **进化学习**：L5元认知分析优化策略\n\n## MCP 工具\n- `memory-engine-global`: memory_remember, memory_recall, memory_stats, memory_consolidate, build_working_representation, run_reflective_cycle\n- `knowledge-graph-global`: kg_query\n\n## 绑定Agent\n@lianli (知识图谱) | @yiku (记忆中枢)\n\n## 记忆数据结构\n```json\n{\n  \"dao_spectrum_snapshot\": {\n    \"timestamp\": \"...\",\n    \"nine_dao_status\": {},\n    \"disha_checks\": 36,\n    \"tiangang_checks\": 72\n  },\n  \"triple_chain_history\": {\n    \"last_check\": \"...\",\n    \"experience_score\": 0.85,\n    \"business_score\": 0.92,\n    \"technical_score\": 0.78\n  },\n  \"14_questions_log\": {\n    \"total_executions\": 150,\n    \"pass_rate\": 0.87,\n    \"common_failures\": [\"Q4\",\"Q11\"]\n  }\n}\n```\n"
+      },
+      {
+        "skill_id": "lingjing-triple-chain",
+        "purpose": "",
+        "triggers": [],
+        "steps": [],
+        "parameters": [],
+        "output_format": "",
+        "best_practices": [],
+        "bound_agents": [],
+        "partners": [],
+        "rules": [],
+        "full_content": "---\nname: lingjing-triple-chain\ndescription: \"代码变更后; 架构决策; 发布前检查\"\n---\n\n# 三链协调验证 (Triple Chain Coordination) — 灵境·枢\n\n## 触发条件\n- 代码变更后\n- 架构决策\n- 发布前检查\n\n## 三链定义\n```\n体验链 (Experience Chain) → 用户感知层\n  ├─ 用户交互流畅度\n  ├─ 响应延迟感知\n  ├─ 信息可发现性\n  └─ 错误恢复体验\n\n业务链 (Business Chain) → 逻辑核心层\n  ├─ 业务流程完整性\n  ├─ 规则一致性\n  ├─ 数据一致性\n  └─ 异常处理完备性\n\n技术链 (Technical Chain) → 基础设施层\n  ├─ ICME记忆层状态\n  ├─ MCP服务器健康\n  ├─ Agent调度延迟\n  └─ 进化闭环健康\n```\n\n## 执行流程\n1. **三链建模**：从代码变更中提取三链模型\n2. **链内一致性**：每条链内部节点的一致性验证\n3. **链间协调性**：链与链之间的协调关系验证\n4. **冲突检测**：标识三链间的冲突\n5. **协调建议**：给出三链协调修正建议\n\n## MCP 工具\n- `agent-framework-global`: agent_dispatch, system_status, context_extract\n- `memory-engine-global`: memory_recall, get_session_digest\n- `ops-engine`: get_resource_usage, list_services\n\n## 输出格式\n```yaml\nchain_status:\n  experience: {score: 0.85, violations: 2}\n  business:   {score: 0.92, violations: 0}\n  technical:  {score: 0.78, violations: 3}\ncross_chain_conflicts: 1\nverdict: PASS_WITH_WARNINGS\n```\n"
+      }
+    ],
+    "skill_count": 5
+  }
+}

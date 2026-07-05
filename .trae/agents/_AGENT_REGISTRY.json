@@ -1,0 +1,4900 @@
+﻿{
+  "_meta": {
+    "source": "core/amim.py + manual-rebuild",
+    "version": "4.2.2",
+    "module": "M37",
+    "agent_count": 31,
+    "rebuild_date": "2026-07-02",
+    "rebuild_reason": "v4.2.2升级：修复天机Agent与Trae官方Agent的协作伙伴关系",
+    "dimensions": [
+      "identity: 名称/层级/角色/emoji",
+      "tools: MCP工具绑定+内置工具",
+      "memory_affinity: 记忆层读写亲和度",
+      "skill_bindings: 技能库归属映射",
+      "decision_steps: 决策引擎6步流水线归属",
+      "stage_gates: Stage Gate责任分配",
+      "data_flow: 上下游数据流拓扑",
+      "event_bus: 事件订阅/发布关系",
+      "quality_metrics: 质量度量指标",
+      "error_escalation: 错误升级链",
+      "circuit_breaker: 熔断阈值"
+    ]
+  },
+  "agents": {
+    "tianji": {
+      "name": "天机",
+      "layer": "L0",
+      "role": "系统总控",
+      "emoji": "🏛️",
+      "capabilities": [
+        "全局编排",
+        "模块协调",
+        "生命周期管理",
+        "自进化闭环"
+      ],
+      "tools": [
+        "agent_dispatch",
+        "system_status",
+        "tianji_health",
+        "tianji_amim_status",
+        "tianji_tool_owner",
+        "execute_command"
+      ],
+      "mcp_server": "agent-framework-global",
+      "runtime_class": "OrchestratorAgent",
+      "lingjing_service_id": "svc-tianji-core",
+      "lingjing_port": 8799,
+      "health_endpoint": "/health/tianji",
+      "memory_affinity": {
+        "primary_read": [
+          "L5"
+        ],
+        "primary_write": [
+          "L5"
+        ],
+        "secondary_read": [
+          "L3",
+          "L4"
+        ],
+        "secondary_write": [
+          "L3"
+        ]
+      },
+      "skill_bindings": [
+        "tianji-orchestrate",
+        "system-diagnose"
+      ],
+      "decision_steps": {
+        "owns": [
+          "Step1-Identify",
+          "Step6-Record"
+        ],
+        "participates": [
+          "Step2-Retrieve",
+          "Step3-Fuse"
+        ]
+      },
+      "stage_gates": {
+        "responsible": [
+          "Gate0"
+        ],
+        "participates": [
+          "Gate4",
+          "Gate5"
+        ]
+      },
+      "data_flow": {
+        "upstream": [],
+        "downstream": [
+          "tianshu",
+          "qianli",
+          "gongzao"
+        ],
+        "bidirectional": [
+          "yiku",
+          "huasheng"
+        ]
+      },
+      "event_bus": {
+        "subscribes": [
+          "system.critical_error",
+          "system.health_degraded",
+          "agent.created",
+          "agent.destroyed"
+        ],
+        "publishes": [
+          "system.evolution_triggered",
+          "system.global_decision",
+          "system.lifecycle_change"
+        ]
+      },
+      "quality_metrics": [
+        "system_uptime",
+        "agent_alignment_score",
+        "evolution_success_rate"
+      ],
+      "error_escalation": {
+        "escalates_to": "HUMAN",
+        "escalation_condition": "system_cascade_failure"
+      },
+      "circuit_breaker": {
+        "failure_threshold": 3,
+        "timeout_seconds": 300,
+        "recovery_action": "restart_all_mcp_servers"
+      },
+      "collaboration_partners": [
+        "tianshu",
+        "qianli",
+        "gongzao",
+        "huasheng",
+        "yiku"
+      ],
+      "source": "tianji",
+      "clear_metrics": {
+        "cost": {
+          "token_usage": 0,
+          "api_calls": 0,
+          "model_cost": 0.0
+        },
+        "latency": {
+          "total_ms": 0,
+          "ttft_ms": 0,
+          "processing_ms": 0
+        },
+        "efficacy": {
+          "success_rate": 0.0,
+          "quality_score": 0.0,
+          "coverage": 0.0
+        },
+        "assurance": {
+          "security_vulnerabilities": 0,
+          "compliance_passed": true,
+          "privacy_risk": 0.0
+        },
+        "reliability": {
+          "consistency_rate": 0.0,
+          "recovery_rate": 0.0,
+          "sla_compliance": 0.0
+        }
+      },
+      "topology_preference": {
+        "preferred": [
+          "sequential"
+        ],
+        "compatible": [
+          "sequential",
+          "parallel"
+        ],
+        "avoid": []
+      },
+      "workflow_blueprint_ids": []
+    },
+    "tiewei": {
+      "name": "铁卫",
+      "layer": "L0",
+      "role": "质量守护者",
+      "emoji": "🛡️",
+      "capabilities": [
+        "SG门禁",
+        "功能验证",
+        "安全测试",
+        "覆盖率分析"
+      ],
+      "tools": [
+        "memory_recall",
+        "security-scanner",
+        "performance-profiler",
+        "execute_command"
+      ],
+      "mcp_server": "security-scanner",
+      "runtime_class": "TieweiAgent",
+      "lingjing_service_id": "svc-quality-gate",
+      "lingjing_port": 8810,
+      "health_endpoint": "/health/quality-gate",
+      "memory_affinity": {
+        "primary_read": [
+          "L3",
+          "L4"
+        ],
+        "primary_write": [
+          "L3"
+        ],
+        "secondary_read": [
+          "L5"
+        ],
+        "secondary_write": [
+          "L5"
+        ]
+      },
+      "skill_bindings": [
+        "test-gate",
+        "rule-check"
+      ],
+      "decision_steps": {
+        "owns": [
+          "Step5-Evaluate"
+        ],
+        "participates": [
+          "Step4-Generate"
+        ]
+      },
+      "stage_gates": {
+        "responsible": [
+          "Gate3",
+          "Gate4"
+        ],
+        "participates": [
+          "Gate2"
+        ]
+      },
+      "data_flow": {
+        "upstream": [
+          "miaobi",
+          "jingwei",
+          "baiqiao"
+        ],
+        "downstream": [
+          "gongzao",
+          "tianshu"
+        ],
+        "bidirectional": [
+          "mingjing",
+          "zhenshan"
+        ]
+      },
+      "event_bus": {
+        "subscribes": [
+          "code.committed",
+          "gate.requested",
+          "test.required"
+        ],
+        "publishes": [
+          "gate.passed",
+          "gate.failed",
+          "coverage.report"
+        ]
+      },
+      "quality_metrics": [
+        "gate_pass_rate",
+        "test_coverage",
+        "security_vulnerability_count"
+      ],
+      "error_escalation": {
+        "escalates_to": "tianshu",
+        "escalation_condition": "gate_failed_3_times"
+      },
+      "circuit_breaker": {
+        "failure_threshold": 5,
+        "timeout_seconds": 600,
+        "recovery_action": "skip_gate_with_warning"
+      },
+      "collaboration_partners": [
+        "tianshu",
+        "zhenshan",
+        "mingjing",
+        "tiansuan",
+        "api-test-pro",
+        "performance-expert"
+      ],
+      "source": "tianji",
+      "clear_metrics": {
+        "cost": {
+          "token_usage": 0,
+          "api_calls": 0,
+          "model_cost": 0.0
+        },
+        "latency": {
+          "total_ms": 0,
+          "ttft_ms": 0,
+          "processing_ms": 0
+        },
+        "efficacy": {
+          "success_rate": 0.0,
+          "quality_score": 0.0,
+          "coverage": 0.0
+        },
+        "assurance": {
+          "security_vulnerabilities": 0,
+          "compliance_passed": true,
+          "privacy_risk": 0.0
+        },
+        "reliability": {
+          "consistency_rate": 0.0,
+          "recovery_rate": 0.0,
+          "sla_compliance": 0.0
+        }
+      },
+      "topology_preference": {
+        "preferred": [
+          "sequential"
+        ],
+        "compatible": [
+          "sequential",
+          "parallel"
+        ],
+        "avoid": []
+      },
+      "workflow_blueprint_ids": []
+    },
+    "yiku": {
+      "name": "忆库",
+      "layer": "L1",
+      "role": "记忆架构师",
+      "emoji": "🗃️",
+      "capabilities": [
+        "ICME六层管理",
+        "语义检索",
+        "容量监控",
+        "巩固晋升"
+      ],
+      "tools": [
+        "memory_remember",
+        "memory_recall",
+        "memory_stats",
+        "memory_capacity",
+        "build_working_representation",
+        "memory_consolidate",
+        "search_memories",
+        "get_memory",
+        "list_memories",
+        "run_reflective_cycle",
+        "get_session_digest",
+        "explain_memory_lineage"
+      ],
+      "mcp_server": "memory-engine-global",
+      "runtime_class": "YikuAgent",
+      "lingjing_service_id": "svc-memory-core",
+      "lingjing_port": 8820,
+      "health_endpoint": "/health/memory",
+      "memory_affinity": {
+        "primary_read": [
+          "L0",
+          "L1",
+          "L2",
+          "L3",
+          "L4",
+          "L5"
+        ],
+        "primary_write": [
+          "L0",
+          "L1",
+          "L2",
+          "L3",
+          "L4",
+          "L5"
+        ],
+        "secondary_read": [],
+        "secondary_write": []
+      },
+      "skill_bindings": [
+        "memory-remember",
+        "memory-recall",
+        "auto-memory-capture"
+      ],
+      "decision_steps": {
+        "owns": [
+          "Step2-Retrieve",
+          "Step3-Fuse"
+        ],
+        "participates": [
+          "Step6-Record"
+        ]
+      },
+      "stage_gates": {
+        "responsible": [],
+        "participates": [
+          "Gate0",
+          "Gate6"
+        ]
+      },
+      "data_flow": {
+        "upstream": [
+          "dongcha",
+          "wanxiang",
+          "kuangshi"
+        ],
+        "downstream": [
+          "tianshu",
+          "miaobi",
+          "tiansuan",
+          "lianli"
+        ],
+        "bidirectional": [
+          "tianji",
+          "huasheng"
+        ]
+      },
+      "event_bus": {
+        "subscribes": [
+          "memory.write_requested",
+          "memory.consolidation_needed",
+          "memory.capacity_warning"
+        ],
+        "publishes": [
+          "memory.written",
+          "memory.consolidated",
+          "memory.capacity_alert",
+          "memory.conflict_detected"
+        ]
+      },
+      "quality_metrics": [
+        "recall_hit_rate",
+        "consolidation_success_rate",
+        "capacity_usage_ratio",
+        "conflict_count"
+      ],
+      "error_escalation": {
+        "escalates_to": "tianshu",
+        "escalation_condition": "memory_corruption_or_hard_cap"
+      },
+      "circuit_breaker": {
+        "failure_threshold": 3,
+        "timeout_seconds": 60,
+        "recovery_action": "fallback_to_fts5_only"
+      },
+      "collaboration_partners": [
+        "tianshu",
+        "dongcha",
+        "tiansuan",
+        "kuangshi",
+        "lianli",
+        "huasheng",
+        "ai-integration-engineer"
+      ],
+      "source": "tianji",
+      "clear_metrics": {
+        "cost": {
+          "token_usage": 0,
+          "api_calls": 0,
+          "model_cost": 0.0
+        },
+        "latency": {
+          "total_ms": 0,
+          "ttft_ms": 0,
+          "processing_ms": 0
+        },
+        "efficacy": {
+          "success_rate": 0.0,
+          "quality_score": 0.0,
+          "coverage": 0.0
+        },
+        "assurance": {
+          "security_vulnerabilities": 0,
+          "compliance_passed": true,
+          "privacy_risk": 0.0
+        },
+        "reliability": {
+          "consistency_rate": 0.0,
+          "recovery_rate": 0.0,
+          "sla_compliance": 0.0
+        }
+      },
+      "topology_preference": {
+        "preferred": [
+          "sequential"
+        ],
+        "compatible": [
+          "sequential",
+          "parallel"
+        ],
+        "avoid": []
+      },
+      "workflow_blueprint_ids": []
+    },
+    "dongcha": {
+      "name": "洞察",
+      "layer": "L1",
+      "role": "上下文分析师",
+      "emoji": "🔍",
+      "capabilities": [
+        "意图识别",
+        "实体抽取",
+        "情感分析",
+        "关键词提取"
+      ],
+      "tools": [
+        "context_extract",
+        "memory_recall",
+        "tianji_classify",
+        "tianji_summarize_conversation",
+        "tianji_intercept"
+      ],
+      "mcp_server": "agent-framework-global",
+      "runtime_class": "DongchaAgent",
+      "lingjing_service_id": "svc-context-analyzer",
+      "lingjing_port": 8821,
+      "health_endpoint": "/health/context",
+      "memory_affinity": {
+        "primary_read": [
+          "L0",
+          "L1"
+        ],
+        "primary_write": [
+          "L1"
+        ],
+        "secondary_read": [
+          "L2",
+          "L3"
+        ],
+        "secondary_write": [
+          "L0"
+        ]
+      },
+      "skill_bindings": [
+        "context-extract",
+        "dialogue-quality"
+      ],
+      "decision_steps": {
+        "owns": [
+          "Step1-Identify"
+        ],
+        "participates": [
+          "Step2-Retrieve"
+        ]
+      },
+      "stage_gates": {
+        "responsible": [],
+        "participates": [
+          "Gate0"
+        ]
+      },
+      "data_flow": {
+        "upstream": [
+          "lingxi"
+        ],
+        "downstream": [
+          "tianshu",
+          "yiku",
+          "luling"
+        ],
+        "bidirectional": [
+          "wanxiang"
+        ]
+      },
+      "event_bus": {
+        "subscribes": [
+          "user.input_received",
+          "session.started"
+        ],
+        "publishes": [
+          "intent.classified",
+          "entity.extracted",
+          "complexity.assessed"
+        ]
+      },
+      "quality_metrics": [
+        "intent_classification_accuracy",
+        "entity_extraction_f1",
+        "complexity_assessment_precision"
+      ],
+      "error_escalation": {
+        "escalates_to": "tianshu",
+        "escalation_condition": "ambiguous_intent_confidence_below_0.3"
+      },
+      "circuit_breaker": {
+        "failure_threshold": 5,
+        "timeout_seconds": 30,
+        "recovery_action": "fallback_to_keyword_matching"
+      },
+      "collaboration_partners": [
+        "tianshu",
+        "yiku",
+        "lingxi",
+        "wanxiang"
+      ],
+      "source": "tianji",
+      "clear_metrics": {
+        "cost": {
+          "token_usage": 0,
+          "api_calls": 0,
+          "model_cost": 0.0
+        },
+        "latency": {
+          "total_ms": 0,
+          "ttft_ms": 0,
+          "processing_ms": 0
+        },
+        "efficacy": {
+          "success_rate": 0.0,
+          "quality_score": 0.0,
+          "coverage": 0.0
+        },
+        "assurance": {
+          "security_vulnerabilities": 0,
+          "compliance_passed": true,
+          "privacy_risk": 0.0
+        },
+        "reliability": {
+          "consistency_rate": 0.0,
+          "recovery_rate": 0.0,
+          "sla_compliance": 0.0
+        }
+      },
+      "topology_preference": {
+        "preferred": [
+          "sequential"
+        ],
+        "compatible": [
+          "sequential",
+          "parallel"
+        ],
+        "avoid": []
+      },
+      "workflow_blueprint_ids": []
+    },
+    "luling": {
+      "name": "律令",
+      "layer": "L1",
+      "role": "规则守护者",
+      "emoji": "⚖️",
+      "capabilities": [
+        "规则匹配",
+        "合规检查",
+        "冲突检测",
+        "门禁执行"
+      ],
+      "tools": [
+        "rule_evaluate",
+        "security-scanner",
+        "memory_recall"
+      ],
+      "mcp_server": "agent-framework-global",
+      "runtime_class": "LulingAgent",
+      "lingjing_service_id": "svc-rule-engine",
+      "lingjing_port": 8822,
+      "health_endpoint": "/health/rules",
+      "memory_affinity": {
+        "primary_read": [
+          "L5"
+        ],
+        "primary_write": [
+          "L5"
+        ],
+        "secondary_read": [
+          "L4"
+        ],
+        "secondary_write": [
+          "L3"
+        ]
+      },
+      "skill_bindings": [
+        "rule-check"
+      ],
+      "decision_steps": {
+        "owns": [
+          "Step5-Evaluate"
+        ],
+        "participates": [
+          "Step1-Identify"
+        ]
+      },
+      "stage_gates": {
+        "responsible": [],
+        "participates": [
+          "Gate0",
+          "Gate1",
+          "Gate2",
+          "Gate3",
+          "Gate4",
+          "Gate5",
+          "Gate6"
+        ]
+      },
+      "data_flow": {
+        "upstream": [
+          "dongcha",
+          "tianshu"
+        ],
+        "downstream": [
+          "tiewei",
+          "mingjing"
+        ],
+        "bidirectional": [
+          "tianshu"
+        ]
+      },
+      "event_bus": {
+        "subscribes": [
+          "operation.pre_execute",
+          "rule.update_requested"
+        ],
+        "publishes": [
+          "rule.violation",
+          "rule.compliance_passed",
+          "rule.conflict_detected"
+        ]
+      },
+      "quality_metrics": [
+        "rule_coverage_rate",
+        "compliance_check_latency",
+        "conflict_resolution_rate"
+      ],
+      "error_escalation": {
+        "escalates_to": "tianshu",
+        "escalation_condition": "rule_conflict_unresolvable"
+      },
+      "circuit_breaker": {
+        "failure_threshold": 3,
+        "timeout_seconds": 30,
+        "recovery_action": "default_deny"
+      },
+      "collaboration_partners": [
+        "tianshu",
+        "tiewei",
+        "mingjing",
+        "zhenshan"
+      ],
+      "source": "tianji",
+      "clear_metrics": {
+        "cost": {
+          "token_usage": 0,
+          "api_calls": 0,
+          "model_cost": 0.0
+        },
+        "latency": {
+          "total_ms": 0,
+          "ttft_ms": 0,
+          "processing_ms": 0
+        },
+        "efficacy": {
+          "success_rate": 0.0,
+          "quality_score": 0.0,
+          "coverage": 0.0
+        },
+        "assurance": {
+          "security_vulnerabilities": 0,
+          "compliance_passed": true,
+          "privacy_risk": 0.0
+        },
+        "reliability": {
+          "consistency_rate": 0.0,
+          "recovery_rate": 0.0,
+          "sla_compliance": 0.0
+        }
+      },
+      "topology_preference": {
+        "preferred": [
+          "sequential"
+        ],
+        "compatible": [
+          "sequential",
+          "parallel"
+        ],
+        "avoid": []
+      },
+      "workflow_blueprint_ids": []
+    },
+    "lingxi": {
+      "name": "灵犀",
+      "layer": "L1",
+      "role": "会话监控者",
+      "emoji": "💠",
+      "capabilities": [
+        "对话完整性",
+        "意图连续性",
+        "上下文恢复",
+        "异常检测"
+      ],
+      "tools": [
+        "context_extract",
+        "memory_recall",
+        "tianji_intercept"
+      ],
+      "mcp_server": "agent-framework-global",
+      "runtime_class": "LingxiAgent",
+      "lingjing_service_id": "svc-session-guardian",
+      "lingjing_port": 8823,
+      "health_endpoint": "/health/session",
+      "memory_affinity": {
+        "primary_read": [
+          "L1",
+          "L2"
+        ],
+        "primary_write": [
+          "L1"
+        ],
+        "secondary_read": [
+          "L0"
+        ],
+        "secondary_write": [
+          "L0"
+        ]
+      },
+      "skill_bindings": [
+        "dialogue-quality"
+      ],
+      "decision_steps": {
+        "owns": [],
+        "participates": [
+          "Step1-Identify",
+          "Step6-Record"
+        ]
+      },
+      "stage_gates": {
+        "responsible": [],
+        "participates": []
+      },
+      "data_flow": {
+        "upstream": [
+          "dongcha"
+        ],
+        "downstream": [
+          "tianshu",
+          "yiku"
+        ],
+        "bidirectional": [
+          "dongcha"
+        ]
+      },
+      "event_bus": {
+        "subscribes": [
+          "session.message",
+          "session.context_lost"
+        ],
+        "publishes": [
+          "session.integrity_warning",
+          "session.context_restored",
+          "session.semantic_break"
+        ]
+      },
+      "quality_metrics": [
+        "dialogue_integrity_score",
+        "context_recovery_rate",
+        "semantic_break_count"
+      ],
+      "error_escalation": {
+        "escalates_to": "tianshu",
+        "escalation_condition": "severe_context_loss"
+      },
+      "circuit_breaker": {
+        "failure_threshold": 3,
+        "timeout_seconds": 30,
+        "recovery_action": "force_context_rebuild"
+      },
+      "collaboration_partners": [
+        "tianshu",
+        "dongcha",
+        "yiku"
+      ],
+      "source": "tianji",
+      "clear_metrics": {
+        "cost": {
+          "token_usage": 0,
+          "api_calls": 0,
+          "model_cost": 0.0
+        },
+        "latency": {
+          "total_ms": 0,
+          "ttft_ms": 0,
+          "processing_ms": 0
+        },
+        "efficacy": {
+          "success_rate": 0.0,
+          "quality_score": 0.0,
+          "coverage": 0.0
+        },
+        "assurance": {
+          "security_vulnerabilities": 0,
+          "compliance_passed": true,
+          "privacy_risk": 0.0
+        },
+        "reliability": {
+          "consistency_rate": 0.0,
+          "recovery_rate": 0.0,
+          "sla_compliance": 0.0
+        }
+      },
+      "topology_preference": {
+        "preferred": [
+          "sequential"
+        ],
+        "compatible": [
+          "sequential",
+          "parallel"
+        ],
+        "avoid": []
+      },
+      "workflow_blueprint_ids": []
+    },
+    "wanxiang": {
+      "name": "万象",
+      "layer": "L1",
+      "role": "多模态感知师",
+      "emoji": "👁️‍🗨️",
+      "capabilities": [
+        "图像理解",
+        "表格解析",
+        "公式识别",
+        "模态分类",
+        "多模态统一存储"
+      ],
+      "tools": [
+        "memory_capture_multimodal",
+        "tianji_classify",
+        "tianji_extract_knowledge",
+        "memory_recall",
+        "memory_remember"
+      ],
+      "mcp_server": "memory-engine-global",
+      "runtime_class": "MultimodalAgent",
+      "lingjing_service_id": "svc-multimodal",
+      "lingjing_port": 8824,
+      "health_endpoint": "/health/multimodal",
+      "memory_affinity": {
+        "primary_read": [
+          "L0"
+        ],
+        "primary_write": [
+          "L0",
+          "L1"
+        ],
+        "secondary_read": [
+          "L4"
+        ],
+        "secondary_write": [
+          "L4"
+        ]
+      },
+      "skill_bindings": [
+        "corpus-extract"
+      ],
+      "decision_steps": {
+        "owns": [
+          "Step1-Identify"
+        ],
+        "participates": [
+          "Step2-Retrieve"
+        ]
+      },
+      "stage_gates": {
+        "responsible": [],
+        "participates": [
+          "Gate0"
+        ]
+      },
+      "data_flow": {
+        "upstream": [],
+        "downstream": [
+          "yiku",
+          "lianli",
+          "dongcha"
+        ],
+        "bidirectional": [
+          "dongcha"
+        ]
+      },
+      "event_bus": {
+        "subscribes": [
+          "multimodal.input_received"
+        ],
+        "publishes": [
+          "multimodal.parsed",
+          "multimodal.classified",
+          "multimodal.stored"
+        ]
+      },
+      "quality_metrics": [
+        "modality_classification_accuracy",
+        "parsing_confidence_avg",
+        "storage_success_rate"
+      ],
+      "error_escalation": {
+        "escalates_to": "tianshu",
+        "escalation_condition": "unsupported_modality"
+      },
+      "circuit_breaker": {
+        "failure_threshold": 5,
+        "timeout_seconds": 120,
+        "recovery_action": "skip_and_log_warning"
+      },
+      "collaboration_partners": [
+        "tianshu",
+        "yiku",
+        "lianli",
+        "dongcha"
+      ],
+      "source": "tianji",
+      "clear_metrics": {
+        "cost": {
+          "token_usage": 0,
+          "api_calls": 0,
+          "model_cost": 0.0
+        },
+        "latency": {
+          "total_ms": 0,
+          "ttft_ms": 0,
+          "processing_ms": 0
+        },
+        "efficacy": {
+          "success_rate": 0.0,
+          "quality_score": 0.0,
+          "coverage": 0.0
+        },
+        "assurance": {
+          "security_vulnerabilities": 0,
+          "compliance_passed": true,
+          "privacy_risk": 0.0
+        },
+        "reliability": {
+          "consistency_rate": 0.0,
+          "recovery_rate": 0.0,
+          "sla_compliance": 0.0
+        }
+      },
+      "topology_preference": {
+        "preferred": [
+          "sequential"
+        ],
+        "compatible": [
+          "sequential",
+          "parallel"
+        ],
+        "avoid": []
+      },
+      "workflow_blueprint_ids": []
+    },
+    "jianheng": {
+      "name": "简衡",
+      "layer": "L1",
+      "role": "轻量评估师",
+      "emoji": "⚖️",
+      "capabilities": [
+        "快速质量评估",
+        "简易合规检查",
+        "轻量级替代明镜"
+      ],
+      "tools": [
+        "rule_evaluate",
+        "memory_recall"
+      ],
+      "mcp_server": "agent-framework-global",
+      "runtime_class": "JianhengAgent",
+      "lingjing_service_id": "svc-light-evaluator",
+      "lingjing_port": 8825,
+      "health_endpoint": "/health/evaluator",
+      "memory_affinity": {
+        "primary_read": [
+          "L4",
+          "L5"
+        ],
+        "primary_write": [
+          "L1"
+        ],
+        "secondary_read": [
+          "L3"
+        ],
+        "secondary_write": []
+      },
+      "skill_bindings": [
+        "rule-check"
+      ],
+      "decision_steps": {
+        "owns": [
+          "Step5-Evaluate"
+        ],
+        "participates": []
+      },
+      "stage_gates": {
+        "responsible": [],
+        "participates": [
+          "Gate0",
+          "Gate3"
+        ]
+      },
+      "data_flow": {
+        "upstream": [
+          "dongcha",
+          "tianshu"
+        ],
+        "downstream": [
+          "mingjing"
+        ],
+        "bidirectional": [
+          "luling"
+        ]
+      },
+      "event_bus": {
+        "subscribes": [
+          "evaluation.quick_requested"
+        ],
+        "publishes": [
+          "evaluation.quick_completed",
+          "evaluation.upgrade_to_mingjing"
+        ]
+      },
+      "quality_metrics": [
+        "quick_eval_accuracy",
+        "escalation_rate"
+      ],
+      "error_escalation": {
+        "escalates_to": "mingjing",
+        "escalation_condition": "quality_score_below_threshold"
+      },
+      "circuit_breaker": {
+        "failure_threshold": 5,
+        "timeout_seconds": 15,
+        "recovery_action": "escalate_to_mingjing"
+      },
+      "collaboration_partners": [
+        "tianshu",
+        "luling",
+        "mingjing"
+      ],
+      "source": "tianji",
+      "clear_metrics": {
+        "cost": {
+          "token_usage": 0,
+          "api_calls": 0,
+          "model_cost": 0.0
+        },
+        "latency": {
+          "total_ms": 0,
+          "ttft_ms": 0,
+          "processing_ms": 0
+        },
+        "efficacy": {
+          "success_rate": 0.0,
+          "quality_score": 0.0,
+          "coverage": 0.0
+        },
+        "assurance": {
+          "security_vulnerabilities": 0,
+          "compliance_passed": true,
+          "privacy_risk": 0.0
+        },
+        "reliability": {
+          "consistency_rate": 0.0,
+          "recovery_rate": 0.0,
+          "sla_compliance": 0.0
+        }
+      },
+      "topology_preference": {
+        "preferred": [
+          "sequential"
+        ],
+        "compatible": [
+          "sequential",
+          "parallel"
+        ],
+        "avoid": []
+      },
+      "workflow_blueprint_ids": []
+    },
+    "tianshu": {
+      "name": "天枢",
+      "layer": "L2",
+      "role": "总指挥",
+      "emoji": "🎯",
+      "capabilities": [
+        "编排",
+        "决策",
+        "调度",
+        "分发",
+        "全局管理"
+      ],
+      "tools": [
+        "agent_dispatch",
+        "system_status",
+        "context_extract",
+        "rule_evaluate",
+        "memory_remember",
+        "memory_recall",
+        "execute_command"
+      ],
+      "mcp_server": "agent-framework-global",
+      "runtime_class": "TianshuAgent",
+      "lingjing_service_id": "svc-orchestrator",
+      "lingjing_port": 8800,
+      "health_endpoint": "/health/orchestrator",
+      "memory_affinity": {
+        "primary_read": [
+          "L3",
+          "L4",
+          "L5"
+        ],
+        "primary_write": [
+          "L1",
+          "L3"
+        ],
+        "secondary_read": [
+          "L0",
+          "L1",
+          "L2"
+        ],
+        "secondary_write": [
+          "L5"
+        ]
+      },
+      "skill_bindings": [
+        "tianji-orchestrate",
+        "agent-dispatch",
+        "agent-transparent-dispatch",
+        "skill-route"
+      ],
+      "decision_steps": {
+        "owns": [
+          "Step1-Identify",
+          "Step2-Retrieve",
+          "Step3-Fuse",
+          "Step4-Generate",
+          "Step5-Evaluate",
+          "Step6-Record"
+        ],
+        "participates": []
+      },
+      "stage_gates": {
+        "responsible": [
+          "Gate0"
+        ],
+        "participates": [
+          "Gate1",
+          "Gate2",
+          "Gate3",
+          "Gate4",
+          "Gate5",
+          "Gate6"
+        ]
+      },
+      "data_flow": {
+        "upstream": [
+          "dongcha",
+          "lingxi",
+          "yiku"
+        ],
+        "downstream": [
+          "wenzong",
+          "jingwei",
+          "miaobi",
+          "mingjing",
+          "tiansuan",
+          "kuangshi",
+          "baiqiao",
+          "shiguan",
+          "jinshu",
+          "qianli",
+          "gongzao",
+          "zhenshan",
+          "zhuiguang",
+          "tiewei",
+          "lianli",
+          "huasheng"
+        ],
+        "bidirectional": [
+          "tianji",
+          "luling"
+        ]
+      },
+      "event_bus": {
+        "subscribes": [
+          "intent.classified",
+          "gate.failed",
+          "agent.error",
+          "system.health_degraded",
+          "memory.capacity_alert",
+          "session.integrity_warning"
+        ],
+        "publishes": [
+          "task.dispatched",
+          "task.completed",
+          "orchestration.decision",
+          "agent.switch"
+        ]
+      },
+      "quality_metrics": [
+        "dispatch_accuracy",
+        "task_completion_rate",
+        "sla_compliance",
+        "agent_utilization"
+      ],
+      "error_escalation": {
+        "escalates_to": "tianji",
+        "escalation_condition": "multi_agent_cascade_failure"
+      },
+      "circuit_breaker": {
+        "failure_threshold": 3,
+        "timeout_seconds": 120,
+        "recovery_action": "fallback_to_simple_dispatch"
+      },
+      "collaboration_partners": [
+        "tianji",
+        "wenzong",
+        "jingwei",
+        "yiku",
+        "dongcha",
+        "luling",
+        "lingxi",
+        "miaobi",
+        "mingjing",
+        "tiansuan",
+        "kuangshi",
+        "baiqiao",
+        "shiguan",
+        "jinshu",
+        "qianli",
+        "gongzao",
+        "zhenshan",
+        "zhuiguang",
+        "tiewei",
+        "lianli",
+        "huasheng",
+        "wanxiang",
+        "jianheng",
+        "ui-designer",
+        "frontend-architect",
+        "backend-architect"
+      ],
+      "source": "tianji",
+      "clear_metrics": {
+        "cost": {
+          "token_usage": 0,
+          "api_calls": 0,
+          "model_cost": 0.0
+        },
+        "latency": {
+          "total_ms": 0,
+          "ttft_ms": 0,
+          "processing_ms": 0
+        },
+        "efficacy": {
+          "success_rate": 0.0,
+          "quality_score": 0.0,
+          "coverage": 0.0
+        },
+        "assurance": {
+          "security_vulnerabilities": 0,
+          "compliance_passed": true,
+          "privacy_risk": 0.0
+        },
+        "reliability": {
+          "consistency_rate": 0.0,
+          "recovery_rate": 0.0,
+          "sla_compliance": 0.0
+        }
+      },
+      "topology_preference": {
+        "preferred": [
+          "sequential"
+        ],
+        "compatible": [
+          "sequential",
+          "parallel"
+        ],
+        "avoid": []
+      },
+      "workflow_blueprint_ids": []
+    },
+    "wenzong": {
+      "name": "文宗",
+      "layer": "L2",
+      "role": "主编",
+      "emoji": "📖",
+      "capabilities": [
+        "项目管理",
+        "内容审核",
+        "进度追踪",
+        "团队协调"
+      ],
+      "tools": [
+        "agent_dispatch",
+        "system_status",
+        "memory_recall",
+        "execute_command"
+      ],
+      "mcp_server": "agent-framework-global",
+      "runtime_class": "WenzongAgent",
+      "lingjing_service_id": "svc-editor-chief",
+      "lingjing_port": 8801,
+      "health_endpoint": "/health/editor",
+      "memory_affinity": {
+        "primary_read": [
+          "L3",
+          "L4"
+        ],
+        "primary_write": [
+          "L3"
+        ],
+        "secondary_read": [
+          "L5"
+        ],
+        "secondary_write": [
+          "L5"
+        ]
+      },
+      "skill_bindings": [
+        "editor-review",
+        "novel-multi-schedule"
+      ],
+      "decision_steps": {
+        "owns": [
+          "Step4-Generate",
+          "Step5-Evaluate"
+        ],
+        "participates": [
+          "Step1-Identify"
+        ]
+      },
+      "stage_gates": {
+        "responsible": [
+          "Gate0",
+          "Gate1"
+        ],
+        "participates": [
+          "Gate3",
+          "Gate6"
+        ]
+      },
+      "data_flow": {
+        "upstream": [
+          "tianshu"
+        ],
+        "downstream": [
+          "miaobi",
+          "mingjing",
+          "shiguan"
+        ],
+        "bidirectional": [
+          "jingwei"
+        ]
+      },
+      "event_bus": {
+        "subscribes": [
+          "task.content_project",
+          "creation.direction_set"
+        ],
+        "publishes": [
+          "project.milestone",
+          "project.approval",
+          "project.priority_change"
+        ]
+      },
+      "quality_metrics": [
+        "project_on_time_rate",
+        "content_quality_score",
+        "team_coordination_efficiency"
+      ],
+      "error_escalation": {
+        "escalates_to": "tianshu",
+        "escalation_condition": "project_deadline_at_risk"
+      },
+      "circuit_breaker": {
+        "failure_threshold": 3,
+        "timeout_seconds": 300,
+        "recovery_action": "pause_project_and_notify"
+      },
+      "collaboration_partners": [
+        "tianshu",
+        "miaobi",
+        "mingjing",
+        "shiguan",
+        "jingwei"
+      ],
+      "source": "tianji",
+      "clear_metrics": {
+        "cost": {
+          "token_usage": 0,
+          "api_calls": 0,
+          "model_cost": 0.0
+        },
+        "latency": {
+          "total_ms": 0,
+          "ttft_ms": 0,
+          "processing_ms": 0
+        },
+        "efficacy": {
+          "success_rate": 0.0,
+          "quality_score": 0.0,
+          "coverage": 0.0
+        },
+        "assurance": {
+          "security_vulnerabilities": 0,
+          "compliance_passed": true,
+          "privacy_risk": 0.0
+        },
+        "reliability": {
+          "consistency_rate": 0.0,
+          "recovery_rate": 0.0,
+          "sla_compliance": 0.0
+        }
+      },
+      "topology_preference": {
+        "preferred": [
+          "sequential"
+        ],
+        "compatible": [
+          "sequential",
+          "parallel"
+        ],
+        "avoid": []
+      },
+      "workflow_blueprint_ids": []
+    },
+    "jingwei": {
+      "name": "经纬",
+      "layer": "L2",
+      "role": "架构师",
+      "emoji": "🏛️",
+      "capabilities": [
+        "架构设计",
+        "技术选型",
+        "路径规划",
+        "重构策略"
+      ],
+      "tools": [
+        "agent_dispatch",
+        "rule_evaluate",
+        "memory_recall",
+        "execute_command"
+      ],
+      "mcp_server": "agent-framework-global",
+      "runtime_class": "JingweiAgent",
+      "lingjing_service_id": "svc-architect",
+      "lingjing_port": 8802,
+      "health_endpoint": "/health/architect",
+      "memory_affinity": {
+        "primary_read": [
+          "L4",
+          "L5"
+        ],
+        "primary_write": [
+          "L4",
+          "L5"
+        ],
+        "secondary_read": [
+          "L3"
+        ],
+        "secondary_write": [
+          "L3"
+        ]
+      },
+      "skill_bindings": [],
+      "decision_steps": {
+        "owns": [
+          "Step2-Retrieve",
+          "Step3-Fuse"
+        ],
+        "participates": [
+          "Step4-Generate",
+          "Step5-Evaluate"
+        ]
+      },
+      "stage_gates": {
+        "responsible": [
+          "Gate1"
+        ],
+        "participates": [
+          "Gate0",
+          "Gate4"
+        ]
+      },
+      "data_flow": {
+        "upstream": [
+          "tianshu"
+        ],
+        "downstream": [
+          "miaobi",
+          "gongzao",
+          "tiewei"
+        ],
+        "bidirectional": [
+          "wenzong",
+          "huasheng"
+        ]
+      },
+      "event_bus": {
+        "subscribes": [
+          "task.architecture",
+          "system.refactor_needed"
+        ],
+        "publishes": [
+          "architecture.design",
+          "architecture.tech_decision",
+          "architecture.refactor_plan"
+        ]
+      },
+      "quality_metrics": [
+        "design_review_pass_rate",
+        "tech_decision_accuracy",
+        "refactor_success_rate"
+      ],
+      "error_escalation": {
+        "escalates_to": "tianshu",
+        "escalation_condition": "architecture_conflict_unresolvable"
+      },
+      "circuit_breaker": {
+        "failure_threshold": 3,
+        "timeout_seconds": 600,
+        "recovery_action": "fallback_to_current_architecture"
+      },
+      "collaboration_partners": [
+        "tianshu",
+        "wenzong",
+        "gongzao",
+        "huasheng",
+        "ui-designer",
+        "frontend-architect",
+        "backend-architect"
+      ],
+      "source": "tianji",
+      "clear_metrics": {
+        "cost": {
+          "token_usage": 0,
+          "api_calls": 0,
+          "model_cost": 0.0
+        },
+        "latency": {
+          "total_ms": 0,
+          "ttft_ms": 0,
+          "processing_ms": 0
+        },
+        "efficacy": {
+          "success_rate": 0.0,
+          "quality_score": 0.0,
+          "coverage": 0.0
+        },
+        "assurance": {
+          "security_vulnerabilities": 0,
+          "compliance_passed": true,
+          "privacy_risk": 0.0
+        },
+        "reliability": {
+          "consistency_rate": 0.0,
+          "recovery_rate": 0.0,
+          "sla_compliance": 0.0
+        }
+      },
+      "topology_preference": {
+        "preferred": [
+          "sequential"
+        ],
+        "compatible": [
+          "sequential",
+          "parallel"
+        ],
+        "avoid": []
+      },
+      "workflow_blueprint_ids": []
+    },
+    "miaobi": {
+      "name": "妙笔",
+      "layer": "L2",
+      "role": "创作者",
+      "emoji": "✒️",
+      "capabilities": [
+        "创作",
+        "写作",
+        "创意生成",
+        "角色塑造",
+        "世界构建"
+      ],
+      "tools": [
+        "memory_recall",
+        "memory_remember",
+        "tianji_semantic_search",
+        "tianji_extract_knowledge"
+      ],
+      "mcp_server": "memory-engine-global",
+      "runtime_class": "MiaobiAgent",
+      "lingjing_service_id": "svc-creator",
+      "lingjing_port": 8803,
+      "health_endpoint": "/health/creator",
+      "memory_affinity": {
+        "primary_read": [
+          "L3",
+          "L4"
+        ],
+        "primary_write": [
+          "L3"
+        ],
+        "secondary_read": [
+          "L1",
+          "L2"
+        ],
+        "secondary_write": [
+          "L1"
+        ]
+      },
+      "skill_bindings": [
+        "novel-chapter-create",
+        "novel-worldbuilding-expand",
+        "novel-setting-consistency-deep",
+        "corpus-retrieve"
+      ],
+      "decision_steps": {
+        "owns": [
+          "Step4-Generate"
+        ],
+        "participates": [
+          "Step2-Retrieve"
+        ]
+      },
+      "stage_gates": {
+        "responsible": [
+          "Gate2"
+        ],
+        "participates": [
+          "Gate3"
+        ]
+      },
+      "data_flow": {
+        "upstream": [
+          "wenzong",
+          "yiku",
+          "kuangshi"
+        ],
+        "downstream": [
+          "mingjing",
+          "jinshu"
+        ],
+        "bidirectional": [
+          "yiku"
+        ]
+      },
+      "event_bus": {
+        "subscribes": [
+          "task.creation",
+          "creation.direction_set",
+          "corpus.ready"
+        ],
+        "publishes": [
+          "creation.draft_completed",
+          "creation.content_generated"
+        ]
+      },
+      "quality_metrics": [
+        "creation_output_volume",
+        "creativity_score",
+        "consistency_with_direction"
+      ],
+      "error_escalation": {
+        "escalates_to": "wenzong",
+        "escalation_condition": "creative_block_or_direction_unclear"
+      },
+      "circuit_breaker": {
+        "failure_threshold": 3,
+        "timeout_seconds": 300,
+        "recovery_action": "request_more_direction_from_wenzong"
+      },
+      "collaboration_partners": [
+        "tianshu",
+        "wenzong",
+        "mingjing",
+        "yiku",
+        "kuangshi"
+      ],
+      "source": "tianji",
+      "clear_metrics": {
+        "cost": {
+          "token_usage": 0,
+          "api_calls": 0,
+          "model_cost": 0.0
+        },
+        "latency": {
+          "total_ms": 0,
+          "ttft_ms": 0,
+          "processing_ms": 0
+        },
+        "efficacy": {
+          "success_rate": 0.0,
+          "quality_score": 0.0,
+          "coverage": 0.0
+        },
+        "assurance": {
+          "security_vulnerabilities": 0,
+          "compliance_passed": true,
+          "privacy_risk": 0.0
+        },
+        "reliability": {
+          "consistency_rate": 0.0,
+          "recovery_rate": 0.0,
+          "sla_compliance": 0.0
+        }
+      },
+      "topology_preference": {
+        "preferred": [
+          "sequential"
+        ],
+        "compatible": [
+          "sequential",
+          "parallel"
+        ],
+        "avoid": []
+      },
+      "workflow_blueprint_ids": []
+    },
+    "mingjing": {
+      "name": "明镜",
+      "layer": "L2",
+      "role": "审校者",
+      "emoji": "🔎",
+      "capabilities": [
+        "审校",
+        "质量评估",
+        "一致性检查",
+        "风格验证"
+      ],
+      "tools": [
+        "memory_recall",
+        "rule_evaluate",
+        "security-scanner"
+      ],
+      "mcp_server": "agent-framework-global",
+      "runtime_class": "MingjingAgent",
+      "lingjing_service_id": "svc-reviewer",
+      "lingjing_port": 8804,
+      "health_endpoint": "/health/reviewer",
+      "memory_affinity": {
+        "primary_read": [
+          "L3",
+          "L4",
+          "L5"
+        ],
+        "primary_write": [
+          "L3"
+        ],
+        "secondary_read": [
+          "L1"
+        ],
+        "secondary_write": [
+          "L1"
+        ]
+      },
+      "skill_bindings": [
+        "editor-review",
+        "novel-consistency-check",
+        "rule-check"
+      ],
+      "decision_steps": {
+        "owns": [
+          "Step5-Evaluate"
+        ],
+        "participates": [
+          "Step4-Generate"
+        ]
+      },
+      "stage_gates": {
+        "responsible": [
+          "Gate3"
+        ],
+        "participates": [
+          "Gate2",
+          "Gate4"
+        ]
+      },
+      "data_flow": {
+        "upstream": [
+          "miaobi",
+          "wenzong"
+        ],
+        "downstream": [
+          "miaobi",
+          "tiewei",
+          "jinshu"
+        ],
+        "bidirectional": [
+          "tiewei",
+          "luling"
+        ]
+      },
+      "event_bus": {
+        "subscribes": [
+          "creation.draft_completed",
+          "review.requested"
+        ],
+        "publishes": [
+          "review.completed",
+          "review.issues_found",
+          "review.approved"
+        ]
+      },
+      "quality_metrics": [
+        "review_accuracy",
+        "issue_detection_rate",
+        "false_positive_rate"
+      ],
+      "error_escalation": {
+        "escalates_to": "tianshu",
+        "escalation_condition": "quality_standard_violation_critical"
+      },
+      "circuit_breaker": {
+        "failure_threshold": 5,
+        "timeout_seconds": 120,
+        "recovery_action": "escalate_to_tiewei"
+      },
+      "collaboration_partners": [
+        "tianshu",
+        "wenzong",
+        "tiewei",
+        "miaobi",
+        "luling"
+      ],
+      "source": "tianji",
+      "clear_metrics": {
+        "cost": {
+          "token_usage": 0,
+          "api_calls": 0,
+          "model_cost": 0.0
+        },
+        "latency": {
+          "total_ms": 0,
+          "ttft_ms": 0,
+          "processing_ms": 0
+        },
+        "efficacy": {
+          "success_rate": 0.0,
+          "quality_score": 0.0,
+          "coverage": 0.0
+        },
+        "assurance": {
+          "security_vulnerabilities": 0,
+          "compliance_passed": true,
+          "privacy_risk": 0.0
+        },
+        "reliability": {
+          "consistency_rate": 0.0,
+          "recovery_rate": 0.0,
+          "sla_compliance": 0.0
+        }
+      },
+      "topology_preference": {
+        "preferred": [
+          "sequential"
+        ],
+        "compatible": [
+          "sequential",
+          "parallel"
+        ],
+        "avoid": []
+      },
+      "workflow_blueprint_ids": []
+    },
+    "tiansuan": {
+      "name": "天算",
+      "layer": "L2",
+      "role": "数据分析师",
+      "emoji": "📊",
+      "capabilities": [
+        "统计分析",
+        "可视化",
+        "模式识别",
+        "报告撰写"
+      ],
+      "tools": [
+        "memory_recall",
+        "memory_stats",
+        "tianji_summarize",
+        "tianji_semantic_search"
+      ],
+      "mcp_server": "memory-engine-global",
+      "runtime_class": "TiansuanAgent",
+      "lingjing_service_id": "svc-analyst",
+      "lingjing_port": 8805,
+      "health_endpoint": "/health/analyst",
+      "memory_affinity": {
+        "primary_read": [
+          "L4",
+          "L5"
+        ],
+        "primary_write": [
+          "L3",
+          "L4"
+        ],
+        "secondary_read": [
+          "L3"
+        ],
+        "secondary_write": [
+          "L1"
+        ]
+      },
+      "skill_bindings": [
+        "data-analyze",
+        "corpus-quality-score"
+      ],
+      "decision_steps": {
+        "owns": [
+          "Step2-Retrieve",
+          "Step5-Evaluate"
+        ],
+        "participates": [
+          "Step4-Generate"
+        ]
+      },
+      "stage_gates": {
+        "responsible": [],
+        "participates": [
+          "Gate3"
+        ]
+      },
+      "data_flow": {
+        "upstream": [
+          "yiku",
+          "qianli"
+        ],
+        "downstream": [
+          "tianshu",
+          "qianli"
+        ],
+        "bidirectional": [
+          "qianli"
+        ]
+      },
+      "event_bus": {
+        "subscribes": [
+          "data.analysis_requested",
+          "metrics.updated"
+        ],
+        "publishes": [
+          "analysis.completed",
+          "trend.predicted",
+          "anomaly.detected"
+        ]
+      },
+      "quality_metrics": [
+        "analysis_accuracy",
+        "prediction_confidence",
+        "report_completeness"
+      ],
+      "error_escalation": {
+        "escalates_to": "tianshu",
+        "escalation_condition": "data_insufficient_for_analysis"
+      },
+      "circuit_breaker": {
+        "failure_threshold": 3,
+        "timeout_seconds": 120,
+        "recovery_action": "fallback_to_descriptive_stats"
+      },
+      "collaboration_partners": [
+        "tianshu",
+        "yiku",
+        "qianli"
+      ],
+      "source": "tianji",
+      "clear_metrics": {
+        "cost": {
+          "token_usage": 0,
+          "api_calls": 0,
+          "model_cost": 0.0
+        },
+        "latency": {
+          "total_ms": 0,
+          "ttft_ms": 0,
+          "processing_ms": 0
+        },
+        "efficacy": {
+          "success_rate": 0.0,
+          "quality_score": 0.0,
+          "coverage": 0.0
+        },
+        "assurance": {
+          "security_vulnerabilities": 0,
+          "compliance_passed": true,
+          "privacy_risk": 0.0
+        },
+        "reliability": {
+          "consistency_rate": 0.0,
+          "recovery_rate": 0.0,
+          "sla_compliance": 0.0
+        }
+      },
+      "topology_preference": {
+        "preferred": [
+          "sequential"
+        ],
+        "compatible": [
+          "sequential",
+          "parallel"
+        ],
+        "avoid": []
+      },
+      "workflow_blueprint_ids": []
+    },
+    "kuangshi": {
+      "name": "矿师",
+      "layer": "L2",
+      "role": "语料处理师",
+      "emoji": "⛏️",
+      "capabilities": [
+        "语料导入",
+        "数据清洗",
+        "分类标注",
+        "批量处理"
+      ],
+      "tools": [
+        "memory_remember",
+        "execute_command",
+        "memory_recall",
+        "tianji_auto_tag",
+        "tianji_classify"
+      ],
+      "mcp_server": "memory-engine-global",
+      "runtime_class": "KuangshiAgent",
+      "lingjing_service_id": "svc-corpus-miner",
+      "lingjing_port": 8806,
+      "health_endpoint": "/health/corpus",
+      "memory_affinity": {
+        "primary_read": [
+          "L0",
+          "L1"
+        ],
+        "primary_write": [
+          "L1",
+          "L4"
+        ],
+        "secondary_read": [
+          "L4"
+        ],
+        "secondary_write": [
+          "L3"
+        ]
+      },
+      "skill_bindings": [
+        "corpus-batch-import",
+        "corpus-extract",
+        "corpus-quality-score"
+      ],
+      "decision_steps": {
+        "owns": [
+          "Step2-Retrieve"
+        ],
+        "participates": [
+          "Step4-Generate"
+        ]
+      },
+      "stage_gates": {
+        "responsible": [],
+        "participates": [
+          "Gate0"
+        ]
+      },
+      "data_flow": {
+        "upstream": [
+          "tianshu",
+          "wanxiang"
+        ],
+        "downstream": [
+          "yiku",
+          "miaobi"
+        ],
+        "bidirectional": [
+          "yiku"
+        ]
+      },
+      "event_bus": {
+        "subscribes": [
+          "corpus.import_requested",
+          "data.raw_received"
+        ],
+        "publishes": [
+          "corpus.processed",
+          "corpus.quality_scored",
+          "corpus.tagged"
+        ]
+      },
+      "quality_metrics": [
+        "corpus_quality_score",
+        "tagging_accuracy",
+        "processing_throughput"
+      ],
+      "error_escalation": {
+        "escalates_to": "tianshu",
+        "escalation_condition": "corpus_quality_below_threshold"
+      },
+      "circuit_breaker": {
+        "failure_threshold": 5,
+        "timeout_seconds": 300,
+        "recovery_action": "pause_import_and_alert"
+      },
+      "collaboration_partners": [
+        "tianshu",
+        "yiku",
+        "miaobi",
+        "wanxiang"
+      ],
+      "source": "tianji",
+      "clear_metrics": {
+        "cost": {
+          "token_usage": 0,
+          "api_calls": 0,
+          "model_cost": 0.0
+        },
+        "latency": {
+          "total_ms": 0,
+          "ttft_ms": 0,
+          "processing_ms": 0
+        },
+        "efficacy": {
+          "success_rate": 0.0,
+          "quality_score": 0.0,
+          "coverage": 0.0
+        },
+        "assurance": {
+          "security_vulnerabilities": 0,
+          "compliance_passed": true,
+          "privacy_risk": 0.0
+        },
+        "reliability": {
+          "consistency_rate": 0.0,
+          "recovery_rate": 0.0,
+          "sla_compliance": 0.0
+        }
+      },
+      "topology_preference": {
+        "preferred": [
+          "sequential"
+        ],
+        "compatible": [
+          "sequential",
+          "parallel"
+        ],
+        "avoid": []
+      },
+      "workflow_blueprint_ids": []
+    },
+    "lianli": {
+      "name": "连理",
+      "layer": "L2",
+      "role": "知识图谱构建师",
+      "emoji": "🔗",
+      "capabilities": [
+        "实体抽取",
+        "关系识别",
+        "图谱构建",
+        "图谱查询",
+        "多跳推理",
+        "路径查找"
+      ],
+      "tools": [
+        "tianji_extract_knowledge",
+        "memory_build_graph",
+        "memory_query_graph",
+        "memory_recall",
+        "memory_remember"
+      ],
+      "mcp_server": "memory-engine-global",
+      "runtime_class": "GraphBuilderAgent",
+      "lingjing_service_id": "svc-graph-builder",
+      "lingjing_port": 8807,
+      "health_endpoint": "/health/graph",
+      "memory_affinity": {
+        "primary_read": [
+          "L4"
+        ],
+        "primary_write": [
+          "L4"
+        ],
+        "secondary_read": [
+          "L3"
+        ],
+        "secondary_write": [
+          "L3"
+        ]
+      },
+      "skill_bindings": [],
+      "decision_steps": {
+        "owns": [
+          "Step2-Retrieve",
+          "Step3-Fuse"
+        ],
+        "participates": [
+          "Step5-Evaluate"
+        ]
+      },
+      "stage_gates": {
+        "responsible": [],
+        "participates": [
+          "Gate1"
+        ]
+      },
+      "data_flow": {
+        "upstream": [
+          "yiku",
+          "dongcha",
+          "wanxiang"
+        ],
+        "downstream": [
+          "tianshu",
+          "yiku"
+        ],
+        "bidirectional": [
+          "yiku",
+          "huasheng"
+        ]
+      },
+      "event_bus": {
+        "subscribes": [
+          "knowledge.extraction_requested",
+          "graph.query_requested"
+        ],
+        "publishes": [
+          "graph.built",
+          "graph.query_result",
+          "knowledge.triple_extracted"
+        ]
+      },
+      "quality_metrics": [
+        "triple_extraction_confidence",
+        "graph_connectivity",
+        "query_accuracy"
+      ],
+      "error_escalation": {
+        "escalates_to": "tianshu",
+        "escalation_condition": "graph_construction_failure"
+      },
+      "circuit_breaker": {
+        "failure_threshold": 3,
+        "timeout_seconds": 120,
+        "recovery_action": "fallback_to_simple_search"
+      },
+      "collaboration_partners": [
+        "tianshu",
+        "yiku",
+        "huasheng",
+        "dongcha",
+        "wanxiang"
+      ],
+      "source": "tianji",
+      "clear_metrics": {
+        "cost": {
+          "token_usage": 0,
+          "api_calls": 0,
+          "model_cost": 0.0
+        },
+        "latency": {
+          "total_ms": 0,
+          "ttft_ms": 0,
+          "processing_ms": 0
+        },
+        "efficacy": {
+          "success_rate": 0.0,
+          "quality_score": 0.0,
+          "coverage": 0.0
+        },
+        "assurance": {
+          "security_vulnerabilities": 0,
+          "compliance_passed": true,
+          "privacy_risk": 0.0
+        },
+        "reliability": {
+          "consistency_rate": 0.0,
+          "recovery_rate": 0.0,
+          "sla_compliance": 0.0
+        }
+      },
+      "topology_preference": {
+        "preferred": [
+          "sequential"
+        ],
+        "compatible": [
+          "sequential",
+          "parallel"
+        ],
+        "avoid": []
+      },
+      "workflow_blueprint_ids": []
+    },
+    "baiqiao": {
+      "name": "百巧",
+      "layer": "L3",
+      "role": "技能代理",
+      "emoji": "🔧",
+      "capabilities": [
+        "技能调用",
+        "工作流编排",
+        "参数验证",
+        "结果格式化"
+      ],
+      "tools": [
+        "execute_command",
+        "agent_dispatch"
+      ],
+      "mcp_server": "command-executor",
+      "runtime_class": "BaiqiaoAgent",
+      "lingjing_service_id": "svc-skill-invoker",
+      "lingjing_port": 8830,
+      "health_endpoint": "/health/skills",
+      "memory_affinity": {
+        "primary_read": [
+          "L1"
+        ],
+        "primary_write": [
+          "L1"
+        ],
+        "secondary_read": [
+          "L4"
+        ],
+        "secondary_write": []
+      },
+      "skill_bindings": [
+        "skill-route"
+      ],
+      "decision_steps": {
+        "owns": [
+          "Step4-Generate"
+        ],
+        "participates": [
+          "Step5-Evaluate"
+        ]
+      },
+      "stage_gates": {
+        "responsible": [],
+        "participates": [
+          "Gate2"
+        ]
+      },
+      "data_flow": {
+        "upstream": [
+          "tianshu",
+          "jingwei"
+        ],
+        "downstream": [
+          "jinshu",
+          "gongzao"
+        ],
+        "bidirectional": [
+          "gongzao"
+        ]
+      },
+      "event_bus": {
+        "subscribes": [
+          "skill.invoke_requested",
+          "tool.chain_needed"
+        ],
+        "publishes": [
+          "skill.invoked",
+          "skill.result_formatted",
+          "skill.chain_completed"
+        ]
+      },
+      "quality_metrics": [
+        "skill_invocation_success_rate",
+        "parameter_validation_rate",
+        "result_format_compliance"
+      ],
+      "error_escalation": {
+        "escalates_to": "tianshu",
+        "escalation_condition": "skill_not_found_or_failed"
+      },
+      "circuit_breaker": {
+        "failure_threshold": 5,
+        "timeout_seconds": 60,
+        "recovery_action": "fallback_to_basic_tools"
+      },
+      "collaboration_partners": [
+        "tianshu",
+        "gongzao",
+        "jinshu"
+      ],
+      "source": "tianji",
+      "clear_metrics": {
+        "cost": {
+          "token_usage": 0,
+          "api_calls": 0,
+          "model_cost": 0.0
+        },
+        "latency": {
+          "total_ms": 0,
+          "ttft_ms": 0,
+          "processing_ms": 0
+        },
+        "efficacy": {
+          "success_rate": 0.0,
+          "quality_score": 0.0,
+          "coverage": 0.0
+        },
+        "assurance": {
+          "security_vulnerabilities": 0,
+          "compliance_passed": true,
+          "privacy_risk": 0.0
+        },
+        "reliability": {
+          "consistency_rate": 0.0,
+          "recovery_rate": 0.0,
+          "sla_compliance": 0.0
+        }
+      },
+      "topology_preference": {
+        "preferred": [
+          "sequential"
+        ],
+        "compatible": [
+          "sequential",
+          "parallel"
+        ],
+        "avoid": []
+      },
+      "workflow_blueprint_ids": []
+    },
+    "shiguan": {
+      "name": "史官",
+      "layer": "L3",
+      "role": "版本追踪者",
+      "emoji": "📜",
+      "capabilities": [
+        "版本管理",
+        "历史归档",
+        "变更分析",
+        "回滚支持"
+      ],
+      "tools": [
+        "memory_recall",
+        "memory_remember",
+        "tianji_export"
+      ],
+      "mcp_server": "memory-engine-global",
+      "runtime_class": "ShiguanAgent",
+      "lingjing_service_id": "svc-history-tracker",
+      "lingjing_port": 8831,
+      "health_endpoint": "/health/history",
+      "memory_affinity": {
+        "primary_read": [
+          "L3",
+          "L5"
+        ],
+        "primary_write": [
+          "L3",
+          "L5"
+        ],
+        "secondary_read": [
+          "L4"
+        ],
+        "secondary_write": [
+          "L4"
+        ]
+      },
+      "skill_bindings": [
+        "novel-version-track"
+      ],
+      "decision_steps": {
+        "owns": [
+          "Step6-Record"
+        ],
+        "participates": [
+          "Step5-Evaluate"
+        ]
+      },
+      "stage_gates": {
+        "responsible": [
+          "Gate6"
+        ],
+        "participates": [
+          "Gate5"
+        ]
+      },
+      "data_flow": {
+        "upstream": [
+          "wenzong",
+          "tiewei",
+          "mingjing"
+        ],
+        "downstream": [
+          "yiku"
+        ],
+        "bidirectional": [
+          "yiku"
+        ]
+      },
+      "event_bus": {
+        "subscribes": [
+          "version.snapshot_requested",
+          "change.detected",
+          "release.approved"
+        ],
+        "publishes": [
+          "version.snapshotted",
+          "changelog.generated",
+          "version.rollback_ready"
+        ]
+      },
+      "quality_metrics": [
+        "snapshot_completeness",
+        "changelog_accuracy",
+        "rollback_readiness"
+      ],
+      "error_escalation": {
+        "escalates_to": "tianshu",
+        "escalation_condition": "version_corruption_detected"
+      },
+      "circuit_breaker": {
+        "failure_threshold": 3,
+        "timeout_seconds": 120,
+        "recovery_action": "fallback_to_last_known_good_version"
+      },
+      "collaboration_partners": [
+        "tianshu",
+        "wenzong",
+        "yiku"
+      ],
+      "source": "tianji",
+      "clear_metrics": {
+        "cost": {
+          "token_usage": 0,
+          "api_calls": 0,
+          "model_cost": 0.0
+        },
+        "latency": {
+          "total_ms": 0,
+          "ttft_ms": 0,
+          "processing_ms": 0
+        },
+        "efficacy": {
+          "success_rate": 0.0,
+          "quality_score": 0.0,
+          "coverage": 0.0
+        },
+        "assurance": {
+          "security_vulnerabilities": 0,
+          "compliance_passed": true,
+          "privacy_risk": 0.0
+        },
+        "reliability": {
+          "consistency_rate": 0.0,
+          "recovery_rate": 0.0,
+          "sla_compliance": 0.0
+        }
+      },
+      "topology_preference": {
+        "preferred": [
+          "sequential"
+        ],
+        "compatible": [
+          "sequential",
+          "parallel"
+        ],
+        "avoid": []
+      },
+      "workflow_blueprint_ids": []
+    },
+    "jinshu": {
+      "name": "锦书",
+      "layer": "L3",
+      "role": "成品导出师",
+      "emoji": "📮",
+      "capabilities": [
+        "格式导出",
+        "成品美化",
+        "模板应用",
+        "输出验证"
+      ],
+      "tools": [
+        "execute_command",
+        "memory_recall",
+        "tianji_export"
+      ],
+      "mcp_server": "command-executor",
+      "runtime_class": "JinshuAgent",
+      "lingjing_service_id": "svc-exporter",
+      "lingjing_port": 8832,
+      "health_endpoint": "/health/export",
+      "memory_affinity": {
+        "primary_read": [
+          "L1",
+          "L3"
+        ],
+        "primary_write": [
+          "L1"
+        ],
+        "secondary_read": [
+          "L4"
+        ],
+        "secondary_write": []
+      },
+      "skill_bindings": [
+        "novel-format-export"
+      ],
+      "decision_steps": {
+        "owns": [
+          "Step4-Generate"
+        ],
+        "participates": [
+          "Step5-Evaluate"
+        ]
+      },
+      "stage_gates": {
+        "responsible": [
+          "Gate6"
+        ],
+        "participates": [
+          "Gate5"
+        ]
+      },
+      "data_flow": {
+        "upstream": [
+          "miaobi",
+          "mingjing",
+          "baiqiao"
+        ],
+        "downstream": [
+          "shiguan"
+        ],
+        "bidirectional": [
+          "baiqiao"
+        ]
+      },
+      "event_bus": {
+        "subscribes": [
+          "export.requested",
+          "format.conversion_needed"
+        ],
+        "publishes": [
+          "export.completed",
+          "export.format_validated",
+          "export.ready_for_release"
+        ]
+      },
+      "quality_metrics": [
+        "format_compliance_rate",
+        "export_success_rate",
+        "cross_platform_compatibility"
+      ],
+      "error_escalation": {
+        "escalates_to": "tianshu",
+        "escalation_condition": "format_unsupported_or_corrupted"
+      },
+      "circuit_breaker": {
+        "failure_threshold": 3,
+        "timeout_seconds": 120,
+        "recovery_action": "fallback_to_plain_text"
+      },
+      "collaboration_partners": [
+        "tianshu",
+        "baiqiao",
+        "shiguan"
+      ],
+      "source": "tianji",
+      "clear_metrics": {
+        "cost": {
+          "token_usage": 0,
+          "api_calls": 0,
+          "model_cost": 0.0
+        },
+        "latency": {
+          "total_ms": 0,
+          "ttft_ms": 0,
+          "processing_ms": 0
+        },
+        "efficacy": {
+          "success_rate": 0.0,
+          "quality_score": 0.0,
+          "coverage": 0.0
+        },
+        "assurance": {
+          "security_vulnerabilities": 0,
+          "compliance_passed": true,
+          "privacy_risk": 0.0
+        },
+        "reliability": {
+          "consistency_rate": 0.0,
+          "recovery_rate": 0.0,
+          "sla_compliance": 0.0
+        }
+      },
+      "topology_preference": {
+        "preferred": [
+          "sequential"
+        ],
+        "compatible": [
+          "sequential",
+          "parallel"
+        ],
+        "avoid": []
+      },
+      "workflow_blueprint_ids": []
+    },
+    "huasheng": {
+      "name": "化生",
+      "layer": "L3",
+      "role": "进化工程师",
+      "emoji": "🧬",
+      "capabilities": [
+        "自我检查",
+        "自我更新",
+        "递归改进",
+        "规则演化",
+        "架构升级"
+      ],
+      "tools": [
+        "memory_evolve_self",
+        "memory_remember",
+        "memory_recall",
+        "execute_command",
+        "system_status"
+      ],
+      "mcp_server": "memory-engine-global",
+      "runtime_class": "EvolverAgent",
+      "lingjing_service_id": "svc-evolver",
+      "lingjing_port": 8833,
+      "health_endpoint": "/health/evolver",
+      "memory_affinity": {
+        "primary_read": [
+          "L5",
+          "L4"
+        ],
+        "primary_write": [
+          "L5",
+          "L3"
+        ],
+        "secondary_read": [
+          "L3"
+        ],
+        "secondary_write": [
+          "L4"
+        ]
+      },
+      "skill_bindings": [],
+      "decision_steps": {
+        "owns": [
+          "Step5-Evaluate",
+          "Step6-Record"
+        ],
+        "participates": [
+          "Step1-Identify",
+          "Step2-Retrieve"
+        ]
+      },
+      "stage_gates": {
+        "responsible": [],
+        "participates": [
+          "Gate4",
+          "Gate5"
+        ]
+      },
+      "data_flow": {
+        "upstream": [
+          "tianshu",
+          "qianli",
+          "zhenshan",
+          "zhuiguang"
+        ],
+        "downstream": [
+          "tianji",
+          "yiku",
+          "lianli"
+        ],
+        "bidirectional": [
+          "tianji",
+          "yiku",
+          "jingwei"
+        ]
+      },
+      "event_bus": {
+        "subscribes": [
+          "system.evolution_triggered",
+          "performance.degradation_detected",
+          "security.vulnerability_found"
+        ],
+        "publishes": [
+          "evolution.cycle_completed",
+          "evolution.improvement_applied",
+          "evolution.risk_assessed"
+        ]
+      },
+      "quality_metrics": [
+        "evolution_success_rate",
+        "improvement_effectiveness",
+        "risk_assessment_accuracy"
+      ],
+      "error_escalation": {
+        "escalates_to": "tianji",
+        "escalation_condition": "evolution_risk_above_0.7"
+      },
+      "circuit_breaker": {
+        "failure_threshold": 3,
+        "timeout_seconds": 600,
+        "recovery_action": "halt_evolution_and_rollback"
+      },
+      "collaboration_partners": [
+        "tianshu",
+        "yiku",
+        "lianli",
+        "tiewei",
+        "zhenshan",
+        "jingwei"
+      ],
+      "source": "tianji",
+      "clear_metrics": {
+        "cost": {
+          "token_usage": 0,
+          "api_calls": 0,
+          "model_cost": 0.0
+        },
+        "latency": {
+          "total_ms": 0,
+          "ttft_ms": 0,
+          "processing_ms": 0
+        },
+        "efficacy": {
+          "success_rate": 0.0,
+          "quality_score": 0.0,
+          "coverage": 0.0
+        },
+        "assurance": {
+          "security_vulnerabilities": 0,
+          "compliance_passed": true,
+          "privacy_risk": 0.0
+        },
+        "reliability": {
+          "consistency_rate": 0.0,
+          "recovery_rate": 0.0,
+          "sla_compliance": 0.0
+        }
+      },
+      "topology_preference": {
+        "preferred": [
+          "sequential"
+        ],
+        "compatible": [
+          "sequential",
+          "parallel"
+        ],
+        "avoid": []
+      },
+      "workflow_blueprint_ids": []
+    },
+    "qianli": {
+      "name": "千里",
+      "layer": "L4",
+      "role": "系统监控者",
+      "emoji": "👁️",
+      "capabilities": [
+        "实时监控",
+        "指标采集",
+        "智能告警",
+        "趋势分析"
+      ],
+      "tools": [
+        "system_status",
+        "ops-engine",
+        "performance-profiler",
+        "memory_recall",
+        "tianji_health"
+      ],
+      "mcp_server": "performance-profiler",
+      "runtime_class": "QianliAgent",
+      "lingjing_service_id": "svc-monitor",
+      "lingjing_port": 8840,
+      "health_endpoint": "/health/monitor",
+      "memory_affinity": {
+        "primary_read": [
+          "L1",
+          "L5"
+        ],
+        "primary_write": [
+          "L1",
+          "L3"
+        ],
+        "secondary_read": [
+          "L3"
+        ],
+        "secondary_write": [
+          "L5"
+        ]
+      },
+      "skill_bindings": [
+        "system-diagnose"
+      ],
+      "decision_steps": {
+        "owns": [
+          "Step2-Retrieve"
+        ],
+        "participates": [
+          "Step5-Evaluate"
+        ]
+      },
+      "stage_gates": {
+        "responsible": [],
+        "participates": [
+          "Gate4",
+          "Gate5"
+        ]
+      },
+      "data_flow": {
+        "upstream": [
+          "tianji",
+          "gongzao"
+        ],
+        "downstream": [
+          "tianshu",
+          "tiansuan",
+          "zhuiguang"
+        ],
+        "bidirectional": [
+          "tiansuan",
+          "zhuiguang"
+        ]
+      },
+      "event_bus": {
+        "subscribes": [
+          "system.metric_updated",
+          "system.health_check"
+        ],
+        "publishes": [
+          "monitor.alert",
+          "monitor.trend",
+          "monitor.anomaly",
+          "monitor.sla_warning"
+        ]
+      },
+      "quality_metrics": [
+        "alert_accuracy",
+        "monitoring_coverage",
+        "sla_compliance_rate",
+        "anomaly_detection_latency"
+      ],
+      "error_escalation": {
+        "escalates_to": "tianshu",
+        "escalation_condition": "system_health_below_0.5"
+      },
+      "circuit_breaker": {
+        "failure_threshold": 3,
+        "timeout_seconds": 30,
+        "recovery_action": "fallback_to_basic_health_check"
+      },
+      "collaboration_partners": [
+        "tianshu",
+        "gongzao",
+        "zhuiguang",
+        "tiansuan"
+      ],
+      "source": "tianji",
+      "clear_metrics": {
+        "cost": {
+          "token_usage": 0,
+          "api_calls": 0,
+          "model_cost": 0.0
+        },
+        "latency": {
+          "total_ms": 0,
+          "ttft_ms": 0,
+          "processing_ms": 0
+        },
+        "efficacy": {
+          "success_rate": 0.0,
+          "quality_score": 0.0,
+          "coverage": 0.0
+        },
+        "assurance": {
+          "security_vulnerabilities": 0,
+          "compliance_passed": true,
+          "privacy_risk": 0.0
+        },
+        "reliability": {
+          "consistency_rate": 0.0,
+          "recovery_rate": 0.0,
+          "sla_compliance": 0.0
+        }
+      },
+      "topology_preference": {
+        "preferred": [
+          "sequential"
+        ],
+        "compatible": [
+          "sequential",
+          "parallel"
+        ],
+        "avoid": []
+      },
+      "workflow_blueprint_ids": []
+    },
+    "gongzao": {
+      "name": "工造",
+      "layer": "L4",
+      "role": "DevOps",
+      "emoji": "🏗️",
+      "capabilities": [
+        "CI/CD",
+        "环境管理",
+        "服务部署",
+        "资源调度"
+      ],
+      "tools": [
+        "execute_command",
+        "ops-engine",
+        "agent_dispatch"
+      ],
+      "mcp_server": "ops-engine",
+      "runtime_class": "GongzaoAgent",
+      "lingjing_service_id": "svc-devops",
+      "lingjing_port": 8841,
+      "health_endpoint": "/health/devops",
+      "memory_affinity": {
+        "primary_read": [
+          "L5"
+        ],
+        "primary_write": [
+          "L5",
+          "L3"
+        ],
+        "secondary_read": [
+          "L3"
+        ],
+        "secondary_write": [
+          "L1"
+        ]
+      },
+      "skill_bindings": [
+        "ops-deploy"
+      ],
+      "decision_steps": {
+        "owns": [
+          "Step4-Generate"
+        ],
+        "participates": [
+          "Step5-Evaluate",
+          "Step6-Record"
+        ]
+      },
+      "stage_gates": {
+        "responsible": [
+          "Gate5"
+        ],
+        "participates": [
+          "Gate4",
+          "Gate6"
+        ]
+      },
+      "data_flow": {
+        "upstream": [
+          "tianshu",
+          "jingwei",
+          "tiewei"
+        ],
+        "downstream": [
+          "qianli",
+          "shiguan"
+        ],
+        "bidirectional": [
+          "qianli",
+          "baiqiao"
+        ]
+      },
+      "event_bus": {
+        "subscribes": [
+          "gate.passed",
+          "deploy.requested",
+          "rollback.required"
+        ],
+        "publishes": [
+          "deploy.started",
+          "deploy.completed",
+          "deploy.failed",
+          "rollback.executed"
+        ]
+      },
+      "quality_metrics": [
+        "deploy_success_rate",
+        "rollback_rate",
+        "deployment_latency",
+        "environment_consistency"
+      ],
+      "error_escalation": {
+        "escalates_to": "tianshu",
+        "escalation_condition": "deployment_failed_after_3_retries"
+      },
+      "circuit_breaker": {
+        "failure_threshold": 3,
+        "timeout_seconds": 600,
+        "recovery_action": "auto_rollback_to_last_stable"
+      },
+      "collaboration_partners": [
+        "tianshu",
+        "jingwei",
+        "qianli",
+        "baiqiao"
+      ],
+      "source": "tianji",
+      "clear_metrics": {
+        "cost": {
+          "token_usage": 0,
+          "api_calls": 0,
+          "model_cost": 0.0
+        },
+        "latency": {
+          "total_ms": 0,
+          "ttft_ms": 0,
+          "processing_ms": 0
+        },
+        "efficacy": {
+          "success_rate": 0.0,
+          "quality_score": 0.0,
+          "coverage": 0.0
+        },
+        "assurance": {
+          "security_vulnerabilities": 0,
+          "compliance_passed": true,
+          "privacy_risk": 0.0
+        },
+        "reliability": {
+          "consistency_rate": 0.0,
+          "recovery_rate": 0.0,
+          "sla_compliance": 0.0
+        }
+      },
+      "topology_preference": {
+        "preferred": [
+          "sequential"
+        ],
+        "compatible": [
+          "sequential",
+          "parallel"
+        ],
+        "avoid": []
+      },
+      "workflow_blueprint_ids": []
+    },
+    "zhenshan": {
+      "name": "镇山",
+      "layer": "L4",
+      "role": "安全审计师",
+      "emoji": "🏔️",
+      "capabilities": [
+        "漏洞扫描",
+        "合规检查",
+        "密钥管理",
+        "数据保护"
+      ],
+      "tools": [
+        "security-scanner",
+        "execute_command",
+        "memory_recall"
+      ],
+      "mcp_server": "security-scanner",
+      "runtime_class": "ZhenshanAgent",
+      "lingjing_service_id": "svc-security",
+      "lingjing_port": 8842,
+      "health_endpoint": "/health/security",
+      "memory_affinity": {
+        "primary_read": [
+          "L5"
+        ],
+        "primary_write": [
+          "L5",
+          "L3"
+        ],
+        "secondary_read": [
+          "L3"
+        ],
+        "secondary_write": [
+          "L1"
+        ]
+      },
+      "skill_bindings": [
+        "security-audit"
+      ],
+      "decision_steps": {
+        "owns": [
+          "Step5-Evaluate"
+        ],
+        "participates": [
+          "Step2-Retrieve"
+        ]
+      },
+      "stage_gates": {
+        "responsible": [
+          "Gate3",
+          "Gate4"
+        ],
+        "participates": [
+          "Gate5"
+        ]
+      },
+      "data_flow": {
+        "upstream": [
+          "tianshu",
+          "tiewei",
+          "luling"
+        ],
+        "downstream": [
+          "tianshu",
+          "huasheng"
+        ],
+        "bidirectional": [
+          "tiewei"
+        ]
+      },
+      "event_bus": {
+        "subscribes": [
+          "security.scan_requested",
+          "vulnerability.reported",
+          "compliance.check_needed"
+        ],
+        "publishes": [
+          "security.scan_completed",
+          "security.vulnerability_found",
+          "security.compliance_result",
+          "security.critical_alert"
+        ]
+      },
+      "quality_metrics": [
+        "vulnerability_detection_rate",
+        "false_positive_rate",
+        "compliance_coverage",
+        "critical_response_time"
+      ],
+      "error_escalation": {
+        "escalates_to": "tianji",
+        "escalation_condition": "critical_vulnerability_found"
+      },
+      "circuit_breaker": {
+        "failure_threshold": 2,
+        "timeout_seconds": 300,
+        "recovery_action": "block_deployment_and_alert"
+      },
+      "collaboration_partners": [
+        "tianshu",
+        "tiewei",
+        "qianli",
+        "huasheng",
+        "compliance-checker"
+      ],
+      "source": "tianji",
+      "clear_metrics": {
+        "cost": {
+          "token_usage": 0,
+          "api_calls": 0,
+          "model_cost": 0.0
+        },
+        "latency": {
+          "total_ms": 0,
+          "ttft_ms": 0,
+          "processing_ms": 0
+        },
+        "efficacy": {
+          "success_rate": 0.0,
+          "quality_score": 0.0,
+          "coverage": 0.0
+        },
+        "assurance": {
+          "security_vulnerabilities": 0,
+          "compliance_passed": true,
+          "privacy_risk": 0.0
+        },
+        "reliability": {
+          "consistency_rate": 0.0,
+          "recovery_rate": 0.0,
+          "sla_compliance": 0.0
+        }
+      },
+      "topology_preference": {
+        "preferred": [
+          "sequential"
+        ],
+        "compatible": [
+          "sequential",
+          "parallel"
+        ],
+        "avoid": []
+      },
+      "workflow_blueprint_ids": []
+    },
+    "zhuiguang": {
+      "name": "追光",
+      "layer": "L4",
+      "role": "性能优化师",
+      "emoji": "⚡",
+      "capabilities": [
+        "性能剖析",
+        "瓶颈分析",
+        "基准测试",
+        "资源优化"
+      ],
+      "tools": [
+        "performance-profiler",
+        "execute_command",
+        "memory_recall"
+      ],
+      "mcp_server": "performance-profiler",
+      "runtime_class": "ZhuiguangAgent",
+      "lingjing_service_id": "svc-performance",
+      "lingjing_port": 8843,
+      "health_endpoint": "/health/performance",
+      "memory_affinity": {
+        "primary_read": [
+          "L3",
+          "L5"
+        ],
+        "primary_write": [
+          "L3",
+          "L5"
+        ],
+        "secondary_read": [
+          "L1"
+        ],
+        "secondary_write": [
+          "L1"
+        ]
+      },
+      "skill_bindings": [
+        "perf-profile"
+      ],
+      "decision_steps": {
+        "owns": [
+          "Step5-Evaluate"
+        ],
+        "participates": [
+          "Step2-Retrieve",
+          "Step4-Generate"
+        ]
+      },
+      "stage_gates": {
+        "responsible": [],
+        "participates": [
+          "Gate4",
+          "Gate5"
+        ]
+      },
+      "data_flow": {
+        "upstream": [
+          "qianli",
+          "tianshu"
+        ],
+        "downstream": [
+          "huasheng",
+          "gongzao"
+        ],
+        "bidirectional": [
+          "qianli"
+        ]
+      },
+      "event_bus": {
+        "subscribes": [
+          "performance.profiling_requested",
+          "monitor.anomaly",
+          "performance.degradation_detected"
+        ],
+        "publishes": [
+          "performance.benchmark_updated",
+          "performance.bottleneck_found",
+          "performance.optimization_applied"
+        ]
+      },
+      "quality_metrics": [
+        "benchmark_coverage",
+        "optimization_effectiveness",
+        "p99_latency_improvement"
+      ],
+      "error_escalation": {
+        "escalates_to": "tianshu",
+        "escalation_condition": "performance_degradation_over_5_percent"
+      },
+      "circuit_breaker": {
+        "failure_threshold": 3,
+        "timeout_seconds": 300,
+        "recovery_action": "skip_profiling_and_use_cached_baseline"
+      },
+      "collaboration_partners": [
+        "tianshu",
+        "qianli",
+        "gongzao",
+        "huasheng",
+        "performance-expert"
+      ],
+      "source": "tianji",
+      "clear_metrics": {
+        "cost": {
+          "token_usage": 0,
+          "api_calls": 0,
+          "model_cost": 0.0
+        },
+        "latency": {
+          "total_ms": 0,
+          "ttft_ms": 0,
+          "processing_ms": 0
+        },
+        "efficacy": {
+          "success_rate": 0.0,
+          "quality_score": 0.0,
+          "coverage": 0.0
+        },
+        "assurance": {
+          "security_vulnerabilities": 0,
+          "compliance_passed": true,
+          "privacy_risk": 0.0
+        },
+        "reliability": {
+          "consistency_rate": 0.0,
+          "recovery_rate": 0.0,
+          "sla_compliance": 0.0
+        }
+      },
+      "topology_preference": {
+        "preferred": [
+          "sequential"
+        ],
+        "compatible": [
+          "sequential",
+          "parallel"
+        ],
+        "avoid": []
+      },
+      "workflow_blueprint_ids": []
+    },
+    "ui-designer": {
+      "name": "UI设计师",
+      "layer": "L2",
+      "role": "界面设计师",
+      "emoji": "🎨",
+      "source": "trae-official",
+      "capabilities": [
+        "UI组件设计",
+        "设计系统构建",
+        "视觉层级优化",
+        "可访问性设计"
+      ],
+      "tools": [
+        "read",
+        "file_system",
+        "terminal",
+        "web_search",
+        "agent_dispatch"
+      ],
+      "mcp_server": "agent-framework-global",
+      "runtime_class": "TraeOfficialAgent",
+      "memory_affinity": {
+        "primary_read": [
+          "L4"
+        ],
+        "primary_write": [
+          "L3"
+        ],
+        "secondary_read": [
+          "L1"
+        ],
+        "secondary_write": []
+      },
+      "skill_bindings": [
+        "ui-design"
+      ],
+      "decision_steps": {
+        "owns": [
+          "Step4-Generate"
+        ],
+        "participates": [
+          "Step2-Retrieve",
+          "Step5-Evaluate"
+        ]
+      },
+      "stage_gates": {
+        "responsible": [],
+        "participates": [
+          "Gate1",
+          "Gate2"
+        ]
+      },
+      "data_flow": {
+        "upstream": [
+          "dongcha",
+          "tianshu"
+        ],
+        "downstream": [
+          "frontend-architect",
+          "miaobi"
+        ],
+        "bidirectional": [
+          "frontend-architect"
+        ]
+      },
+      "event_bus": {
+        "subscribes": [
+          "design.requested",
+          "ui.component_needed"
+        ],
+        "publishes": [
+          "design.completed",
+          "ui.spec_ready"
+        ]
+      },
+      "quality_metrics": [
+        "design_consistency",
+        "a11y_compliance",
+        "component_reusability"
+      ],
+      "error_escalation": {
+        "escalates_to": "tianshu",
+        "escalation_condition": "design_conflict_or_scope_unclear"
+      },
+      "circuit_breaker": {
+        "failure_threshold": 3,
+        "timeout_seconds": 120,
+        "recovery_action": "fallback_to_simple_layout"
+      },
+      "collaboration_partners": [
+        "frontend-architect",
+        "backend-architect",
+        "miaobi",
+        "tianshu"
+      ],
+      "clear_metrics": {
+        "cost": {
+          "token_usage": 0,
+          "api_calls": 0,
+          "model_cost": 0.0
+        },
+        "latency": {
+          "total_ms": 0,
+          "ttft_ms": 0,
+          "processing_ms": 0
+        },
+        "efficacy": {
+          "success_rate": 0.0,
+          "quality_score": 0.0,
+          "coverage": 0.0
+        },
+        "assurance": {
+          "security_vulnerabilities": 0,
+          "compliance_passed": true,
+          "privacy_risk": 0.0
+        },
+        "reliability": {
+          "consistency_rate": 0.0,
+          "recovery_rate": 0.0,
+          "sla_compliance": 0.0
+        }
+      },
+      "topology_preference": {
+        "preferred": [
+          "sequential"
+        ],
+        "compatible": [
+          "sequential",
+          "parallel"
+        ],
+        "avoid": []
+      },
+      "workflow_blueprint_ids": []
+    },
+    "frontend-architect": {
+      "name": "前端架构师",
+      "layer": "L2",
+      "role": "前端架构师",
+      "emoji": "⚛️",
+      "source": "trae-official",
+      "capabilities": [
+        "前端组件实现",
+        "状态管理",
+        "前端性能优化",
+        "TypeScript工程化"
+      ],
+      "tools": [
+        "read",
+        "file_system",
+        "terminal",
+        "web_search",
+        "agent_dispatch"
+      ],
+      "mcp_server": "agent-framework-global",
+      "runtime_class": "TraeOfficialAgent",
+      "memory_affinity": {
+        "primary_read": [
+          "L4"
+        ],
+        "primary_write": [
+          "L3"
+        ],
+        "secondary_read": [
+          "L1"
+        ],
+        "secondary_write": []
+      },
+      "skill_bindings": [
+        "frontend-dev"
+      ],
+      "decision_steps": {
+        "owns": [
+          "Step4-Generate"
+        ],
+        "participates": [
+          "Step2-Retrieve",
+          "Step5-Evaluate"
+        ]
+      },
+      "stage_gates": {
+        "responsible": [],
+        "participates": [
+          "Gate2",
+          "Gate3"
+        ]
+      },
+      "data_flow": {
+        "upstream": [
+          "ui-designer",
+          "jingwei",
+          "tianshu"
+        ],
+        "downstream": [
+          "api-test-pro",
+          "tiewei"
+        ],
+        "bidirectional": [
+          "ui-designer",
+          "backend-architect"
+        ]
+      },
+      "event_bus": {
+        "subscribes": [
+          "ui.spec_ready",
+          "frontend.task_assigned"
+        ],
+        "publishes": [
+          "frontend.component_completed",
+          "frontend.build_ready"
+        ]
+      },
+      "quality_metrics": [
+        "type_coverage",
+        "component_testability",
+        "bundle_size"
+      ],
+      "error_escalation": {
+        "escalates_to": "jingwei",
+        "escalation_condition": "architecture_conflict_or_build_failure"
+      },
+      "circuit_breaker": {
+        "failure_threshold": 3,
+        "timeout_seconds": 120,
+        "recovery_action": "fallback_to_vanilla_js"
+      },
+      "collaboration_partners": [
+        "ui-designer",
+        "backend-architect",
+        "api-test-pro",
+        "jingwei",
+        "tianshu"
+      ],
+      "clear_metrics": {
+        "cost": {
+          "token_usage": 0,
+          "api_calls": 0,
+          "model_cost": 0.0
+        },
+        "latency": {
+          "total_ms": 0,
+          "ttft_ms": 0,
+          "processing_ms": 0
+        },
+        "efficacy": {
+          "success_rate": 0.0,
+          "quality_score": 0.0,
+          "coverage": 0.0
+        },
+        "assurance": {
+          "security_vulnerabilities": 0,
+          "compliance_passed": true,
+          "privacy_risk": 0.0
+        },
+        "reliability": {
+          "consistency_rate": 0.0,
+          "recovery_rate": 0.0,
+          "sla_compliance": 0.0
+        }
+      },
+      "topology_preference": {
+        "preferred": [
+          "sequential"
+        ],
+        "compatible": [
+          "sequential",
+          "parallel"
+        ],
+        "avoid": []
+      },
+      "workflow_blueprint_ids": []
+    },
+    "backend-architect": {
+      "name": "后端架构师",
+      "layer": "L2",
+      "role": "后端架构师",
+      "emoji": "🖥️",
+      "source": "trae-official",
+      "capabilities": [
+        "API设计",
+        "数据库建模",
+        "服务端逻辑",
+        "分布式系统"
+      ],
+      "tools": [
+        "read",
+        "file_system",
+        "terminal",
+        "web_search",
+        "agent_dispatch",
+        "security-scanner"
+      ],
+      "mcp_server": "agent-framework-global",
+      "runtime_class": "TraeOfficialAgent",
+      "memory_affinity": {
+        "primary_read": [
+          "L4"
+        ],
+        "primary_write": [
+          "L3"
+        ],
+        "secondary_read": [
+          "L1"
+        ],
+        "secondary_write": []
+      },
+      "skill_bindings": [
+        "backend-dev"
+      ],
+      "decision_steps": {
+        "owns": [
+          "Step4-Generate"
+        ],
+        "participates": [
+          "Step2-Retrieve",
+          "Step5-Evaluate"
+        ]
+      },
+      "stage_gates": {
+        "responsible": [],
+        "participates": [
+          "Gate1",
+          "Gate2",
+          "Gate3"
+        ]
+      },
+      "data_flow": {
+        "upstream": [
+          "jingwei",
+          "tianshu"
+        ],
+        "downstream": [
+          "api-test-pro",
+          "zhenshan"
+        ],
+        "bidirectional": [
+          "frontend-architect"
+        ]
+      },
+      "event_bus": {
+        "subscribes": [
+          "backend.task_assigned",
+          "api.spec_needed"
+        ],
+        "publishes": [
+          "backend.api_completed",
+          "database.schema_ready"
+        ]
+      },
+      "quality_metrics": [
+        "api_contract_compliance",
+        "query_efficiency",
+        "security_score"
+      ],
+      "error_escalation": {
+        "escalates_to": "jingwei",
+        "escalation_condition": "data_model_conflict_or_security_risk"
+      },
+      "circuit_breaker": {
+        "failure_threshold": 3,
+        "timeout_seconds": 150,
+        "recovery_action": "fallback_to_simple_crud"
+      },
+      "collaboration_partners": [
+        "frontend-architect",
+        "api-test-pro",
+        "jingwei",
+        "zhenshan",
+        "tianshu"
+      ],
+      "clear_metrics": {
+        "cost": {
+          "token_usage": 0,
+          "api_calls": 0,
+          "model_cost": 0.0
+        },
+        "latency": {
+          "total_ms": 0,
+          "ttft_ms": 0,
+          "processing_ms": 0
+        },
+        "efficacy": {
+          "success_rate": 0.0,
+          "quality_score": 0.0,
+          "coverage": 0.0
+        },
+        "assurance": {
+          "security_vulnerabilities": 0,
+          "compliance_passed": true,
+          "privacy_risk": 0.0
+        },
+        "reliability": {
+          "consistency_rate": 0.0,
+          "recovery_rate": 0.0,
+          "sla_compliance": 0.0
+        }
+      },
+      "topology_preference": {
+        "preferred": [
+          "sequential"
+        ],
+        "compatible": [
+          "sequential",
+          "parallel"
+        ],
+        "avoid": []
+      },
+      "workflow_blueprint_ids": []
+    },
+    "api-test-pro": {
+      "name": "API测试专家",
+      "layer": "L3",
+      "role": "API测试专家",
+      "emoji": "🧪",
+      "source": "trae-official",
+      "capabilities": [
+        "API契约验证",
+        "性能测试",
+        "负载测试",
+        "自动化测试"
+      ],
+      "tools": [
+        "read",
+        "file_system",
+        "terminal",
+        "web_search",
+        "agent_dispatch",
+        "performance-profiler"
+      ],
+      "mcp_server": "performance-profiler",
+      "runtime_class": "TraeOfficialAgent",
+      "memory_affinity": {
+        "primary_read": [
+          "L3",
+          "L4"
+        ],
+        "primary_write": [
+          "L3"
+        ],
+        "secondary_read": [
+          "L1"
+        ],
+        "secondary_write": []
+      },
+      "skill_bindings": [
+        "api-test"
+      ],
+      "decision_steps": {
+        "owns": [
+          "Step5-Evaluate"
+        ],
+        "participates": [
+          "Step2-Retrieve",
+          "Step4-Generate"
+        ]
+      },
+      "stage_gates": {
+        "responsible": [],
+        "participates": [
+          "Gate3"
+        ]
+      },
+      "data_flow": {
+        "upstream": [
+          "backend-architect",
+          "frontend-architect"
+        ],
+        "downstream": [
+          "tiewei"
+        ],
+        "bidirectional": [
+          "backend-architect"
+        ]
+      },
+      "event_bus": {
+        "subscribes": [
+          "api.test_requested",
+          "backend.api_completed"
+        ],
+        "publishes": [
+          "api.test_completed",
+          "api.contract_violation"
+        ]
+      },
+      "quality_metrics": [
+        "test_coverage",
+        "contract_pass_rate",
+        "p99_latency"
+      ],
+      "error_escalation": {
+        "escalates_to": "tiewei",
+        "escalation_condition": "critical_api_failure_or_contract_break"
+      },
+      "circuit_breaker": {
+        "failure_threshold": 4,
+        "timeout_seconds": 180,
+        "recovery_action": "skip_perf_test_and_report_warning"
+      },
+      "collaboration_partners": [
+        "backend-architect",
+        "frontend-architect",
+        "tiewei",
+        "performance-expert"
+      ],
+      "clear_metrics": {
+        "cost": {
+          "token_usage": 0,
+          "api_calls": 0,
+          "model_cost": 0.0
+        },
+        "latency": {
+          "total_ms": 0,
+          "ttft_ms": 0,
+          "processing_ms": 0
+        },
+        "efficacy": {
+          "success_rate": 0.0,
+          "quality_score": 0.0,
+          "coverage": 0.0
+        },
+        "assurance": {
+          "security_vulnerabilities": 0,
+          "compliance_passed": true,
+          "privacy_risk": 0.0
+        },
+        "reliability": {
+          "consistency_rate": 0.0,
+          "recovery_rate": 0.0,
+          "sla_compliance": 0.0
+        }
+      },
+      "topology_preference": {
+        "preferred": [
+          "sequential"
+        ],
+        "compatible": [
+          "sequential",
+          "parallel"
+        ],
+        "avoid": []
+      },
+      "workflow_blueprint_ids": []
+    },
+    "ai-integration-engineer": {
+      "name": "AI集成工程师",
+      "layer": "L3",
+      "role": "AI集成工程师",
+      "emoji": "🤖",
+      "source": "trae-official",
+      "capabilities": [
+        "LLM集成",
+        "提示工程",
+        "RAG架构",
+        "推荐系统"
+      ],
+      "tools": [
+        "read",
+        "file_system",
+        "terminal",
+        "web_search",
+        "agent_dispatch",
+        "security-scanner"
+      ],
+      "mcp_server": "agent-framework-global",
+      "runtime_class": "TraeOfficialAgent",
+      "memory_affinity": {
+        "primary_read": [
+          "L4"
+        ],
+        "primary_write": [
+          "L3"
+        ],
+        "secondary_read": [
+          "L1"
+        ],
+        "secondary_write": []
+      },
+      "skill_bindings": [
+        "ai-integration"
+      ],
+      "decision_steps": {
+        "owns": [
+          "Step4-Generate"
+        ],
+        "participates": [
+          "Step2-Retrieve",
+          "Step5-Evaluate"
+        ]
+      },
+      "stage_gates": {
+        "responsible": [],
+        "participates": [
+          "Gate2",
+          "Gate4"
+        ]
+      },
+      "data_flow": {
+        "upstream": [
+          "tianshu",
+          "jingwei"
+        ],
+        "downstream": [
+          "zhenshan",
+          "tiewei"
+        ],
+        "bidirectional": [
+          "tianshu"
+        ]
+      },
+      "event_bus": {
+        "subscribes": [
+          "ai.integration_requested",
+          "llm.task_assigned"
+        ],
+        "publishes": [
+          "ai.integration_completed",
+          "llm.prompt_ready"
+        ]
+      },
+      "quality_metrics": [
+        "llm_output_quality",
+        "integration_stability",
+        "cost_efficiency"
+      ],
+      "error_escalation": {
+        "escalates_to": "tianshu",
+        "escalation_condition": "llm_failure_or_security_concern"
+      },
+      "circuit_breaker": {
+        "failure_threshold": 3,
+        "timeout_seconds": 120,
+        "recovery_action": "fallback_to_rule_based"
+      },
+      "collaboration_partners": [
+        "tianshu",
+        "zhenshan",
+        "tiewei",
+        "yiku"
+      ],
+      "clear_metrics": {
+        "cost": {
+          "token_usage": 0,
+          "api_calls": 0,
+          "model_cost": 0.0
+        },
+        "latency": {
+          "total_ms": 0,
+          "ttft_ms": 0,
+          "processing_ms": 0
+        },
+        "efficacy": {
+          "success_rate": 0.0,
+          "quality_score": 0.0,
+          "coverage": 0.0
+        },
+        "assurance": {
+          "security_vulnerabilities": 0,
+          "compliance_passed": true,
+          "privacy_risk": 0.0
+        },
+        "reliability": {
+          "consistency_rate": 0.0,
+          "recovery_rate": 0.0,
+          "sla_compliance": 0.0
+        }
+      },
+      "topology_preference": {
+        "preferred": [
+          "sequential"
+        ],
+        "compatible": [
+          "sequential",
+          "parallel"
+        ],
+        "avoid": []
+      },
+      "workflow_blueprint_ids": []
+    },
+    "performance-expert": {
+      "name": "性能优化专家",
+      "layer": "L4",
+      "role": "性能优化专家",
+      "emoji": "⚡",
+      "source": "trae-official",
+      "capabilities": [
+        "性能测试",
+        "应用性能分析",
+        "瓶颈识别",
+        "优化建议"
+      ],
+      "tools": [
+        "read",
+        "file_system",
+        "terminal",
+        "web_search",
+        "agent_dispatch",
+        "performance-profiler",
+        "command-executor"
+      ],
+      "mcp_server": "performance-profiler",
+      "runtime_class": "TraeOfficialAgent",
+      "memory_affinity": {
+        "primary_read": [
+          "L3",
+          "L5"
+        ],
+        "primary_write": [
+          "L3"
+        ],
+        "secondary_read": [
+          "L1"
+        ],
+        "secondary_write": []
+      },
+      "skill_bindings": [
+        "perf-expert"
+      ],
+      "decision_steps": {
+        "owns": [
+          "Step5-Evaluate"
+        ],
+        "participates": [
+          "Step2-Retrieve",
+          "Step4-Generate"
+        ]
+      },
+      "stage_gates": {
+        "responsible": [],
+        "participates": [
+          "Gate4",
+          "Gate5"
+        ]
+      },
+      "data_flow": {
+        "upstream": [
+          "qianli",
+          "tianshu"
+        ],
+        "downstream": [
+          "zhuiguang",
+          "huasheng"
+        ],
+        "bidirectional": [
+          "zhuiguang"
+        ]
+      },
+      "event_bus": {
+        "subscribes": [
+          "performance.test_requested",
+          "monitor.anomaly"
+        ],
+        "publishes": [
+          "performance.benchmark_updated",
+          "performance.optimization_recommended"
+        ]
+      },
+      "quality_metrics": [
+        "benchmark_coverage",
+        "optimization_effectiveness",
+        "latency_improvement"
+      ],
+      "error_escalation": {
+        "escalates_to": "zhuiguang",
+        "escalation_condition": "performance_degradation_over_5_percent"
+      },
+      "circuit_breaker": {
+        "failure_threshold": 3,
+        "timeout_seconds": 300,
+        "recovery_action": "use_cached_baseline"
+      },
+      "collaboration_partners": [
+        "qianli",
+        "zhuiguang",
+        "huasheng",
+        "tianshu"
+      ],
+      "clear_metrics": {
+        "cost": {
+          "token_usage": 0,
+          "api_calls": 0,
+          "model_cost": 0.0
+        },
+        "latency": {
+          "total_ms": 0,
+          "ttft_ms": 0,
+          "processing_ms": 0
+        },
+        "efficacy": {
+          "success_rate": 0.0,
+          "quality_score": 0.0,
+          "coverage": 0.0
+        },
+        "assurance": {
+          "security_vulnerabilities": 0,
+          "compliance_passed": true,
+          "privacy_risk": 0.0
+        },
+        "reliability": {
+          "consistency_rate": 0.0,
+          "recovery_rate": 0.0,
+          "sla_compliance": 0.0
+        }
+      },
+      "topology_preference": {
+        "preferred": [
+          "sequential"
+        ],
+        "compatible": [
+          "sequential",
+          "parallel"
+        ],
+        "avoid": []
+      },
+      "workflow_blueprint_ids": []
+    },
+    "compliance-checker": {
+      "name": "合规检查专家",
+      "layer": "L4",
+      "role": "合规检查专家",
+      "emoji": "📋",
+      "source": "trae-official",
+      "capabilities": [
+        "法规合规审查",
+        "隐私政策检查",
+        "服务条款审查",
+        "合规风险评估"
+      ],
+      "tools": [
+        "read",
+        "file_system",
+        "terminal",
+        "web_search",
+        "agent_dispatch",
+        "security-scanner"
+      ],
+      "mcp_server": "security-scanner",
+      "runtime_class": "TraeOfficialAgent",
+      "memory_affinity": {
+        "primary_read": [
+          "L4",
+          "L5"
+        ],
+        "primary_write": [
+          "L3"
+        ],
+        "secondary_read": [
+          "L1"
+        ],
+        "secondary_write": []
+      },
+      "skill_bindings": [
+        "compliance-check"
+      ],
+      "decision_steps": {
+        "owns": [
+          "Step5-Evaluate"
+        ],
+        "participates": [
+          "Step2-Retrieve",
+          "Step4-Generate"
+        ]
+      },
+      "stage_gates": {
+        "responsible": [],
+        "participates": [
+          "Gate4"
+        ]
+      },
+      "data_flow": {
+        "upstream": [
+          "zhenshan",
+          "tianshu"
+        ],
+        "downstream": [
+          "tianji",
+          "shiguan"
+        ],
+        "bidirectional": [
+          "zhenshan"
+        ]
+      },
+      "event_bus": {
+        "subscribes": [
+          "compliance.check_requested",
+          "security.vulnerability_found"
+        ],
+        "publishes": [
+          "compliance.check_completed",
+          "compliance.risk_reported"
+        ]
+      },
+      "quality_metrics": [
+        "compliance_coverage",
+        "risk_detection_rate",
+        "false_positive_rate"
+      ],
+      "error_escalation": {
+        "escalates_to": "zhenshan",
+        "escalation_condition": "critical_compliance_violation"
+      },
+      "circuit_breaker": {
+        "failure_threshold": 2,
+        "timeout_seconds": 300,
+        "recovery_action": "block_deployment_and_alert"
+      },
+      "collaboration_partners": [
+        "zhenshan",
+        "tianji",
+        "luling",
+        "shiguan"
+      ],
+      "clear_metrics": {
+        "cost": {
+          "token_usage": 0,
+          "api_calls": 0,
+          "model_cost": 0.0
+        },
+        "latency": {
+          "total_ms": 0,
+          "ttft_ms": 0,
+          "processing_ms": 0
+        },
+        "efficacy": {
+          "success_rate": 0.0,
+          "quality_score": 0.0,
+          "coverage": 0.0
+        },
+        "assurance": {
+          "security_vulnerabilities": 0,
+          "compliance_passed": true,
+          "privacy_risk": 0.0
+        },
+        "reliability": {
+          "consistency_rate": 0.0,
+          "recovery_rate": 0.0,
+          "sla_compliance": 0.0
+        }
+      },
+      "topology_preference": {
+        "preferred": [
+          "sequential"
+        ],
+        "compatible": [
+          "sequential",
+          "parallel"
+        ],
+        "avoid": []
+      },
+      "workflow_blueprint_ids": []
+    }
+  },
+  "cross_cutting_matrices": {
+    "memory_layer_coverage": {
+      "L0_sensory": {
+        "readers": [
+          "yiku",
+          "dongcha",
+          "wanxiang",
+          "kuangshi"
+        ],
+        "writers": [
+          "yiku",
+          "wanxiang",
+          "dongcha",
+          "lingxi"
+        ]
+      },
+      "L1_working": {
+        "readers": [
+          "yiku",
+          "dongcha",
+          "lingxi",
+          "miaobi",
+          "baiqiao",
+          "jinshu",
+          "qianli"
+        ],
+        "writers": [
+          "yiku",
+          "dongcha",
+          "lingxi",
+          "miaobi",
+          "baiqiao",
+          "jinshu",
+          "qianli",
+          "gongzao",
+          "zhenshan",
+          "zhuiguang"
+        ]
+      },
+      "L2_short_term": {
+        "readers": [
+          "yiku",
+          "lingxi",
+          "miaobi"
+        ],
+        "writers": [
+          "yiku"
+        ]
+      },
+      "L3_episodic": {
+        "readers": [
+          "yiku",
+          "tianshu",
+          "tiewei",
+          "wenzong",
+          "miaobi",
+          "mingjing",
+          "tiansuan",
+          "shiguan",
+          "huasheng",
+          "zhuiguang"
+        ],
+        "writers": [
+          "yiku",
+          "tianshu",
+          "tiewei",
+          "wenzong",
+          "miaobi",
+          "mingjing",
+          "tiansuan",
+          "shiguan",
+          "huasheng",
+          "gongzao",
+          "zhenshan",
+          "zhuiguang"
+        ]
+      },
+      "L4_semantic": {
+        "readers": [
+          "yiku",
+          "tianshu",
+          "jingwei",
+          "miaobi",
+          "mingjing",
+          "tiansuan",
+          "lianli",
+          "huasheng",
+          "kuangshi"
+        ],
+        "writers": [
+          "yiku",
+          "jingwei",
+          "tiansuan",
+          "lianli",
+          "huasheng",
+          "kuangshi",
+          "shiguan"
+        ]
+      },
+      "L5_meta": {
+        "readers": [
+          "yiku",
+          "tianji",
+          "tiewei",
+          "tianshu",
+          "luling",
+          "wenzong",
+          "jingwei",
+          "mingjing",
+          "jianheng",
+          "shiguan",
+          "huasheng",
+          "qianli",
+          "gongzao",
+          "zhenshan",
+          "zhuiguang"
+        ],
+        "writers": [
+          "yiku",
+          "tianji",
+          "tiewei",
+          "tianshu",
+          "luling",
+          "wenzong",
+          "jingwei",
+          "shiguan",
+          "huasheng",
+          "qianli",
+          "gongzao",
+          "zhenshan",
+          "zhuiguang"
+        ]
+      }
+    },
+    "decision_step_ownership": {
+      "Step1-Identify": {
+        "owners": [
+          "tianji",
+          "dongcha",
+          "wanxiang",
+          "tianshu"
+        ],
+        "participants": [
+          "luling",
+          "lingxi",
+          "huasheng"
+        ]
+      },
+      "Step2-Retrieve": {
+        "owners": [
+          "yiku",
+          "jingwei",
+          "tiansuan",
+          "kuangshi",
+          "lianli",
+          "qianli",
+          "tianshu"
+        ],
+        "participants": [
+          "tianji",
+          "dongcha",
+          "miaobi",
+          "zhenshan",
+          "zhuiguang",
+          "huasheng"
+        ]
+      },
+      "Step3-Fuse": {
+        "owners": [
+          "yiku",
+          "jingwei",
+          "lianli",
+          "tianshu"
+        ],
+        "participants": [
+          "tianji"
+        ]
+      },
+      "Step4-Generate": {
+        "owners": [
+          "miaobi",
+          "baiqiao",
+          "jinshu",
+          "gongzao",
+          "tianshu"
+        ],
+        "participants": [
+          "wenzong",
+          "jingwei",
+          "tiansuan",
+          "kuangshi",
+          "zhuiguang"
+        ]
+      },
+      "Step5-Evaluate": {
+        "owners": [
+          "tiewei",
+          "luling",
+          "mingjing",
+          "tiansuan",
+          "huasheng",
+          "zhenshan",
+          "jianheng",
+          "tianshu"
+        ],
+        "participants": [
+          "wenzong",
+          "baiqiao",
+          "jinshu",
+          "shiguan",
+          "gongzao",
+          "qianli"
+        ]
+      },
+      "Step6-Record": {
+        "owners": [
+          "tianji",
+          "shiguan",
+          "huasheng",
+          "tianshu"
+        ],
+        "participants": [
+          "yiku",
+          "lingxi",
+          "gongzao"
+        ]
+      }
+    },
+    "stage_gate_responsibility": {
+      "Gate0-需求清晰": {
+        "responsible": [
+          "tianji",
+          "tianshu",
+          "wenzong"
+        ],
+        "participates": [
+          "dongcha",
+          "luling",
+          "wanxiang",
+          "kuangshi",
+          "jianheng"
+        ]
+      },
+      "Gate1-架构评审": {
+        "responsible": [
+          "jingwei",
+          "wenzong"
+        ],
+        "participates": [
+          "tianshu",
+          "luling",
+          "lianli"
+        ]
+      },
+      "Gate2-代码审查": {
+        "responsible": [
+          "miaobi"
+        ],
+        "participates": [
+          "tianshu",
+          "tiewei",
+          "baiqiao"
+        ]
+      },
+      "Gate3-测试通过": {
+        "responsible": [
+          "tiewei",
+          "mingjing",
+          "zhenshan"
+        ],
+        "participates": [
+          "tianshu",
+          "wenzong",
+          "jianheng",
+          "tiansuan"
+        ]
+      },
+      "Gate4-集成验证": {
+        "responsible": [
+          "tiewei",
+          "zhenshan"
+        ],
+        "participates": [
+          "tianji",
+          "tianshu",
+          "jingwei",
+          "huasheng",
+          "qianli",
+          "zhuiguang"
+        ]
+      },
+      "Gate5-部署成功": {
+        "responsible": [
+          "gongzao"
+        ],
+        "participates": [
+          "tianji",
+          "tianshu",
+          "shiguan",
+          "zhenshan",
+          "qianli",
+          "zhuiguang"
+        ]
+      },
+      "Gate6-归档完成": {
+        "responsible": [
+          "shiguan",
+          "jinshu"
+        ],
+        "participates": [
+          "tianshu",
+          "wenzong",
+          "yiku",
+          "gongzao"
+        ]
+      }
+    },
+    "skill_agent_mapping": {
+      "tianji-orchestrate": [
+        "tianji",
+        "tianshu"
+      ],
+      "system-diagnose": [
+        "tianji",
+        "qianli"
+      ],
+      "agent-dispatch": [
+        "tianshu"
+      ],
+      "agent-transparent-dispatch": [
+        "tianshu"
+      ],
+      "skill-route": [
+        "baiqiao",
+        "tianshu"
+      ],
+      "context-extract": [
+        "dongcha"
+      ],
+      "dialogue-quality": [
+        "dongcha",
+        "lingxi"
+      ],
+      "memory-remember": [
+        "yiku"
+      ],
+      "memory-recall": [
+        "yiku"
+      ],
+      "auto-memory-capture": [
+        "yiku"
+      ],
+      "corpus-batch-import": [
+        "kuangshi"
+      ],
+      "corpus-extract": [
+        "kuangshi",
+        "wanxiang"
+      ],
+      "corpus-quality-score": [
+        "kuangshi",
+        "tiansuan"
+      ],
+      "corpus-retrieve": [
+        "miaobi"
+      ],
+      "data-analyze": [
+        "tiansuan"
+      ],
+      "editor-review": [
+        "wenzong",
+        "mingjing"
+      ],
+      "novel-chapter-create": [
+        "miaobi"
+      ],
+      "novel-consistency-check": [
+        "mingjing"
+      ],
+      "novel-format-export": [
+        "jinshu"
+      ],
+      "novel-multi-schedule": [
+        "wenzong"
+      ],
+      "novel-setting-consistency-deep": [
+        "miaobi"
+      ],
+      "novel-version-track": [
+        "shiguan"
+      ],
+      "novel-worldbuilding-expand": [
+        "miaobi"
+      ],
+      "ops-deploy": [
+        "gongzao"
+      ],
+      "perf-profile": [
+        "zhuiguang"
+      ],
+      "rule-check": [
+        "luling",
+        "tiewei",
+        "mingjing",
+        "jianheng"
+      ],
+      "security-audit": [
+        "zhenshan"
+      ],
+      "test-gate": [
+        "tiewei"
+      ]
+    },
+    "event_flow_topology": {
+      "user_input_flow": [
+        "user → lingxi → dongcha → tianshu → {target_agent}"
+      ],
+      "creation_flow": [
+        "tianshu → wenzong → miaobi → mingjing → jinshu → shiguan"
+      ],
+      "quality_flow": [
+        "miaobi → mingjing → tiewei → gongzao"
+      ],
+      "security_flow": [
+        "tiewei → zhenshan → tianji"
+      ],
+      "performance_flow": [
+        "qianli → zhuiguang → huasheng"
+      ],
+      "evolution_flow": [
+        "qianli/zhuiguang/zhenshan → huasheng → tianji → yiku"
+      ],
+      "knowledge_flow": [
+        "wanxiang/kuangshi → yiku → lianli → tianshu"
+      ],
+      "memory_flow": [
+        "any_agent → yiku → {consolidation} → lianli"
+      ]
+    }
+  }
+}

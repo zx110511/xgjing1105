@@ -1,0 +1,35 @@
+﻿{
+  "total_skills": 23,
+  "high_potential": [
+    "agent-transparent-dispatch",
+    "dialogue-quality",
+    "editor-review",
+    "tianji-orchestrate"
+  ],
+  "medium_potential": [
+    "corpus-batch-import",
+    "corpus-extract",
+    "corpus-quality-score",
+    "corpus-retrieve",
+    "memory-audit",
+    "memory-test",
+    "novel-chapter-create",
+    "novel-consistency-check",
+    "novel-format-export",
+    "novel-multi-schedule",
+    "novel-setting-consistency-deep",
+    "novel-version-track",
+    "novel-worldbuilding-expand",
+    "system-audit"
+  ],
+  "low_potential": [
+    "lingjing-14questions",
+    "lingjing-9dao-orchestrate",
+    "lingjing-dao-compliance",
+    "lingjing-memory",
+    "lingjing-triple-chain"
+  ],
+  "recommendation": "保留5个灵境概念技能，其余18个逐步归位到法则系统+Agent能力声明",
+  "final_target_skill_count": 5,
+  "theoretical_slimming_rate": 0.782608695652174
+}

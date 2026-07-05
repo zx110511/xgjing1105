@@ -1,0 +1,3554 @@
+[
+  {
+    "round": 1,
+    "start_time": 1780411039.179463,
+    "end_time": 1780411044.4816484,
+    "duration_ms": 5302.185535430908,
+    "total_checks": 122,
+    "total_passed": 120,
+    "total_failed": 0,
+    "overall_pass_rate": 98.36065573770492,
+    "overall_score": 7151.666001236646,
+    "overall_max_score": 6853.0,
+    "overall_pass": true,
+    "exceptions": [],
+    "dimensions": {
+      "functionality": {
+        "total_checks": 99,
+        "passed": 99,
+        "warned": 0,
+        "failed": 0,
+        "skipped": 0,
+        "errored": 0,
+        "score": 372.0,
+        "max_score": 372.0,
+        "pass_rate": 100.0,
+        "score_rate": 100.0,
+        "checks": [
+          {
+            "id": "F-FILE-asset_atom.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "asset_atom.py: EXISTS (20821 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-change_tracker.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "change_tracker.py: EXISTS (7773 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-alignment_engine.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "alignment_engine.py: EXISTS (15478 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-consistency_guardian.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "consistency_guardian.py: EXISTS (10279 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-directory_index.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "directory_index.py: EXISTS (12508 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-tdaf_schema.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "tdaf_schema.py: EXISTS (10094 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-tdaf_exporter.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "tdaf_exporter.py: EXISTS (9157 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-tdaf_adapters.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "tdaf_adapters.py: EXISTS (9113 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-file_watcher.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "file_watcher.py: EXISTS (6867 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-enforcement_hook.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "enforcement_hook.py: EXISTS (152212 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-engine.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "engine.py: EXISTS (80738 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-hybrid_engine.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "hybrid_engine.py: EXISTS (46246 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-quality_gate.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "quality_gate.py: EXISTS (41250 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-llm_bridge.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "llm_bridge.py: EXISTS (12885 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-sqlite_store.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "sqlite_store.py: EXISTS (35984 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-config.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "config.py: EXISTS (19900 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-register_historical_assets.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "register_historical_assets.py: EXISTS (7622 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-enrich_l2_memories.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "enrich_l2_memories.py: EXISTS (6175 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-enrich_l3_memories.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "enrich_l3_memories.py: EXISTS (7168 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-enrich_l4_memories.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "enrich_l4_memories.py: EXISTS (8559 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-enrich_l5_memories.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "enrich_l5_memories.py: EXISTS (9086 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.asset_atom.AssetAtom",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "AssetAtom importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.asset_atom.AssetRegistry",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "AssetRegistry importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.asset_atom.ChangeAtom",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "ChangeAtom importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.asset_atom.Provenance",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "Provenance importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.asset_atom.AssetStatus",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "AssetStatus importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.asset_atom.ContentType",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "ContentType importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.asset_atom.VALID_TRANSITIONS",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "VALID_TRANSITIONS importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.change_tracker.ChangeTracker",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "ChangeTracker importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.alignment_engine.AlignmentEngine",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "AlignmentEngine importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.alignment_engine.ChangeClassifier",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "ChangeClassifier importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.alignment_engine.ChangeSeverity",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "ChangeSeverity importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.alignment_engine.ImpactAnalyzer",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "ImpactAnalyzer importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.alignment_engine.CascadeUpdater",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "CascadeUpdater importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.alignment_engine.ScientificDeleter",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "ScientificDeleter importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.consistency_guardian.ConsistencyGuardian",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "ConsistencyGuardian importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.directory_index.DirectoryScanner",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "DirectoryScanner importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.directory_index.DirectorySmartIndex",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "DirectorySmartIndex importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.directory_index.READMEGenerator",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "READMEGenerator importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.tdaf_schema.TDAFDocument",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "TDAFDocument importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.tdaf_schema.TDAFManifest",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "TDAFManifest importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.tdaf_schema.TDAFValidator",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "TDAFValidator importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.tdaf_schema.validate_tdaf",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "validate_tdaf importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.tdaf_schema.create_empty_tdaf",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "create_empty_tdaf importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.tdaf_exporter.TDAFExporter",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "TDAFExporter importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.tdaf_adapters.adapt",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "adapt importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.tdaf_adapters.TraeAdapter",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "TraeAdapter importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.file_watcher.FileWatcher",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "FileWatcher importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.engine.ICMEEngine",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "ICMEEngine importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.quality_gate.QualityGate",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "QualityGate importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-AssetRegistry.register",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "AssetRegistry.register() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-AssetRegistry.get",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "AssetRegistry.get() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-AssetRegistry.get_version_chain",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "AssetRegistry.get_version_chain() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-AssetRegistry.get_latest_version",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "AssetRegistry.get_latest_version() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-AssetRegistry.add_reference",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "AssetRegistry.add_reference() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-AssetRegistry.remove_reference",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "AssetRegistry.remove_reference() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-AssetRegistry.get_dependents",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "AssetRegistry.get_dependents() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-AssetRegistry.get_dependencies",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "AssetRegistry.get_dependencies() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-AssetRegistry.transition",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "AssetRegistry.transition() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-ChangeTracker.track_create",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "ChangeTracker.track_create() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-ChangeTracker.track_update",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "ChangeTracker.track_update() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-ChangeTracker.track_delete",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "ChangeTracker.track_delete() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-AlignmentEngine.on_change",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "AlignmentEngine.on_change() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-ChangeClassifier.classify",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "ChangeClassifier.classify() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-ImpactAnalyzer.analyze",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "ImpactAnalyzer.analyze() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-CascadeUpdater.execute",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "CascadeUpdater.execute() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-ScientificDeleter.delete_asset",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "ScientificDeleter.delete_asset() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-DirectoryScanner.scan_directory",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "DirectoryScanner.scan_directory() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-READMEGenerator.generate_readme",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "READMEGenerator.generate_readme() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-ConsistencyGuardian.verify_references",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "ConsistencyGuardian.verify_references() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-ConsistencyGuardian.verify_hashes",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "ConsistencyGuardian.verify_hashes() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-ConsistencyGuardian.run_full_audit",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "ConsistencyGuardian.run_full_audit() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-TDAFExporter.export_full",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "TDAFExporter.export_full() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-TDAFExporter.export_incremental",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "TDAFExporter.export_incremental() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-FileWatcher.simulate_create",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "FileWatcher.simulate_create() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-ICMEEngine.remember",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "ICMEEngine.remember() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-ICMEEngine.recall",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "ICMEEngine.recall() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-ICMEEngine.check_l0_ttl",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "ICMEEngine.check_l0_ttl() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 10.0,
+            "threshold": 10.0,
+            "message": "register+get: working:6d8749c4:0001 (8.0ms)",
+            "duration_ms": 8.03232192993164
+          },
+          {
+            "id": "F-E2E-02",
+            "status": "PASS",
+            "severity": "info",
+            "score": 8.0,
+            "threshold": 8.0,
+            "message": "track_create: ChangeAtom(change_id='3ea2cfbefe2b71a5', change_type='create', target_asset_id='working:9f86d081:0001', target_path='/audit/e2e.py', before_snapshot='', after_snapshot='9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08', diff_summary='File created: /audit/e2e.py (4 bytes)', impact_scope=[], trigger_source='audit', timestamp=1780411039.2278512, session_id='', undo_possible=True)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-03",
+            "status": "PASS",
+            "severity": "info",
+            "score": 8.0,
+            "threshold": 8.0,
+            "message": "version chain len=2",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-04",
+            "status": "PASS",
+            "severity": "info",
+            "score": 8.0,
+            "threshold": 8.0,
+            "message": "ref graph: 1 deps",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-05",
+            "status": "PASS",
+            "severity": "info",
+            "score": 6.0,
+            "threshold": 6.0,
+            "message": "state transition: True",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-06",
+            "status": "PASS",
+            "severity": "info",
+            "score": 6.0,
+            "threshold": 6.0,
+            "message": "classifier: ChangeSeverity.SEMANTIC",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-07",
+            "status": "PASS",
+            "severity": "info",
+            "score": 6.0,
+            "threshold": 6.0,
+            "message": "impact report generated",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-08",
+            "status": "PASS",
+            "severity": "info",
+            "score": 6.0,
+            "threshold": 6.0,
+            "message": "scan: C:\\Users\\Administrator\\AppData\\Local\\Temp\\tianji_audit_r1_4tugqr9v",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-09",
+            "status": "PASS",
+            "severity": "info",
+            "score": 6.0,
+            "threshold": 6.0,
+            "message": "README has AI-SECTION",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-10",
+            "status": "PASS",
+            "severity": "info",
+            "score": 6.0,
+            "threshold": 6.0,
+            "message": "guardian: 3 checks",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-11",
+            "status": "PASS",
+            "severity": "info",
+            "score": 6.0,
+            "threshold": 6.0,
+            "message": "TDAF valid: True",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-12",
+            "status": "PASS",
+            "severity": "info",
+            "score": 6.0,
+            "threshold": 6.0,
+            "message": "export_full: True",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-13",
+            "status": "PASS",
+            "severity": "info",
+            "score": 6.0,
+            "threshold": 6.0,
+            "message": "export_inc: True",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-14",
+            "status": "PASS",
+            "severity": "info",
+            "score": 4.0,
+            "threshold": 4.0,
+            "message": "TraeAdapter: 81 chars",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-15",
+            "status": "PASS",
+            "severity": "info",
+            "score": 4.0,
+            "threshold": 4.0,
+            "message": "FileWatcher created",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-16",
+            "status": "PASS",
+            "severity": "info",
+            "score": 4.0,
+            "threshold": 4.0,
+            "message": "check_l0_ttl: scanned=0",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-17",
+            "status": "PASS",
+            "severity": "info",
+            "score": 8.0,
+            "threshold": 8.0,
+            "message": "historical: 20 registered",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-18",
+            "status": "PASS",
+            "severity": "info",
+            "score": 4.0,
+            "threshold": 4.0,
+            "message": "L2: 4 enriched",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-19",
+            "status": "PASS",
+            "severity": "info",
+            "score": 4.0,
+            "threshold": 4.0,
+            "message": "L3: 4 enriched",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-20",
+            "status": "PASS",
+            "severity": "info",
+            "score": 4.0,
+            "threshold": 4.0,
+            "message": "L4: 4 enriched",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-21",
+            "status": "PASS",
+            "severity": "info",
+            "score": 4.0,
+            "threshold": 4.0,
+            "message": "L5: 0 enriched",
+            "duration_ms": 0.0
+          }
+        ]
+      },
+      "stability": {
+        "total_checks": 5,
+        "passed": 5,
+        "warned": 0,
+        "failed": 0,
+        "skipped": 0,
+        "errored": 0,
+        "score": 230.0,
+        "max_score": 220.0,
+        "pass_rate": 100.0,
+        "score_rate": 104.54545454545455,
+        "checks": [
+          {
+            "id": "S-REPEAT-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 100.0,
+            "threshold": 95.0,
+            "message": "Repeated: 5/5, avg=7.3ms",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "S-CONCURRENT-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 100.0,
+            "threshold": 95.0,
+            "message": "Concurrent: 10/10 success",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "S-ERR-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 10.0,
+            "threshold": 10.0,
+            "message": "Invalid transition rejected",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "S-ERR-02",
+            "status": "PASS",
+            "severity": "info",
+            "score": 10.0,
+            "threshold": 10.0,
+            "message": "Nonexistent returns None",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "S-CLEAN-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 10.0,
+            "threshold": 10.0,
+            "message": "50 assets persisted: count=50",
+            "duration_ms": 0.0
+          }
+        ]
+      },
+      "performance": {
+        "total_checks": 5,
+        "passed": 5,
+        "warned": 0,
+        "failed": 0,
+        "skipped": 0,
+        "errored": 0,
+        "score": 6059.666001236646,
+        "max_score": 5760.0,
+        "pass_rate": 100.0,
+        "score_rate": 105.20253474369177,
+        "checks": [
+          {
+            "id": "P-REMEMBER-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 547.4560737609863,
+            "threshold": 500.0,
+            "message": "remember() p95=2.5ms avg=1.3ms p99=20.3ms",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "P-RECALL-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 220.0,
+            "threshold": 200.0,
+            "message": "recall() p95=0.0ms",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "P-EXPORT-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5093.283033370972,
+            "threshold": 5000.0,
+            "message": "export_full(100): 6.7ms",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "P-THROUGHPUT-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 188.9268941046877,
+            "threshold": 50.0,
+            "message": "Throughput: 188.9 ops/sec",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "P-BATCH-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 10.0,
+            "threshold": 10.0,
+            "message": "Batch: 200 in 1059.4ms (189 ops/sec)",
+            "duration_ms": 0.0
+          }
+        ]
+      },
+      "security": {
+        "total_checks": 6,
+        "passed": 4,
+        "warned": 2,
+        "failed": 0,
+        "skipped": 0,
+        "errored": 0,
+        "score": 60.0,
+        "max_score": 70.0,
+        "pass_rate": 66.66666666666666,
+        "score_rate": 85.71428571428571,
+        "checks": [
+          {
+            "id": "SEC-SENSITIVE-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 15.0,
+            "threshold": 15.0,
+            "message": "No hardcoded secrets in production code",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "SEC-DANGEROUS-deepseek_driver.py",
+            "status": "WARN",
+            "severity": "medium",
+            "score": 5.0,
+            "threshold": 10.0,
+            "message": "deepseek_driver.py: eval()",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "SEC-DANGEROUS-stat_collector.py",
+            "status": "WARN",
+            "severity": "medium",
+            "score": 5.0,
+            "threshold": 10.0,
+            "message": "stat_collector.py: eval()",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "SEC-SQL-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 15.0,
+            "threshold": 15.0,
+            "message": "SQL injection safely handled",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "SEC-ACL-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 10.0,
+            "threshold": 10.0,
+            "message": "Invalid transitions rejected",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "SEC-INT-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 10.0,
+            "threshold": 10.0,
+            "message": "Hash integrity: 50ed8fcbb09b9dab...",
+            "duration_ms": 0.0
+          }
+        ]
+      },
+      "data_accuracy": {
+        "total_checks": 7,
+        "passed": 7,
+        "warned": 0,
+        "failed": 0,
+        "skipped": 0,
+        "errored": 0,
+        "score": 180.0,
+        "max_score": 180.0,
+        "pass_rate": 100.0,
+        "score_rate": 100.0,
+        "checks": [
+          {
+            "id": "DA-HASH-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 100.0,
+            "threshold": 100.0,
+            "message": "Hash: 50/50 (100.0%)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "DA-REF-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 15.0,
+            "threshold": 15.0,
+            "message": "Reference A→B verified",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "DA-REF-02",
+            "status": "PASS",
+            "severity": "info",
+            "score": 10.0,
+            "threshold": 10.0,
+            "message": "Ref removal verified",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "DA-VER-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 15.0,
+            "threshold": 15.0,
+            "message": "Version chain: 5 versions",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "DA-VER-02",
+            "status": "PASS",
+            "severity": "info",
+            "score": 10.0,
+            "threshold": 10.0,
+            "message": "Latest: v5",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "DA-TDAF-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 15.0,
+            "threshold": 15.0,
+            "message": "TDAF roundtrip PASS",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "DA-LAYER-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 15.0,
+            "threshold": 15.0,
+            "message": "All 6 layers verified",
+            "duration_ms": 0.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "round": 2,
+    "start_time": 1780411044.4826498,
+    "end_time": 1780411050.1147332,
+    "duration_ms": 5632.083415985107,
+    "total_checks": 122,
+    "total_passed": 120,
+    "total_failed": 0,
+    "overall_pass_rate": 98.36065573770492,
+    "overall_score": 7150.4816462354875,
+    "overall_max_score": 6853.0,
+    "overall_pass": true,
+    "exceptions": [],
+    "dimensions": {
+      "functionality": {
+        "total_checks": 99,
+        "passed": 99,
+        "warned": 0,
+        "failed": 0,
+        "skipped": 0,
+        "errored": 0,
+        "score": 372.0,
+        "max_score": 372.0,
+        "pass_rate": 100.0,
+        "score_rate": 100.0,
+        "checks": [
+          {
+            "id": "F-FILE-asset_atom.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "asset_atom.py: EXISTS (20821 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-change_tracker.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "change_tracker.py: EXISTS (7773 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-alignment_engine.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "alignment_engine.py: EXISTS (15478 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-consistency_guardian.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "consistency_guardian.py: EXISTS (10279 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-directory_index.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "directory_index.py: EXISTS (12508 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-tdaf_schema.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "tdaf_schema.py: EXISTS (10094 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-tdaf_exporter.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "tdaf_exporter.py: EXISTS (9157 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-tdaf_adapters.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "tdaf_adapters.py: EXISTS (9113 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-file_watcher.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "file_watcher.py: EXISTS (6867 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-enforcement_hook.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "enforcement_hook.py: EXISTS (152212 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-engine.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "engine.py: EXISTS (80738 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-hybrid_engine.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "hybrid_engine.py: EXISTS (46246 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-quality_gate.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "quality_gate.py: EXISTS (41250 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-llm_bridge.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "llm_bridge.py: EXISTS (12885 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-sqlite_store.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "sqlite_store.py: EXISTS (35984 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-config.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "config.py: EXISTS (19900 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-register_historical_assets.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "register_historical_assets.py: EXISTS (7622 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-enrich_l2_memories.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "enrich_l2_memories.py: EXISTS (6175 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-enrich_l3_memories.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "enrich_l3_memories.py: EXISTS (7168 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-enrich_l4_memories.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "enrich_l4_memories.py: EXISTS (8559 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-enrich_l5_memories.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "enrich_l5_memories.py: EXISTS (9086 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.asset_atom.AssetAtom",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "AssetAtom importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.asset_atom.AssetRegistry",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "AssetRegistry importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.asset_atom.ChangeAtom",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "ChangeAtom importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.asset_atom.Provenance",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "Provenance importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.asset_atom.AssetStatus",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "AssetStatus importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.asset_atom.ContentType",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "ContentType importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.asset_atom.VALID_TRANSITIONS",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "VALID_TRANSITIONS importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.change_tracker.ChangeTracker",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "ChangeTracker importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.alignment_engine.AlignmentEngine",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "AlignmentEngine importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.alignment_engine.ChangeClassifier",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "ChangeClassifier importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.alignment_engine.ChangeSeverity",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "ChangeSeverity importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.alignment_engine.ImpactAnalyzer",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "ImpactAnalyzer importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.alignment_engine.CascadeUpdater",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "CascadeUpdater importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.alignment_engine.ScientificDeleter",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "ScientificDeleter importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.consistency_guardian.ConsistencyGuardian",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "ConsistencyGuardian importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.directory_index.DirectoryScanner",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "DirectoryScanner importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.directory_index.DirectorySmartIndex",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "DirectorySmartIndex importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.directory_index.READMEGenerator",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "READMEGenerator importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.tdaf_schema.TDAFDocument",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "TDAFDocument importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.tdaf_schema.TDAFManifest",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "TDAFManifest importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.tdaf_schema.TDAFValidator",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "TDAFValidator importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.tdaf_schema.validate_tdaf",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "validate_tdaf importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.tdaf_schema.create_empty_tdaf",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "create_empty_tdaf importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.tdaf_exporter.TDAFExporter",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "TDAFExporter importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.tdaf_adapters.adapt",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "adapt importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.tdaf_adapters.TraeAdapter",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "TraeAdapter importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.file_watcher.FileWatcher",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "FileWatcher importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.engine.ICMEEngine",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "ICMEEngine importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.quality_gate.QualityGate",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "QualityGate importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-AssetRegistry.register",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "AssetRegistry.register() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-AssetRegistry.get",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "AssetRegistry.get() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-AssetRegistry.get_version_chain",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "AssetRegistry.get_version_chain() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-AssetRegistry.get_latest_version",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "AssetRegistry.get_latest_version() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-AssetRegistry.add_reference",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "AssetRegistry.add_reference() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-AssetRegistry.remove_reference",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "AssetRegistry.remove_reference() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-AssetRegistry.get_dependents",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "AssetRegistry.get_dependents() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-AssetRegistry.get_dependencies",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "AssetRegistry.get_dependencies() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-AssetRegistry.transition",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "AssetRegistry.transition() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-ChangeTracker.track_create",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "ChangeTracker.track_create() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-ChangeTracker.track_update",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "ChangeTracker.track_update() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-ChangeTracker.track_delete",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "ChangeTracker.track_delete() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-AlignmentEngine.on_change",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "AlignmentEngine.on_change() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-ChangeClassifier.classify",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "ChangeClassifier.classify() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-ImpactAnalyzer.analyze",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "ImpactAnalyzer.analyze() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-CascadeUpdater.execute",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "CascadeUpdater.execute() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-ScientificDeleter.delete_asset",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "ScientificDeleter.delete_asset() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-DirectoryScanner.scan_directory",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "DirectoryScanner.scan_directory() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-READMEGenerator.generate_readme",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "READMEGenerator.generate_readme() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-ConsistencyGuardian.verify_references",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "ConsistencyGuardian.verify_references() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-ConsistencyGuardian.verify_hashes",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "ConsistencyGuardian.verify_hashes() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-ConsistencyGuardian.run_full_audit",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "ConsistencyGuardian.run_full_audit() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-TDAFExporter.export_full",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "TDAFExporter.export_full() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-TDAFExporter.export_incremental",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "TDAFExporter.export_incremental() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-FileWatcher.simulate_create",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "FileWatcher.simulate_create() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-ICMEEngine.remember",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "ICMEEngine.remember() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-ICMEEngine.recall",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "ICMEEngine.recall() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-ICMEEngine.check_l0_ttl",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "ICMEEngine.check_l0_ttl() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 10.0,
+            "threshold": 10.0,
+            "message": "register+get: working:6d8749c4:0001 (7.1ms)",
+            "duration_ms": 7.052898406982422
+          },
+          {
+            "id": "F-E2E-02",
+            "status": "PASS",
+            "severity": "info",
+            "score": 8.0,
+            "threshold": 8.0,
+            "message": "track_create: ChangeAtom(change_id='e88aae7673eff928', change_type='create', target_asset_id='working:9f86d081:0001', target_path='/audit/e2e.py', before_snapshot='', after_snapshot='9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08', diff_summary='File created: /audit/e2e.py (4 bytes)', impact_scope=[], trigger_source='audit', timestamp=1780411044.512387, session_id='', undo_possible=True)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-03",
+            "status": "PASS",
+            "severity": "info",
+            "score": 8.0,
+            "threshold": 8.0,
+            "message": "version chain len=2",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-04",
+            "status": "PASS",
+            "severity": "info",
+            "score": 8.0,
+            "threshold": 8.0,
+            "message": "ref graph: 1 deps",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-05",
+            "status": "PASS",
+            "severity": "info",
+            "score": 6.0,
+            "threshold": 6.0,
+            "message": "state transition: True",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-06",
+            "status": "PASS",
+            "severity": "info",
+            "score": 6.0,
+            "threshold": 6.0,
+            "message": "classifier: ChangeSeverity.SEMANTIC",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-07",
+            "status": "PASS",
+            "severity": "info",
+            "score": 6.0,
+            "threshold": 6.0,
+            "message": "impact report generated",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-08",
+            "status": "PASS",
+            "severity": "info",
+            "score": 6.0,
+            "threshold": 6.0,
+            "message": "scan: C:\\Users\\Administrator\\AppData\\Local\\Temp\\tianji_audit_r2__2bf51jv",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-09",
+            "status": "PASS",
+            "severity": "info",
+            "score": 6.0,
+            "threshold": 6.0,
+            "message": "README has AI-SECTION",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-10",
+            "status": "PASS",
+            "severity": "info",
+            "score": 6.0,
+            "threshold": 6.0,
+            "message": "guardian: 3 checks",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-11",
+            "status": "PASS",
+            "severity": "info",
+            "score": 6.0,
+            "threshold": 6.0,
+            "message": "TDAF valid: True",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-12",
+            "status": "PASS",
+            "severity": "info",
+            "score": 6.0,
+            "threshold": 6.0,
+            "message": "export_full: True",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-13",
+            "status": "PASS",
+            "severity": "info",
+            "score": 6.0,
+            "threshold": 6.0,
+            "message": "export_inc: True",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-14",
+            "status": "PASS",
+            "severity": "info",
+            "score": 4.0,
+            "threshold": 4.0,
+            "message": "TraeAdapter: 81 chars",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-15",
+            "status": "PASS",
+            "severity": "info",
+            "score": 4.0,
+            "threshold": 4.0,
+            "message": "FileWatcher created",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-16",
+            "status": "PASS",
+            "severity": "info",
+            "score": 4.0,
+            "threshold": 4.0,
+            "message": "check_l0_ttl: scanned=0",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-17",
+            "status": "PASS",
+            "severity": "info",
+            "score": 8.0,
+            "threshold": 8.0,
+            "message": "historical: 20 registered",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-18",
+            "status": "PASS",
+            "severity": "info",
+            "score": 4.0,
+            "threshold": 4.0,
+            "message": "L2: 4 enriched",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-19",
+            "status": "PASS",
+            "severity": "info",
+            "score": 4.0,
+            "threshold": 4.0,
+            "message": "L3: 4 enriched",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-20",
+            "status": "PASS",
+            "severity": "info",
+            "score": 4.0,
+            "threshold": 4.0,
+            "message": "L4: 4 enriched",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-21",
+            "status": "PASS",
+            "severity": "info",
+            "score": 4.0,
+            "threshold": 4.0,
+            "message": "L5: 0 enriched",
+            "duration_ms": 0.0
+          }
+        ]
+      },
+      "stability": {
+        "total_checks": 5,
+        "passed": 5,
+        "warned": 0,
+        "failed": 0,
+        "skipped": 0,
+        "errored": 0,
+        "score": 230.0,
+        "max_score": 220.0,
+        "pass_rate": 100.0,
+        "score_rate": 104.54545454545455,
+        "checks": [
+          {
+            "id": "S-REPEAT-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 100.0,
+            "threshold": 95.0,
+            "message": "Repeated: 5/5, avg=7.7ms",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "S-CONCURRENT-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 100.0,
+            "threshold": 95.0,
+            "message": "Concurrent: 10/10 success",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "S-ERR-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 10.0,
+            "threshold": 10.0,
+            "message": "Invalid transition rejected",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "S-ERR-02",
+            "status": "PASS",
+            "severity": "info",
+            "score": 10.0,
+            "threshold": 10.0,
+            "message": "Nonexistent returns None",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "S-CLEAN-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 10.0,
+            "threshold": 10.0,
+            "message": "50 assets persisted: count=50",
+            "duration_ms": 0.0
+          }
+        ]
+      },
+      "performance": {
+        "total_checks": 5,
+        "passed": 5,
+        "warned": 0,
+        "failed": 0,
+        "skipped": 0,
+        "errored": 0,
+        "score": 6058.4816462354875,
+        "max_score": 5760.0,
+        "pass_rate": 100.0,
+        "score_rate": 105.18197302492165,
+        "checks": [
+          {
+            "id": "P-REMEMBER-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 548.4259605407715,
+            "threshold": 500.0,
+            "message": "remember() p95=1.6ms avg=0.9ms p99=2.6ms",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "P-RECALL-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 220.0,
+            "threshold": 200.0,
+            "message": "recall() p95=0.0ms",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "P-EXPORT-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5093.943214416504,
+            "threshold": 5000.0,
+            "message": "export_full(100): 6.1ms",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "P-THROUGHPUT-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 186.1124712782125,
+            "threshold": 50.0,
+            "message": "Throughput: 186.1 ops/sec",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "P-BATCH-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 10.0,
+            "threshold": 10.0,
+            "message": "Batch: 200 in 1041.6ms (192 ops/sec)",
+            "duration_ms": 0.0
+          }
+        ]
+      },
+      "security": {
+        "total_checks": 6,
+        "passed": 4,
+        "warned": 2,
+        "failed": 0,
+        "skipped": 0,
+        "errored": 0,
+        "score": 60.0,
+        "max_score": 70.0,
+        "pass_rate": 66.66666666666666,
+        "score_rate": 85.71428571428571,
+        "checks": [
+          {
+            "id": "SEC-SENSITIVE-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 15.0,
+            "threshold": 15.0,
+            "message": "No hardcoded secrets in production code",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "SEC-DANGEROUS-deepseek_driver.py",
+            "status": "WARN",
+            "severity": "medium",
+            "score": 5.0,
+            "threshold": 10.0,
+            "message": "deepseek_driver.py: eval()",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "SEC-DANGEROUS-stat_collector.py",
+            "status": "WARN",
+            "severity": "medium",
+            "score": 5.0,
+            "threshold": 10.0,
+            "message": "stat_collector.py: eval()",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "SEC-SQL-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 15.0,
+            "threshold": 15.0,
+            "message": "SQL injection safely handled",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "SEC-ACL-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 10.0,
+            "threshold": 10.0,
+            "message": "Invalid transitions rejected",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "SEC-INT-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 10.0,
+            "threshold": 10.0,
+            "message": "Hash integrity: 50ed8fcbb09b9dab...",
+            "duration_ms": 0.0
+          }
+        ]
+      },
+      "data_accuracy": {
+        "total_checks": 7,
+        "passed": 7,
+        "warned": 0,
+        "failed": 0,
+        "skipped": 0,
+        "errored": 0,
+        "score": 180.0,
+        "max_score": 180.0,
+        "pass_rate": 100.0,
+        "score_rate": 100.0,
+        "checks": [
+          {
+            "id": "DA-HASH-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 100.0,
+            "threshold": 100.0,
+            "message": "Hash: 50/50 (100.0%)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "DA-REF-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 15.0,
+            "threshold": 15.0,
+            "message": "Reference A→B verified",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "DA-REF-02",
+            "status": "PASS",
+            "severity": "info",
+            "score": 10.0,
+            "threshold": 10.0,
+            "message": "Ref removal verified",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "DA-VER-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 15.0,
+            "threshold": 15.0,
+            "message": "Version chain: 5 versions",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "DA-VER-02",
+            "status": "PASS",
+            "severity": "info",
+            "score": 10.0,
+            "threshold": 10.0,
+            "message": "Latest: v5",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "DA-TDAF-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 15.0,
+            "threshold": 15.0,
+            "message": "TDAF roundtrip PASS",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "DA-LAYER-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 15.0,
+            "threshold": 15.0,
+            "message": "All 6 layers verified",
+            "duration_ms": 0.0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "round": 3,
+    "start_time": 1780411050.115947,
+    "end_time": 1780411055.6903684,
+    "duration_ms": 5574.421405792236,
+    "total_checks": 122,
+    "total_passed": 120,
+    "total_failed": 0,
+    "overall_pass_rate": 98.36065573770492,
+    "overall_score": 7147.494621086339,
+    "overall_max_score": 6853.0,
+    "overall_pass": true,
+    "exceptions": [],
+    "dimensions": {
+      "functionality": {
+        "total_checks": 99,
+        "passed": 99,
+        "warned": 0,
+        "failed": 0,
+        "skipped": 0,
+        "errored": 0,
+        "score": 372.0,
+        "max_score": 372.0,
+        "pass_rate": 100.0,
+        "score_rate": 100.0,
+        "checks": [
+          {
+            "id": "F-FILE-asset_atom.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "asset_atom.py: EXISTS (20821 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-change_tracker.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "change_tracker.py: EXISTS (7773 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-alignment_engine.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "alignment_engine.py: EXISTS (15478 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-consistency_guardian.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "consistency_guardian.py: EXISTS (10279 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-directory_index.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "directory_index.py: EXISTS (12508 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-tdaf_schema.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "tdaf_schema.py: EXISTS (10094 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-tdaf_exporter.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "tdaf_exporter.py: EXISTS (9157 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-tdaf_adapters.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "tdaf_adapters.py: EXISTS (9113 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-file_watcher.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "file_watcher.py: EXISTS (6867 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-enforcement_hook.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "enforcement_hook.py: EXISTS (152212 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-engine.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "engine.py: EXISTS (80738 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-hybrid_engine.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "hybrid_engine.py: EXISTS (46246 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-quality_gate.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "quality_gate.py: EXISTS (41250 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-llm_bridge.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "llm_bridge.py: EXISTS (12885 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-sqlite_store.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "sqlite_store.py: EXISTS (35984 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-config.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "config.py: EXISTS (19900 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-register_historical_assets.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "register_historical_assets.py: EXISTS (7622 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-enrich_l2_memories.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "enrich_l2_memories.py: EXISTS (6175 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-enrich_l3_memories.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "enrich_l3_memories.py: EXISTS (7168 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-enrich_l4_memories.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "enrich_l4_memories.py: EXISTS (8559 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-FILE-enrich_l5_memories.py",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5.0,
+            "threshold": 5.0,
+            "message": "enrich_l5_memories.py: EXISTS (9086 bytes)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.asset_atom.AssetAtom",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "AssetAtom importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.asset_atom.AssetRegistry",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "AssetRegistry importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.asset_atom.ChangeAtom",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "ChangeAtom importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.asset_atom.Provenance",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "Provenance importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.asset_atom.AssetStatus",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "AssetStatus importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.asset_atom.ContentType",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "ContentType importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.asset_atom.VALID_TRANSITIONS",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "VALID_TRANSITIONS importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.change_tracker.ChangeTracker",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "ChangeTracker importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.alignment_engine.AlignmentEngine",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "AlignmentEngine importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.alignment_engine.ChangeClassifier",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "ChangeClassifier importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.alignment_engine.ChangeSeverity",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "ChangeSeverity importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.alignment_engine.ImpactAnalyzer",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "ImpactAnalyzer importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.alignment_engine.CascadeUpdater",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "CascadeUpdater importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.alignment_engine.ScientificDeleter",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "ScientificDeleter importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.consistency_guardian.ConsistencyGuardian",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "ConsistencyGuardian importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.directory_index.DirectoryScanner",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "DirectoryScanner importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.directory_index.DirectorySmartIndex",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "DirectorySmartIndex importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.directory_index.READMEGenerator",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "READMEGenerator importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.tdaf_schema.TDAFDocument",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "TDAFDocument importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.tdaf_schema.TDAFManifest",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "TDAFManifest importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.tdaf_schema.TDAFValidator",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "TDAFValidator importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.tdaf_schema.validate_tdaf",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "validate_tdaf importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.tdaf_schema.create_empty_tdaf",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "create_empty_tdaf importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.tdaf_exporter.TDAFExporter",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "TDAFExporter importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.tdaf_adapters.adapt",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "adapt importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.tdaf_adapters.TraeAdapter",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "TraeAdapter importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.file_watcher.FileWatcher",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "FileWatcher importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.engine.ICMEEngine",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "ICMEEngine importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-CLASS-core.quality_gate.QualityGate",
+            "status": "PASS",
+            "severity": "info",
+            "score": 3.0,
+            "threshold": 3.0,
+            "message": "QualityGate importable",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-AssetRegistry.register",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "AssetRegistry.register() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-AssetRegistry.get",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "AssetRegistry.get() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-AssetRegistry.get_version_chain",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "AssetRegistry.get_version_chain() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-AssetRegistry.get_latest_version",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "AssetRegistry.get_latest_version() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-AssetRegistry.add_reference",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "AssetRegistry.add_reference() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-AssetRegistry.remove_reference",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "AssetRegistry.remove_reference() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-AssetRegistry.get_dependents",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "AssetRegistry.get_dependents() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-AssetRegistry.get_dependencies",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "AssetRegistry.get_dependencies() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-AssetRegistry.transition",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "AssetRegistry.transition() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-ChangeTracker.track_create",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "ChangeTracker.track_create() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-ChangeTracker.track_update",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "ChangeTracker.track_update() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-ChangeTracker.track_delete",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "ChangeTracker.track_delete() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-AlignmentEngine.on_change",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "AlignmentEngine.on_change() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-ChangeClassifier.classify",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "ChangeClassifier.classify() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-ImpactAnalyzer.analyze",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "ImpactAnalyzer.analyze() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-CascadeUpdater.execute",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "CascadeUpdater.execute() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-ScientificDeleter.delete_asset",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "ScientificDeleter.delete_asset() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-DirectoryScanner.scan_directory",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "DirectoryScanner.scan_directory() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-READMEGenerator.generate_readme",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "READMEGenerator.generate_readme() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-ConsistencyGuardian.verify_references",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "ConsistencyGuardian.verify_references() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-ConsistencyGuardian.verify_hashes",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "ConsistencyGuardian.verify_hashes() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-ConsistencyGuardian.run_full_audit",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "ConsistencyGuardian.run_full_audit() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-TDAFExporter.export_full",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "TDAFExporter.export_full() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-TDAFExporter.export_incremental",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "TDAFExporter.export_incremental() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-FileWatcher.simulate_create",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "FileWatcher.simulate_create() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-ICMEEngine.remember",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "ICMEEngine.remember() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-ICMEEngine.recall",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "ICMEEngine.recall() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-METHOD-ICMEEngine.check_l0_ttl",
+            "status": "PASS",
+            "severity": "info",
+            "score": 2.0,
+            "threshold": 2.0,
+            "message": "ICMEEngine.check_l0_ttl() exists",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 10.0,
+            "threshold": 10.0,
+            "message": "register+get: working:6d8749c4:0001 (6.7ms)",
+            "duration_ms": 6.724357604980469
+          },
+          {
+            "id": "F-E2E-02",
+            "status": "PASS",
+            "severity": "info",
+            "score": 8.0,
+            "threshold": 8.0,
+            "message": "track_create: ChangeAtom(change_id='7531916d317d8bbc', change_type='create', target_asset_id='working:9f86d081:0001', target_path='/audit/e2e.py', before_snapshot='', after_snapshot='9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08', diff_summary='File created: /audit/e2e.py (4 bytes)', impact_scope=[], trigger_source='audit', timestamp=1780411050.1475637, session_id='', undo_possible=True)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-03",
+            "status": "PASS",
+            "severity": "info",
+            "score": 8.0,
+            "threshold": 8.0,
+            "message": "version chain len=2",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-04",
+            "status": "PASS",
+            "severity": "info",
+            "score": 8.0,
+            "threshold": 8.0,
+            "message": "ref graph: 1 deps",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-05",
+            "status": "PASS",
+            "severity": "info",
+            "score": 6.0,
+            "threshold": 6.0,
+            "message": "state transition: True",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-06",
+            "status": "PASS",
+            "severity": "info",
+            "score": 6.0,
+            "threshold": 6.0,
+            "message": "classifier: ChangeSeverity.SEMANTIC",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-07",
+            "status": "PASS",
+            "severity": "info",
+            "score": 6.0,
+            "threshold": 6.0,
+            "message": "impact report generated",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-08",
+            "status": "PASS",
+            "severity": "info",
+            "score": 6.0,
+            "threshold": 6.0,
+            "message": "scan: C:\\Users\\Administrator\\AppData\\Local\\Temp\\tianji_audit_r3_n2pymvnt",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-09",
+            "status": "PASS",
+            "severity": "info",
+            "score": 6.0,
+            "threshold": 6.0,
+            "message": "README has AI-SECTION",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-10",
+            "status": "PASS",
+            "severity": "info",
+            "score": 6.0,
+            "threshold": 6.0,
+            "message": "guardian: 3 checks",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-11",
+            "status": "PASS",
+            "severity": "info",
+            "score": 6.0,
+            "threshold": 6.0,
+            "message": "TDAF valid: True",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-12",
+            "status": "PASS",
+            "severity": "info",
+            "score": 6.0,
+            "threshold": 6.0,
+            "message": "export_full: True",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-13",
+            "status": "PASS",
+            "severity": "info",
+            "score": 6.0,
+            "threshold": 6.0,
+            "message": "export_inc: True",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-14",
+            "status": "PASS",
+            "severity": "info",
+            "score": 4.0,
+            "threshold": 4.0,
+            "message": "TraeAdapter: 81 chars",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-15",
+            "status": "PASS",
+            "severity": "info",
+            "score": 4.0,
+            "threshold": 4.0,
+            "message": "FileWatcher created",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-16",
+            "status": "PASS",
+            "severity": "info",
+            "score": 4.0,
+            "threshold": 4.0,
+            "message": "check_l0_ttl: scanned=0",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-17",
+            "status": "PASS",
+            "severity": "info",
+            "score": 8.0,
+            "threshold": 8.0,
+            "message": "historical: 20 registered",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-18",
+            "status": "PASS",
+            "severity": "info",
+            "score": 4.0,
+            "threshold": 4.0,
+            "message": "L2: 4 enriched",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-19",
+            "status": "PASS",
+            "severity": "info",
+            "score": 4.0,
+            "threshold": 4.0,
+            "message": "L3: 4 enriched",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-20",
+            "status": "PASS",
+            "severity": "info",
+            "score": 4.0,
+            "threshold": 4.0,
+            "message": "L4: 4 enriched",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "F-E2E-21",
+            "status": "PASS",
+            "severity": "info",
+            "score": 4.0,
+            "threshold": 4.0,
+            "message": "L5: 0 enriched",
+            "duration_ms": 0.0
+          }
+        ]
+      },
+      "stability": {
+        "total_checks": 5,
+        "passed": 5,
+        "warned": 0,
+        "failed": 0,
+        "skipped": 0,
+        "errored": 0,
+        "score": 230.0,
+        "max_score": 220.0,
+        "pass_rate": 100.0,
+        "score_rate": 104.54545454545455,
+        "checks": [
+          {
+            "id": "S-REPEAT-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 100.0,
+            "threshold": 95.0,
+            "message": "Repeated: 5/5, avg=6.8ms",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "S-CONCURRENT-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 100.0,
+            "threshold": 95.0,
+            "message": "Concurrent: 10/10 success",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "S-ERR-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 10.0,
+            "threshold": 10.0,
+            "message": "Invalid transition rejected",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "S-ERR-02",
+            "status": "PASS",
+            "severity": "info",
+            "score": 10.0,
+            "threshold": 10.0,
+            "message": "Nonexistent returns None",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "S-CLEAN-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 10.0,
+            "threshold": 10.0,
+            "message": "50 assets persisted: count=50",
+            "duration_ms": 0.0
+          }
+        ]
+      },
+      "performance": {
+        "total_checks": 5,
+        "passed": 5,
+        "warned": 0,
+        "failed": 0,
+        "skipped": 0,
+        "errored": 0,
+        "score": 6055.494621086339,
+        "max_score": 5760.0,
+        "pass_rate": 100.0,
+        "score_rate": 105.1301149494156,
+        "checks": [
+          {
+            "id": "P-REMEMBER-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 547.9898929595947,
+            "threshold": 500.0,
+            "message": "remember() p95=2.0ms avg=0.8ms p99=2.1ms",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "P-RECALL-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 220.0,
+            "threshold": 200.0,
+            "message": "recall() p95=0.0ms",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "P-EXPORT-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 5094.9071407318115,
+            "threshold": 5000.0,
+            "message": "export_full(100): 5.1ms",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "P-THROUGHPUT-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 182.5975873949325,
+            "threshold": 50.0,
+            "message": "Throughput: 182.6 ops/sec",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "P-BATCH-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 10.0,
+            "threshold": 10.0,
+            "message": "Batch: 200 in 1063.3ms (188 ops/sec)",
+            "duration_ms": 0.0
+          }
+        ]
+      },
+      "security": {
+        "total_checks": 6,
+        "passed": 4,
+        "warned": 2,
+        "failed": 0,
+        "skipped": 0,
+        "errored": 0,
+        "score": 60.0,
+        "max_score": 70.0,
+        "pass_rate": 66.66666666666666,
+        "score_rate": 85.71428571428571,
+        "checks": [
+          {
+            "id": "SEC-SENSITIVE-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 15.0,
+            "threshold": 15.0,
+            "message": "No hardcoded secrets in production code",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "SEC-DANGEROUS-deepseek_driver.py",
+            "status": "WARN",
+            "severity": "medium",
+            "score": 5.0,
+            "threshold": 10.0,
+            "message": "deepseek_driver.py: eval()",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "SEC-DANGEROUS-stat_collector.py",
+            "status": "WARN",
+            "severity": "medium",
+            "score": 5.0,
+            "threshold": 10.0,
+            "message": "stat_collector.py: eval()",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "SEC-SQL-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 15.0,
+            "threshold": 15.0,
+            "message": "SQL injection safely handled",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "SEC-ACL-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 10.0,
+            "threshold": 10.0,
+            "message": "Invalid transitions rejected",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "SEC-INT-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 10.0,
+            "threshold": 10.0,
+            "message": "Hash integrity: 50ed8fcbb09b9dab...",
+            "duration_ms": 0.0
+          }
+        ]
+      },
+      "data_accuracy": {
+        "total_checks": 7,
+        "passed": 7,
+        "warned": 0,
+        "failed": 0,
+        "skipped": 0,
+        "errored": 0,
+        "score": 180.0,
+        "max_score": 180.0,
+        "pass_rate": 100.0,
+        "score_rate": 100.0,
+        "checks": [
+          {
+            "id": "DA-HASH-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 100.0,
+            "threshold": 100.0,
+            "message": "Hash: 50/50 (100.0%)",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "DA-REF-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 15.0,
+            "threshold": 15.0,
+            "message": "Reference A→B verified",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "DA-REF-02",
+            "status": "PASS",
+            "severity": "info",
+            "score": 10.0,
+            "threshold": 10.0,
+            "message": "Ref removal verified",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "DA-VER-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 15.0,
+            "threshold": 15.0,
+            "message": "Version chain: 5 versions",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "DA-VER-02",
+            "status": "PASS",
+            "severity": "info",
+            "score": 10.0,
+            "threshold": 10.0,
+            "message": "Latest: v5",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "DA-TDAF-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 15.0,
+            "threshold": 15.0,
+            "message": "TDAF roundtrip PASS",
+            "duration_ms": 0.0
+          },
+          {
+            "id": "DA-LAYER-01",
+            "status": "PASS",
+            "severity": "info",
+            "score": 15.0,
+            "threshold": 15.0,
+            "message": "All 6 layers verified",
+            "duration_ms": 0.0
+          }
+        ]
+      }
+    }
+  }
+]

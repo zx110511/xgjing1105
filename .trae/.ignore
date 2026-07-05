@@ -1,0 +1,139 @@
+# Trae 项目忽略配置
+# 项目根: D:\元初系统
+# 版本: 5.0.0 | 更新时间: 2026-05-01
+
+# --- Python 编译产物 ---
+__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+.Python
+**/*.so
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.eggs/
+**/*.egg-info/
+
+# --- 虚拟环境 ---
+.venv/
+venv/
+env/
+ENV/
+
+# --- Node.js ---
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# --- 构建输出 ---
+dist/
+build/
+out/
+
+# --- 数据与缓存 ---
+# data/ 已解封 - 天机/data/ 含领域词典等资源文件需要索引
+# data/cache/*
+# data/logs/*.log
+# **/*.db 已解封 - 天机记忆icme.db需要被索引
+# **/*.sqlite3
+# **/*.db-journal
+# **/*.db-wal
+# **/*.db-shm
+
+# --- 记忆系统运行时数据 ---
+.amfs/data/
+.amfs/index.*.bak
+# .memory/ 已解封 - 天机记忆数据需要被索引
+# .knowledge/ 已解封 - 天机知识数据需要被索引
+trae-memory-runtime/data/
+trae-memory-runtime/.memory/
+trae-memory-runtime/logs/
+trae-memory-runtime/__pycache__/
+
+# --- IDE 与编辑器 ---
+.vscode/settings.json
+.vscode/tasks.json
+.vscode/launch.json
+.idea/
+**/*.swp
+**/*.swo
+**/*~
+.project
+.classpath
+.c9/
+**/*.launch
+.settings/
+
+# --- 系统文件 ---
+.DS_Store
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# --- 日志 ---
+**/*.log
+logs/
+log/
+
+# --- 测试与覆盖率 ---
+coverage/
+.nyc_output/
+.jest_cache/
+.hypothesis/
+nosetests.xml
+
+# --- 压缩包 ---
+**/*.tar.gz
+**/*.zip
+**/*.rar
+**/*.7z
+**/*.gz
+
+# --- 临时文件 ---
+tmp/
+temp/
+**/*.tmp
+**/*.temp
+**/*.bak
+
+# --- Rust/Nexus 编译产物 ---
+target/
+Cargo.lock
+
+# --- 环境变量与密钥 ---
+.env
+.env.local
+.env.*.local
+**/*.pem
+**/*.key
+.secrets/
+
+# --- 文档生成产物 ---
+docs/_build/
+site/
+**/*.map
+
+# --- 非核心目录 (整体排除) ---
+AI记忆系统/
+Nexus-Memory-System-master/
+openclaw/
+研究区/
+# 小说工厂/ 已解封 - 创作内容需要索引
+
+# --- 脚本与批处理 (精细化: 排除临时脚本, 保留核心系统脚本) ---
+# *.bat
+# *.cmd
+# *.ps1
+# **/*.bat
+# **/*.cmd
+# **/*.ps1
+# [保留] core/daemon/*.ps1 - TUMSS-Daemon 守护进程核心脚本
+
+# --- 前端构建产物 ---
+package-lock.json
+eslint.config.js
+**/*.tsbuildinfo

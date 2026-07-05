@@ -1,0 +1,50 @@
+﻿{
+  "total": 38,
+  "category_1_mcp_mapped": [
+    "agent-dispatch",
+    "auto-memory-capture (映射: memory_remember)",
+    "context-extract",
+    "data-analyze (映射: memory_stats, memory_capacity, execute_command)",
+    "memory-file-capture (映射: memory_remember, memory_recall)",
+    "memory-recall",
+    "memory-remember",
+    "memory-smart-dispatch (映射: memory_remember, tianji_classify, tianji_auto_tag)",
+    "ops-deploy (映射: execute_command, list_processes)",
+    "perf-profile (映射: profile_function)",
+    "rule-check (映射: execute_command)",
+    "security-audit (映射: execute_command, scan_dependencies, check_permissions)",
+    "skill-route (映射: agent_dispatch)",
+    "system-diagnose (映射: memory_stats, memory_consolidate, system_status)",
+    "test-gate (映射: execute_command)"
+  ],
+  "category_2_domain": [
+    "agent-transparent-dispatch",
+    "corpus-batch-import",
+    "corpus-extract",
+    "corpus-quality-score",
+    "corpus-retrieve",
+    "dialogue-quality",
+    "editor-review",
+    "memory-audit",
+    "memory-test",
+    "novel-chapter-create",
+    "novel-consistency-check",
+    "novel-format-export",
+    "novel-multi-schedule",
+    "novel-setting-consistency-deep",
+    "novel-version-track",
+    "novel-worldbuilding-expand",
+    "system-audit",
+    "tianji-orchestrate"
+  ],
+  "category_3_concept": [
+    "lingjing-14questions",
+    "lingjing-9dao-orchestrate",
+    "lingjing-dao-compliance",
+    "lingjing-memory",
+    "lingjing-triple-chain"
+  ],
+  "special": [
+    ".audit"
+  ]
+}

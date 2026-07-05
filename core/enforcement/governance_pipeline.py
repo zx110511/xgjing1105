@@ -1,0 +1,992 @@
+r"""
+天机模块治理流水线 (Tianji Module Governance Pipeline) v1.1
+===========================================================
+Phase 2 治理机制建设 — 审核闭环支柱
+
+M18升级: EvolutionLoop闭环 + record_action喂入 + health() + 双注入
+灵境道谱溯源: D4-4【强制记录煞】· 道四·质量体道 · 四地煞之护之术
+  - 不可绕过的质量管控+审计全覆盖+Plan→Audit→Implement→Approve四阶闭环
+  - 源文件: core/governance_pipeline.py → GovernancePipeline
+
+完整流程: 规划 → 审计 → 落地 → 审批
+
+设计哲学:
+  治理不是事后检查，而是融入开发全流程的自动化闭环。
+  每个阶段都有明确的准入/准出标准，阶段间通过Gate衔接。
+
+流水线阶段:
+  1. 规划阶段 (Plan)      — 模块定义、依赖声明、API设计
+  2. 审计阶段 (Audit)     — 静态分析、合规校验、循环依赖检测
+  3. 落地阶段 (Implement) — 注册、初始化、生命周期转换
+  4. 审批阶段 (Approve)   — 验证结果汇总、审计记录、签准
+
+数据根基:
+  - 从记忆库提取的合规审计流水线: 镇山→律令 两级审批
+  - 天机进化闭环: observe→learn→evolve 因果对追踪
+  - Agent流水线 TVP 声明协议
+  - 36地煞模块体系
+
+参考:
+  - Spring Modulith Verification
+  - ArchUnit 架构测试
+  - 天机 SG门禁 质量铁律
+"""
+
+import time
+import json
+import uuid
+import logging
+import threading
+from pathlib import Path
+from dataclasses import dataclass, field
+from typing import Any, Optional, Dict, List, Set, Tuple, Callable
+from enum import Enum
+from collections import defaultdict
+
+logger = logging.getLogger(__name__)
+
+try:
+    from ..processors.evolution_loop import EvolutionLoop
+except ImportError:
+    EvolutionLoop = None
+
+
+# ═══════════════════════════════════════════════════════════════
+# 流水线阶段枚举
+# ═══════════════════════════════════════════════════════════════
+
+class PipelinePhase(str, Enum):
+    PLAN = "plan"
+    AUDIT = "audit"
+    IMPLEMENT = "implement"
+    APPROVE = "approve"
+
+
+class PhaseStatus(str, Enum):
+    PENDING = "pending"
+    IN_PROGRESS = "in_progress"
+    PASSED = "passed"
+    FAILED = "failed"
+    BLOCKED = "blocked"
+    SKIPPED = "skipped"
+
+
+class AuditVerdict(str, Enum):
+    PASS = "pass"
+    FAIL = "fail"
+    CONDITIONAL_PASS = "conditional_pass"
+    NEEDS_REVIEW = "needs_review"
+
+
+class ApprovalLevel(str, Enum):
+    AUTO = "auto"
+    TIEWEI_L0 = "tiewei_l0"
+    ZHENSHAN_L4 = "zhenshan_l4"
+    TIANSHU = "tianshu"
+
+
+# ═══════════════════════════════════════════════════════════════
+# 流水线核心数据结构
+# ═══════════════════════════════════════════════════════════════
+
+@dataclass
+class StageGate:
+    gate_id: str
+    phase: PipelinePhase
+    name: str
+    description: str
+    required: bool = True
+    status: PhaseStatus = PhaseStatus.PENDING
+    passed: bool = False
+    errors: List[str] = field(default_factory=list)
+    warnings: List[str] = field(default_factory=list)
+    duration_ms: float = 0.0
+    started_at: float = 0.0
+    completed_at: float = 0.0
+
+
+@dataclass
+class AuditCheck:
+    check_id: str
+    category: str
+    name: str
+    description: str
+    severity: str = "error"
+    passed: bool = False
+    detail: str = ""
+    suggestion: str = ""
+    checked_at: float = field(default_factory=time.time)
+
+
+@dataclass
+class AuditReport:
+    report_id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
+    module_id: str = ""
+    module_version: str = ""
+    created_at: float = field(default_factory=time.time)
+    verdict: AuditVerdict = AuditVerdict.NEEDS_REVIEW
+    checks: List[AuditCheck] = field(default_factory=list)
+    summary: Dict[str, int] = field(default_factory=lambda: {
+        "total": 0, "passed": 0, "failed": 0, "skipped": 0
+    })
+    dependency_issues: List[str] = field(default_factory=list)
+    circular_deps: List[List[str]] = field(default_factory=list)
+    layer_violations: List[str] = field(default_factory=list)
+    approved_by: Optional[str] = None
+    approved_at: float = 0.0
+    approval_level: ApprovalLevel = ApprovalLevel.AUTO
+
+
+@dataclass
+class GovernanceRecord:
+    record_id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
+    module_id: str = ""
+    pipeline_id: str = ""
+    phases: Dict[str, PhaseStatus] = field(default_factory=dict)
+    gates: List[StageGate] = field(default_factory=list)
+    audit_report: Optional[AuditReport] = None
+    started_at: float = field(default_factory=time.time)
+    completed_at: float = 0.0
+    overall_status: PhaseStatus = PhaseStatus.PENDING
+    history: List[Dict[str, Any]] = field(default_factory=list)
+
+
+# ═══════════════════════════════════════════════════════════════
+# 审计检查器注册表 — 可插拔的审计规则
+# ═══════════════════════════════════════════════════════════════
+
+class AuditCheckerRegistry:
+    """审计检查器注册表 — 所有审计规则在此注册"""
+
+    def __init__(self):
+        self._checks: Dict[str, callable] = {}
+        self._register_defaults()
+
+    def _register_defaults(self):
+        self._checks["dependency_health"] = self._check_dependency_health
+        self._checks["circular_dependency"] = self._check_circular_dependency
+        self._checks["layer_compliance"] = self._check_layer_compliance
+        self._checks["naming_convention"] = self._check_naming_convention
+        self._checks["api_completeness"] = self._check_api_completeness
+        self._checks["documentation"] = self._check_documentation
+        self._checks["version_semver"] = self._check_version_semver
+        self._checks["config_schema"] = self._check_config_schema
+        self._checks["test_coverage"] = self._check_test_coverage
+
+    def register(self, check_id: str, check_fn: callable):
+        self._checks[check_id] = check_fn
+
+    def run_all(self, context: Dict[str, Any]) -> List[AuditCheck]:
+        results = []
+        for check_id, check_fn in self._checks.items():
+            try:
+                result = check_fn(context)
+                if isinstance(result, list):
+                    results.extend(result)
+                elif result:
+                    results.append(result)
+            except Exception as e:
+                logger.warning(f"审计检查 {check_id} 执行异常: {e}")
+                results.append(AuditCheck(
+                    check_id=check_id,
+                    category="execution_error",
+                    name=f"执行异常: {check_id}",
+                    description=str(e),
+                    severity="error",
+                    passed=False,
+                    detail=str(e),
+                ))
+        return results
+
+    def _check_dependency_health(self, ctx: Dict[str, Any]) -> AuditCheck:
+        deps = ctx.get("dependencies", [])
+        undefined = []
+        for dep in deps:
+            target = dep.get("target_module", "")
+            if target and target not in ctx.get("known_modules", set()):
+                undefined.append(target)
+        return AuditCheck(
+            check_id="dependency_health",
+            category="dependency",
+            name="依赖健康检查",
+            description="验证所有声明的依赖模块均存在",
+            severity="error",
+            passed=len(undefined) == 0,
+            detail=f"未定义依赖: {undefined}" if undefined else f"全部 {len(deps)} 个依赖有效",
+            suggestion="检查依赖模块是否已在ModuleRegistry中注册" if undefined else "",
+        )
+
+    def _check_circular_dependency(self, ctx: Dict[str, Any]) -> AuditCheck:
+        circular = ctx.get("circular_dependencies", [])
+        return AuditCheck(
+            check_id="circular_dependency",
+            category="dependency",
+            name="循环依赖检测",
+            description="检测是否存在循环依赖",
+            severity="error",
+            passed=len(circular) == 0,
+            detail=f"发现 {len(circular)} 个循环依赖: {circular}" if circular else "无循环依赖",
+            suggestion="引入接口抽象或事件总线打破循环" if circular else "",
+        )
+
+    def _check_layer_compliance(self, ctx: Dict[str, Any]) -> AuditCheck:
+        violations = ctx.get("layer_violations", [])
+        return AuditCheck(
+            check_id="layer_compliance",
+            category="architecture",
+            name="分层合规检查",
+            description="验证模块未违反分层架构约束",
+            severity="warning",
+            passed=len(violations) == 0,
+            detail=f"发现 {len(violations)} 个分层违规" if violations else "分层合规",
+            suggestion="将共用功能下沉或通过事件总线解耦" if violations else "",
+        )
+
+    def _check_naming_convention(self, ctx: Dict[str, Any]) -> AuditCheck:
+        module_id = ctx.get("module_id", "")
+        file_name = ctx.get("file_name", "")
+        issues = []
+        if module_id and "-" in module_id:
+            issues.append(f"模块ID包含连字符: {module_id}")
+        if not module_id.islower() and module_id:
+            issues.append(f"模块ID应全小写: {module_id}")
+        return AuditCheck(
+            check_id="naming_convention",
+            category="style",
+            name="命名规范检查",
+            description="验证命名符合snake_case规范",
+            severity="info",
+            passed=len(issues) == 0,
+            detail="; ".join(issues) if issues else "命名规范合规",
+            suggestion="使用snake_case命名" if issues else "",
+        )
+
+    def _check_api_completeness(self, ctx: Dict[str, Any]) -> AuditCheck:
+        public_api = ctx.get("public_api", [])
+        missing = []
+        for api in public_api:
+            if not api.get("description"):
+                missing.append(api.get("name", "unknown"))
+        return AuditCheck(
+            check_id="api_completeness",
+            category="api",
+            name="API完整性检查",
+            description="验证所有公开API均有描述和类型签名",
+            severity="warning",
+            passed=len(missing) == 0,
+            detail=f"API描述缺失: {missing}" if missing else "API文档完整",
+            suggestion="为所有公开API添加描述" if missing else "",
+        )
+
+    def _check_documentation(self, ctx: Dict[str, Any]) -> AuditCheck:
+        has_readme = ctx.get("has_readme", False)
+        has_docstring = ctx.get("has_docstring", False)
+        issues = []
+        if not has_docstring:
+            issues.append("缺少模块级文档字符串")
+        return AuditCheck(
+            check_id="documentation",
+            category="documentation",
+            name="文档完整性检查",
+            description="验证模块是否包含必要的文档",
+            severity="warning",
+            passed=len(issues) == 0,
+            detail="; ".join(issues) if issues else "文档完整",
+            suggestion="添加模块级文档字符串" if issues else "",
+        )
+
+    def _check_version_semver(self, ctx: Dict[str, Any]) -> Optional[AuditCheck]:
+        version = ctx.get("version", "0.0.0")
+        parts = version.split(".")
+        if len(parts) != 3 or not all(p.isdigit() for p in parts):
+            return AuditCheck(
+                check_id="version_semver",
+                category="version",
+                name="语义版本检查",
+                description="验证版本号符合SemVer 2.0规范",
+                severity="warning",
+                passed=False,
+                detail=f"版本号 {version} 不符合SemVer规范",
+                suggestion="使用 MAJOR.MINOR.PATCH 格式，如 1.0.0",
+            )
+        return None
+
+    def _check_config_schema(self, ctx: Dict[str, Any]) -> AuditCheck:
+        config = ctx.get("config_schema", {})
+        defaults = ctx.get("default_config", {})
+        missing_defaults = set(config.keys()) - set(defaults.keys())
+        return AuditCheck(
+            check_id="config_schema",
+            category="config",
+            name="配置Schema检查",
+            description="验证配置项均有默认值",
+            severity="warning",
+            passed=len(missing_defaults) == 0,
+            detail=f"缺少默认值的配置项: {missing_defaults}" if missing_defaults else "配置Schema完整",
+            suggestion="为所有配置项提供默认值" if missing_defaults else "",
+        )
+
+    def _check_test_coverage(self, ctx: Dict[str, Any]) -> AuditCheck:
+        has_tests = ctx.get("has_tests", False)
+        return AuditCheck(
+            check_id="test_coverage",
+            category="quality",
+            name="测试覆盖检查",
+            description="验证模块是否有对应的测试文件",
+            severity="info",
+            passed=has_tests,
+            detail="已检测到测试文件" if has_tests else "未检测到测试文件",
+            suggestion="创建 tests/test_<module>.py 文件" if not has_tests else "",
+        )
+
+
+# ═══════════════════════════════════════════════════════════════
+# 治理流水线主体
+# ═══════════════════════════════════════════════════════════════
+
+class GovernancePipeline:
+    """
+    天机模块治理流水线
+
+    四阶段完整闭环:
+      Plan → Audit → Implement → Approve
+
+    每个阶段都有Gate控制流转，Gate未通过则阻塞流水线。
+
+    使用方式:
+      pipeline = GovernancePipeline(registry, analyzer)
+      pipeline.plan(module_def)
+      pipeline.audit(module_def)
+      pipeline.implement(module_def)
+      result = pipeline.approve(module_def)
+    """
+
+    def __init__(self, registry=None, analyzer=None,
+                 recorder: Optional[Any] = None,
+                 learning_engine: Optional[Any] = None):
+        self._registry = registry
+        self._analyzer = analyzer
+        self._recorder = recorder
+        self._learning_engine = learning_engine
+        self._checker = AuditCheckerRegistry()
+        self._records: Dict[str, GovernanceRecord] = {}
+        self._lock = threading.RLock()
+        self._stats = {
+            "pipelines_created": 0,
+            "pipelines_passed": 0,
+            "pipelines_failed": 0,
+            "total_audits": 0,
+            "total_plans": 0,
+            "total_implements": 0,
+            "total_approvals": 0,
+            "start_time": time.time(),
+        }
+        self._errors = 0
+
+        self._evo_loop = None
+        if EvolutionLoop is not None:
+            try:
+                self._evo_loop = EvolutionLoop(
+                    module_name="governance_pipeline",
+                    effectiveness_fn=self._calc_pipeline_effectiveness,
+                    learn_fn=self._learn_from_pipeline,
+                    evolve_fn=self._evolve_pipeline_config,
+                    mutable_config={
+                        "auto_approve_threshold": 0.8,
+                        "audit_timeout_seconds": 30.0,
+                    },
+                    recorder=recorder,
+                    learning_engine=learning_engine,
+                )
+            except Exception:
+                pass
+
+    def plan(self, module_definition) -> GovernanceRecord:
+        """
+        规划阶段: 验证模块定义完整性
+
+        检查项:
+          - 模块ID/名称/版本是否完整
+          - 职责边界是否清晰
+          - 依赖声明是否完整
+          - API签名是否定义
+          - 反职责是否声明
+        """
+        record = self._create_record(module_definition.module_id)
+        self._record_phase(record, PipelinePhase.PLAN, PhaseStatus.IN_PROGRESS)
+
+        gates = []
+
+        gate_id = self._define_gate(
+            gates, PipelinePhase.PLAN, "plan_identity",
+            "模块身份验证", "验证模块ID/名称/版本/职责等必填字段"
+        )
+        identity_ok = all([
+            module_definition.module_id,
+            module_definition.module_name,
+            module_definition.module_version,
+            module_definition.responsibility,
+        ])
+        self._pass_gate(gates, gate_id, identity_ok,
+                        "模块身份信息完整" if identity_ok else "缺少必填字段",
+                        errors=[] if identity_ok else self._missing_fields(module_definition))
+
+        gate_dep = self._define_gate(
+            gates, PipelinePhase.PLAN, "plan_dependencies",
+            "依赖声明检查", "验证依赖模块是否已注册"
+        )
+        dep_errors = self._validate_dependencies(module_definition)
+        self._pass_gate(gates, gate_dep, len(dep_errors) == 0,
+                        f"依赖声明完整 ({len(module_definition.dependencies)}个)" if not dep_errors else "依赖问题",
+                        errors=dep_errors)
+
+        gate_api = self._define_gate(
+            gates, PipelinePhase.PLAN, "plan_api",
+            "API设计检查", "验证公开API是否定义了方法签名"
+        )
+        api_ok = len(module_definition.public_api) > 0
+        self._pass_gate(gates, gate_api, api_ok,
+                        f"定义了 {len(module_definition.public_api)} 个公开API" if api_ok else "未定义公开API",
+                        warnings=[] if api_ok else ["建议至少定义1个公开API方法签名"])
+
+        gate_anti = self._define_gate(
+            gates, PipelinePhase.PLAN, "plan_anti_responsibilities",
+            "反职责声明检查", "验证模块是否明确声明了不做什么"
+        )
+        anti_ok = len(module_definition.anti_responsibilities) > 0 if hasattr(module_definition, 'anti_responsibilities') else False
+        self._pass_gate(gates, gate_anti, anti_ok,
+                        f"声明了 {len(module_definition.anti_responsibilities)} 条反职责" if anti_ok else "未声明反职责",
+                        warnings=[] if anti_ok else ["反职责声明有助于明确模块边界，建议填写"])
+
+        record.gates = gates
+        all_passed = all(g.passed for g in gates if g.required)
+        self._record_phase(record, PipelinePhase.PLAN,
+                          PhaseStatus.PASSED if all_passed else PhaseStatus.FAILED)
+
+        record.history.append({
+            "phase": "plan",
+            "timestamp": time.time(),
+            "gates": [{"id": g.gate_id, "passed": g.passed, "errors": g.errors} for g in gates],
+        })
+
+        self._stats["total_plans"] += 1
+
+        if self._evo_loop is not None:
+            try:
+                self._evo_loop.record_action(
+                    action="plan",
+                    state_before={"pipelines_created": self._stats["pipelines_created"]},
+                    state_after={"pipelines_created": self._stats["pipelines_created"],
+                                 "module_id": module_definition.module_id,
+                                 "plan_passed": all_passed},
+                )
+            except Exception:
+                pass
+
+        logger.info(f"[GovernancePipeline] 规划完成: {module_definition.module_id} -> "
+                    f"{'PASSED' if all_passed else 'FAILED'}")
+        return record
+
+    def audit(self, module_definition, record: Optional[GovernanceRecord] = None,
+              circuit_check_callback: Optional[Callable] = None) -> AuditReport:
+        """
+        审计阶段: 运行所有合规检查
+
+        基于知识功能实现数据根基进行审计验证:
+          - 静态依赖分析结果
+          - 分层架构合规性
+          - 循环依赖检测
+          - 命名规范
+          - API完整性
+          - 配置Schema
+          - 测试覆盖
+        """
+        if record is None:
+            record = self._records.get(module_definition.module_id)
+            if record is None:
+                record = self._create_record(module_definition.module_id)
+
+        self._record_phase(record, PipelinePhase.AUDIT, PhaseStatus.IN_PROGRESS)
+
+        context = self._build_audit_context(module_definition)
+
+        if circuit_check_callback:
+            context["circuit_check"] = circuit_check_callback(module_definition)
+
+        checks = self._checker.run_all(context)
+        self._stats["total_audits"] += 1
+
+        passed = sum(1 for c in checks if c.passed)
+        failed = sum(1 for c in checks if not c.passed and c.severity == "error")
+        warnings = sum(1 for c in checks if not c.passed and c.severity == "warning")
+
+        report = AuditReport(
+            module_id=module_definition.module_id,
+            module_version=module_definition.module_version,
+            checks=checks,
+            summary={"total": len(checks), "passed": passed, "failed": failed, "skipped": 0},
+            dependency_issues=context.get("dependency_issues", []),
+            circular_deps=context.get("circular_dependencies", []),
+            layer_violations=context.get("layer_violations", []),
+        )
+
+        if failed > 0:
+            report.verdict = AuditVerdict.FAIL
+        elif warnings > 0:
+            report.verdict = AuditVerdict.CONDITIONAL_PASS
+        else:
+            report.verdict = AuditVerdict.PASS
+
+        record.audit_report = report
+        self._record_phase(record, PipelinePhase.AUDIT,
+                          PhaseStatus.PASSED if report.verdict != AuditVerdict.FAIL else PhaseStatus.FAILED)
+
+        record.history.append({
+            "phase": "audit",
+            "timestamp": time.time(),
+            "verdict": report.verdict.value,
+            "summary": report.summary,
+        })
+
+        if self._evo_loop is not None:
+            try:
+                self._evo_loop.record_action(
+                    action="audit",
+                    state_before={"total_audits": self._stats["total_audits"] - 1},
+                    state_after={"total_audits": self._stats["total_audits"],
+                                 "module_id": module_definition.module_id,
+                                 "verdict": report.verdict.value,
+                                 "passed": passed, "total": len(checks)},
+                )
+            except Exception:
+                pass
+
+        logger.info(f"[GovernancePipeline] 审计完成: {module_definition.module_id} -> "
+                    f"{report.verdict.value} (通过{passed}/{len(checks)})")
+        return report
+
+    def implement(self, module_definition, record: Optional[GovernanceRecord] = None) -> bool:
+        """
+        落地阶段: 将模块注册到注册中心并初始化
+
+        前置条件: 审计阶段必须通过
+        执行操作:
+          1. 注册模块到ModuleRegistry
+          2. 激活模块生命周期
+          3. 初始化模块实例(如有)
+          4. 触发EVOLUTION_STARTED事件
+        """
+        if record is None:
+            record = self._records.get(module_definition.module_id)
+            if record is None:
+                record = self._create_record(module_definition.module_id)
+
+        if record.audit_report and record.audit_report.verdict == AuditVerdict.FAIL:
+            logger.error(f"[GovernancePipeline] 落地被阻塞: {module_definition.module_id} 审计未通过")
+            self._record_phase(record, PipelinePhase.IMPLEMENT, PhaseStatus.BLOCKED)
+            return False
+
+        self._record_phase(record, PipelinePhase.IMPLEMENT, PhaseStatus.IN_PROGRESS)
+
+        success = True
+        if self._registry:
+            success = self._registry.register(module_definition)
+            if success:
+                from ..shared.module_registry import ModuleLifecycleState
+                self._registry.update_state(module_definition.module_id, ModuleLifecycleState.ACTIVE)
+                logger.info(f"[GovernancePipeline] 注册成功: {module_definition.module_id}")
+
+        self._record_phase(record, PipelinePhase.IMPLEMENT,
+                          PhaseStatus.PASSED if success else PhaseStatus.FAILED)
+
+        record.history.append({
+            "phase": "implement",
+            "timestamp": time.time(),
+            "success": success,
+        })
+
+        self._stats["total_implements"] += 1
+
+        if self._evo_loop is not None:
+            try:
+                self._evo_loop.record_action(
+                    action="implement",
+                    state_before={"total_implements": self._stats["total_implements"] - 1},
+                    state_after={"total_implements": self._stats["total_implements"],
+                                 "module_id": module_definition.module_id,
+                                 "success": success},
+                )
+            except Exception:
+                pass
+
+        return success
+
+    def approve(self, module_definition, record: Optional[GovernanceRecord] = None) -> Dict[str, Any]:
+        """
+        审批阶段: 最终审查与签准
+
+        审批层级:
+          - AUTO:      所有审计通过 → 自动签准
+          - TIEWEI_L0: 有条件通过 → L0铁卫审批
+          - ZHENSHAN_L4: 有警告 → L4镇山审批
+          - TIANSHU:   审计失败 → 天枢终审
+
+        返回审批结果摘要
+        """
+        if record is None:
+            record = self._records.get(module_definition.module_id)
+            if record is None:
+                record = self._create_record(module_definition.module_id)
+
+        self._record_phase(record, PipelinePhase.APPROVE, PhaseStatus.IN_PROGRESS)
+
+        report = record.audit_report
+        if report is None:
+            self._record_phase(record, PipelinePhase.APPROVE, PhaseStatus.FAILED)
+            return {"approved": False, "reason": "缺少审计报告"}
+
+        if report.verdict == AuditVerdict.PASS:
+            approval_level = ApprovalLevel.AUTO
+            self._perform_approval(report, approval_level.value)
+        elif report.verdict == AuditVerdict.CONDITIONAL_PASS:
+            approval_level = ApprovalLevel.TIEWEI_L0
+            self._perform_approval(report, approval_level.value)
+        elif report.verdict == AuditVerdict.NEEDS_REVIEW:
+            approval_level = ApprovalLevel.ZHENSHAN_L4
+            self._perform_approval(report, approval_level.value)
+        else:
+            approval_level = ApprovalLevel.TIANSHU
+            self._perform_approval(report, approval_level.value)
+
+        overall_passed = report.verdict != AuditVerdict.FAIL
+        self._record_phase(record, PipelinePhase.APPROVE,
+                          PhaseStatus.PASSED if overall_passed else PhaseStatus.FAILED)
+
+        record.overall_status = PhaseStatus.PASSED if overall_passed else PhaseStatus.FAILED
+        record.completed_at = time.time()
+
+        if overall_passed:
+            self._stats["pipelines_passed"] += 1
+        else:
+            self._stats["pipelines_failed"] += 1
+
+        record.history.append({
+            "phase": "approve",
+            "timestamp": time.time(),
+            "approved": overall_passed,
+            "level": approval_level.value,
+        })
+
+        result = {
+            "approved": overall_passed,
+            "approval_level": approval_level.value,
+            "verdict": report.verdict.value,
+            "summary": report.summary,
+            "checks_passed": report.summary["passed"],
+            "checks_total": report.summary["total"],
+            "pipeline_duration_ms": (record.completed_at - record.started_at) * 1000,
+            "recommendation": self._generate_recommendation(report),
+        }
+
+        self._stats["total_approvals"] += 1
+
+        if self._evo_loop is not None:
+            try:
+                self._evo_loop.record_action(
+                    action="approve",
+                    state_before={"total_approvals": self._stats["total_approvals"] - 1},
+                    state_after={"total_approvals": self._stats["total_approvals"],
+                                 "module_id": module_definition.module_id,
+                                 "approved": overall_passed,
+                                 "level": approval_level.value},
+                )
+            except Exception:
+                pass
+
+        logger.info(f"[GovernancePipeline] 审批完成: {module_definition.module_id} -> "
+                    f"{'APPROVED' if overall_passed else 'REJECTED'} ({approval_level.value})")
+        return result
+
+    def run_full_pipeline(self, module_definition) -> Dict[str, Any]:
+        """
+        一键执行完整流水线: Plan → Audit → Implement → Approve
+
+        Returns:
+            完整的执行结果字典
+        """
+        pipeline_id = uuid.uuid4().hex[:12]
+        start = time.time()
+
+        record = self.plan(module_definition)
+        record.pipeline_id = pipeline_id
+
+        plan_passed = record.phases.get(PipelinePhase.PLAN.value) == PhaseStatus.PASSED.value
+        if not plan_passed:
+            return {
+                "pipeline_id": pipeline_id,
+                "module_id": module_definition.module_id,
+                "status": "failed",
+                "failed_at": "plan",
+                "record": record,
+            }
+
+        audit_report = self.audit(module_definition, record)
+        if audit_report.verdict == AuditVerdict.FAIL:
+            return {
+                "pipeline_id": pipeline_id,
+                "module_id": module_definition.module_id,
+                "status": "failed",
+                "failed_at": "audit",
+                "audit_report": audit_report,
+                "record": record,
+            }
+
+        implement_ok = self.implement(module_definition, record)
+        if not implement_ok:
+            return {
+                "pipeline_id": pipeline_id,
+                "module_id": module_definition.module_id,
+                "status": "failed",
+                "failed_at": "implement",
+                "record": record,
+            }
+
+        approval = self.approve(module_definition, record)
+
+        elapsed = time.time() - start
+        return {
+            "pipeline_id": pipeline_id,
+            "module_id": module_definition.module_id,
+            "status": "approved" if approval["approved"] else "rejected",
+            "approval": approval,
+            "duration_seconds": round(elapsed, 3),
+            "record": record,
+        }
+
+    def _create_record(self, module_id: str) -> GovernanceRecord:
+        with self._lock:
+            record = GovernanceRecord(module_id=module_id)
+            for phase in PipelinePhase:
+                record.phases[phase.value] = PhaseStatus.PENDING.value
+            self._records[module_id] = record
+            self._stats["pipelines_created"] += 1
+            return record
+
+    def _record_phase(self, record: GovernanceRecord, phase: PipelinePhase, status: PhaseStatus):
+        record.phases[phase.value] = status.value
+
+    def _define_gate(self, gates: List[StageGate], phase: PipelinePhase,
+                     gate_id: str, name: str, description: str) -> str:
+        full_id = f"{phase.value}_{gate_id}"
+        gate = StageGate(
+            gate_id=full_id,
+            phase=phase,
+            name=name,
+            description=description,
+            started_at=time.time(),
+        )
+        gates.append(gate)
+        return full_id
+
+    def _pass_gate(self, gates: List[StageGate], gate_id: str, passed: bool,
+                   message: str, errors: List[str] = None, warnings: List[str] = None):
+        for gate in gates:
+            if gate.gate_id == gate_id:
+                gate.passed = passed
+                gate.status = PhaseStatus.PASSED if passed else PhaseStatus.FAILED
+                gate.completed_at = time.time()
+                gate.duration_ms = (gate.completed_at - gate.started_at) * 1000
+                if not passed:
+                    gate.errors = errors or [message]
+                if warnings:
+                    gate.warnings = warnings
+                return
+
+    def _missing_fields(self, module_def) -> List[str]:
+        missing = []
+        if not module_def.module_id:
+            missing.append("module_id")
+        if not module_def.module_name:
+            missing.append("module_name")
+        if not module_def.module_version:
+            missing.append("module_version")
+        if not module_def.responsibility:
+            missing.append("responsibility")
+        return missing
+
+    def _validate_dependencies(self, module_def) -> List[str]:
+        errors = []
+        if self._registry:
+            for dep in module_def.dependencies:
+                target = dep.target_module if hasattr(dep, 'target_module') else dep.get("target_module", "")
+                if target and target not in self._registry._modules:
+                    errors.append(f"依赖模块 '{target}' 未在注册中心注册")
+        return errors
+
+    def _build_audit_context(self, module_def) -> Dict[str, Any]:
+        known = set()
+        if self._registry:
+            known = {m.module_id for m in self._registry.list_all()
+                     if m.lifecycle_state not in ('unregistered', 'retired')}
+
+        context = {
+            "module_id": module_def.module_id,
+            "file_name": f"{module_def.module_id}.py",
+            "version": module_def.module_version,
+            "has_readme": False,
+            "has_docstring": bool(module_def.responsibility),
+            "has_tests": False,
+            "public_api": [
+                {"name": api.name if hasattr(api, 'name') else str(api),
+                 "description": api.description if hasattr(api, 'description') else ""}
+                for api in (module_def.public_api or [])
+            ],
+            "config_schema": module_def.config_schema or {},
+            "default_config": module_def.default_config or {},
+            "dependencies": [
+                {"target_module": dep.target_module if hasattr(dep, 'target_module') else str(dep)}
+                for dep in (module_def.dependencies or [])
+            ],
+            "known_modules": known,
+            "circular_dependencies": [],
+            "layer_violations": [],
+            "dependency_issues": [],
+        }
+        return context
+
+    def enrich_audit_context_with_analysis(self, context: Dict[str, Any], report) -> Dict[str, Any]:
+        if report is None:
+            return context
+        if hasattr(report, 'dependency_graph') and report.dependency_graph:
+            context["dependency_graph"] = report.dependency_graph
+        if hasattr(report, 'circular_dependencies'):
+            context["circular_dependencies"] = [
+                list(c) for c in report.circular_dependencies
+            ]
+        if hasattr(report, 'findings'):
+            violations = []
+            for f in report.findings:
+                if f.rule_id == "R002" and f.severity.value == "warning":
+                    violations.append(f.message)
+            context["layer_violations"] = violations
+            context["dependency_issues"] = [
+                f.message for f in report.findings
+                if f.rule_id in ("R001", "R002") and f.severity.value == "error"
+            ]
+        return context
+
+    def _perform_approval(self, report: AuditReport, approver: str):
+        report.approved_by = approver
+        report.approved_at = time.time()
+        report.approval_level = ApprovalLevel(approver) if approver in [e.value for e in ApprovalLevel] else ApprovalLevel.AUTO
+
+    def _generate_recommendation(self, report: AuditReport) -> str:
+        if report.verdict == AuditVerdict.PASS:
+            return "建议立即上线，所有审计检查通过"
+        elif report.verdict == AuditVerdict.CONDITIONAL_PASS:
+            return "建议上线，但需关注警告项并在1个迭代内修复"
+        elif report.verdict == AuditVerdict.NEEDS_REVIEW:
+            return f"需要人工审核，共{report.summary['failed']}项未通过"
+        else:
+            return f"不通过，需修复{report.summary['failed']}个错误后重新审计"
+
+    def get_record(self, module_id: str) -> Optional[GovernanceRecord]:
+        return self._records.get(module_id)
+
+    def get_stats(self) -> Dict[str, Any]:
+        return {
+            "version": "1.1",
+            **self._stats,
+            "health": self.health(),
+            "evo_loop": self._evo_loop.get_stats() if self._evo_loop else {},
+        }
+
+    def get_all_records(self) -> List[GovernanceRecord]:
+        return list(self._records.values())
+
+    def list_by_status(self, status: PhaseStatus) -> List[GovernanceRecord]:
+        return [r for r in self._records.values() if r.overall_status == status]
+
+    def health(self) -> Dict[str, Any]:
+        return {
+            "status": "ready",
+            "version": "1.1",
+            "pipelines_created": self._stats["pipelines_created"],
+            "pipelines_passed": self._stats["pipelines_passed"],
+            "pipelines_failed": self._stats["pipelines_failed"],
+            "total_audits": self._stats["total_audits"],
+            "total_plans": self._stats["total_plans"],
+            "total_implements": self._stats["total_implements"],
+            "total_approvals": self._stats["total_approvals"],
+            "errors": self._errors,
+            "evo_loop_active": self._evo_loop is not None,
+            "recorder_attached": self._recorder is not None,
+            "registry_attached": self._registry is not None,
+            "analyzer_attached": self._analyzer is not None,
+        }
+
+    def tick(self):
+        if self._evo_loop is not None:
+            try:
+                self._evo_loop.tick()
+            except Exception:
+                pass
+
+    def _calc_pipeline_effectiveness(self, action: str,
+                                      state_before: Dict[str, Any],
+                                      state_after: Dict[str, Any]) -> float:
+        if action == "plan":
+            return 0.4 if state_after.get("plan_passed", False) else -0.2
+        elif action == "audit":
+            verdict = state_after.get("verdict", "")
+            if verdict == "pass":
+                return 0.6
+            elif verdict == "conditional_pass":
+                return 0.3
+            return -0.3 if verdict == "fail" else 0.0
+        elif action == "implement":
+            return 0.5 if state_after.get("success", False) else -0.3
+        elif action == "approve":
+            return 0.5 if state_after.get("approved", False) else -0.4
+        return 0.0
+
+    def _learn_from_pipeline(self, causal_pairs: List[Any],
+                              effectiveness_summary: Dict[str, Any]) -> Dict[str, Any]:
+        return {
+            "patterns_found": len(causal_pairs),
+            "avg_effectiveness": effectiveness_summary.get("avg_effectiveness", 0.0),
+            "pipelines_total": self._stats["pipelines_created"],
+            "pass_rate": (
+                self._stats["pipelines_passed"] / max(self._stats["pipelines_created"], 1)
+            ),
+        }
+
+    def _evolve_pipeline_config(self, learn_result: Dict[str, Any],
+                                 mutable_config: Dict[str, Any]) -> Dict[str, Any]:
+        changes = {}
+        pass_rate = learn_result.get("pass_rate", 1.0)
+        if pass_rate < 0.5:
+            changes["auto_approve_threshold"] = max(0.5,
+                mutable_config.get("auto_approve_threshold", 0.8) - 0.1)
+        if pass_rate > 0.9:
+            changes["auto_approve_threshold"] = min(0.95,
+                mutable_config.get("auto_approve_threshold", 0.8) + 0.05)
+        return {"rules_modified": changes, "skills_created": []}
+
+
+# ═══════════════════════════════════════════════════════════════
+# 便捷函数
+# ═══════════════════════════════════════════════════════════════
+
+def create_governance_pipeline(registry=None, analyzer=None) -> GovernancePipeline:
+    return GovernancePipeline(registry=registry, analyzer=analyzer)
+
+
+def audit_module(definition, registry=None, analyzer=None) -> AuditReport:
+    pipeline = GovernancePipeline(registry=registry, analyzer=analyzer)
+    return pipeline.audit(definition)
+
+
+def govern_module(definition, registry=None, analyzer=None) -> Dict[str, Any]:
+    pipeline = GovernancePipeline(registry=registry, analyzer=analyzer)
+    return pipeline.run_full_pipeline(definition)

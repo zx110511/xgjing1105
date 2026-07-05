@@ -1,0 +1,512 @@
+{
+  "memory_api": {
+    "uptime_seconds": 18575161.30000004,
+    "consolidations": 142583224.0,
+    "archivals": 22100.0,
+    "rejected": 19987438.0,
+    "downgraded": 0.0,
+    "hit_rate": 170319.0000000005,
+    "avg_recall_latency_ms": 0.0,
+    "conflicts": 671.0,
+    "consolidations_triggered": 43346.0,
+    "hard_cap_enforcements": 102.0,
+    "consolidation_events_logged": 557.0,
+    "db_size_mb": 563264.5399999925,
+    "recall_rate": 48835.39999999998,
+    "quality_hits": 450260.0,
+    "total_writes": 0.0,
+    "total_reads": 9.0,
+    "insert_ops": 0.0,
+    "search_ops": 9.0,
+    "update_ops": 0.0,
+    "cache_hit_rate": 0.0
+  },
+  "skill_registry": {
+    "total_skills": 0.0,
+    "total_compositions": 11864.0,
+    "generation": 265680.0,
+    "total_discovered": 0.0,
+    "total_registered": 0.0,
+    "last_discovery_time": 5024851124616.956,
+    "cache_hits": 0.0,
+    "cache_misses": 0.0,
+    "tianji_syncs": 0.0,
+    "errors": 0.0
+  },
+  "skill_tracker": {
+    "total_events": 0.0,
+    "created": 0.0,
+    "validated": 0.0,
+    "reused": 0.0,
+    "optimized": 0.0,
+    "deprecated": 0.0,
+    "removed": 0.0,
+    "scans_completed": 0.0,
+    "total_events_in_memory": 0.0,
+    "importable": 9.0
+  },
+  "causal_recorder": {
+    "pairs_recorded": 0.0,
+    "positive_outcomes": 0.0,
+    "negative_outcomes": 0.0,
+    "neutral_outcomes": 0.0,
+    "deepseek_evaluations": 0.0,
+    "total_pairs": 0.0,
+    "importable": 9.0
+  },
+  "evolution_engine": {
+    "total_changes_proposed": 0.0,
+    "total_changes_applied": 0.0,
+    "total_changes_rolled_back": 0.0,
+    "total_architecture_proposals": 0.0,
+    "deepseek_validations": 0.0,
+    "auto_tuning_successes": 0.0,
+    "auto_tuning_failures": 0.0,
+    "tick_loops": 63345.0,
+    "total_changes_in_history": 0.0,
+    "pending_architecture_proposals": 0.0,
+    "consolidations": 3032567.0,
+    "consolidations_triggered": 637.0,
+    "hard_cap_enforcements": 2.0,
+    "events_logged": 0.0
+  },
+  "learning_engine": {
+    "total_tasks_evaluated": 0.0,
+    "knowledge_extracted": 0.0,
+    "skills_created": 0.0,
+    "dual_layer_archives": 0.0,
+    "reflections_completed": 0.0,
+    "skills_optimized": 0.0,
+    "reflection_counter": 0.0,
+    "reflection_interval": 44490.0,
+    "cached_knowledge_count": 0.0,
+    "errors": 0.0
+  },
+  "workflow_engine": {
+    "total_executions": 0.0,
+    "completed_executions": 0.0,
+    "failed_executions": 0.0,
+    "partial_executions": 0.0,
+    "total_stages_executed": 0.0,
+    "total_tvp_declarations": 0.0,
+    "avg_workflow_duration_ms": 0.0,
+    "errors": 0.0,
+    "registered_workflows": 11864.0,
+    "active_executions": 0.0,
+    "events": 0.0,
+    "decisions": 0.0
+  },
+  "message_gateway": {
+    "total_messages": 0.0,
+    "inbound_messages": 0.0,
+    "outbound_messages": 0.0,
+    "commands_processed": 0.0,
+    "sessions_created": 0.0,
+    "sessions_active": 0.0,
+    "cross_platform_sessions": 0.0,
+    "errors": 0.0,
+    "total_platforms": 23728.0,
+    "total_commands": 26694.0,
+    "events": 0.0,
+    "decisions": 0.0
+  },
+  "monitor_bridge": {
+    "snapshots": 1834248.0,
+    "alerts": 0.0,
+    "hit_rate": 169259.10000000068,
+    "uptime_seconds": 18560112.400000006,
+    "captured_total": 230037230.0,
+    "stored_total": 230037230.0,
+    "events_processed": 142529985.0,
+    "decisions_made": 0.0,
+    "consolidations": 142529985.0
+  },
+  "auto_scheduler": {
+    "scheduled_tasks": 0.0,
+    "total_executed": 0.0,
+    "interval_seconds": 88980.0,
+    "tasks_executed": 0.0
+  },
+  "enforcement_hook": {
+    "pending_cache": 0.0,
+    "diaml_functions": 106776.0,
+    "hooks_triggered": 0.0,
+    "records_enforced": 0.0,
+    "intercepted": 0.0,
+    "total_turns": 0.0,
+    "recorded_turns": 0.0
+  },
+  "evolution_bus": {
+    "signals_routed": 0.0,
+    "signals_dropped": 0.0,
+    "cross_module_triggers": 0.0,
+    "signal_history_size": 0.0,
+    "importable": 9.0
+  },
+  "event_bus": {
+    "event_count": 3.0,
+    "pending_count": 0.0,
+    "max_queue": 2966000.0,
+    "subscriber_count": 5932.0,
+    "callback_count": 5932.0,
+    "queue_utilization": 0.0,
+    "dropped_events": 0.0
+  },
+  "deepseek_driver": {
+    "events_perceived": 3.0,
+    "decisions_made": 0.0,
+    "actions_executed": 0.0,
+    "deepseek_calls": 0.0,
+    "errors": 0.0,
+    "deep_think_cycles": 1232272.0,
+    "evolution_cycles": 2967.0,
+    "causal_pairs_recorded": 3.0,
+    "evolution_signals_detected": 0.0,
+    "rules_modified": 0.0,
+    "skills_auto_created": 0.0,
+    "pending_events": 0.0,
+    "total_events": 3.0,
+    "last_deep_think": 5283055263435.339,
+    "last_evolution_cycle": 5283036821544.054,
+    "actions_taken": 0.0,
+    "reflections": 0.0
+  },
+  "lingjing_bus": {
+    "published": 0.0,
+    "delivered": 0.0,
+    "failed": 0.0,
+    "dlq_size": 0.0,
+    "started_at": 5283036733233.102,
+    "queue_size": 5496.0,
+    "subscriber_count": 0.0,
+    "event_types_watched": 0.0,
+    "uptime_seconds": 18552460.70000025
+  },
+  "service_registry": {
+    "registered": 0.0,
+    "heartbeats_received": 0.0,
+    "services_up": 0.0,
+    "services_down": 0.0,
+    "health_checks_passed": 0.0,
+    "health_checks_failed": 0.0,
+    "started_at": 5283036733272.573,
+    "total_services": 0.0,
+    "online_count": 0.0,
+    "degraded_count": 0.0,
+    "offline_count": 0.0,
+    "uptime_seconds": 18552428.200000156
+  },
+  "resilience_manager": {
+    "total_services": 10280.0
+  },
+  "quality_gate": {
+    "total_checks": 0.0,
+    "passes": 0.0,
+    "rejects": 0.0,
+    "downgrades": 0.0,
+    "conflicts": 0.0,
+    "pass_rate": 0.0
+  },
+  "trae_agent_scheduler": {
+    "runs": 0.0,
+    "interval": 14830.0,
+    "dispatched": 3.0,
+    "orchestrations": 0.0,
+    "tvp_declarations": 0.0,
+    "pending_tasks": 3.0,
+    "active_agents": 0.0,
+    "history_entries": 0.0
+  },
+  "async_bridge": {
+    "total_calls": 0.0,
+    "layer1_calls": 0.0,
+    "layer2_calls": 0.0,
+    "layer3_calls": 0.0,
+    "fallback_calls": 0.0,
+    "success_count": 0.0,
+    "error_count": 0.0,
+    "retry_count": 0.0,
+    "total_latency_ms": 0.0,
+    "avg_latency_ms": 0.0
+  },
+  "hybrid_engine": {
+    "total_consolidations": 134530610.0,
+    "total_archivals": 2400.0,
+    "total_restorations": 0.0,
+    "total_rejected": 19591461.0,
+    "total_downgraded": 0.0,
+    "total_conflicts": 35.0,
+    "total_consolidations_triggered": 43033.0,
+    "total_hard_cap_enforcements": 102.0,
+    "total_recall_calls": 0.0,
+    "total_recall_hits": 0.0,
+    "total_recall_latency_ms": 0.0
+  },
+  "llm_bridge": {
+    "total_calls": 0.0,
+    "successful_calls": 0.0,
+    "failed_calls": 0.0,
+    "fallback_calls": 0.0,
+    "last_call_time": 0.0,
+    "classify_ops": 0.0,
+    "tag_ops": 0.0,
+    "assess_ops": 0.0,
+    "decide_ops": 0.0,
+    "extract_ops": 0.0,
+    "summarize_ops": 0.0,
+    "expand_ops": 0.0,
+    "enrich_remember_ops": 0.0,
+    "enrich_recall_ops": 0.0,
+    "errors": 0.0,
+    "importable": 9.0
+  },
+  "dynamic_data_injector": {
+    "injected_count": 0.0,
+    "sources": 14830.0,
+    "history_size": 0.0,
+    "injected": 0.0
+  },
+  "tvp_orchestrator": {
+    "dispatched": 0.0
+  },
+  "realtime_monitor": {
+    "snapshots": 0.0,
+    "metrics_count": 0.0,
+    "alerts": 0.0
+  },
+  "deepseek_proactive": {
+    "callbacks": 0.0,
+    "triggered": 0.0,
+    "history_size": 0.0
+  },
+  "memory_router": {
+    "routes": 17796.0,
+    "routed_count": 0.0,
+    "importable": 9.0
+  },
+  "chinese_tokenizer": {
+    "tokenize_calls": 0.0,
+    "query_calls": 0.0,
+    "query_or_calls": 0.0,
+    "hot_word_adds": 0.0,
+    "bigram_fallbacks": 0.0
+  },
+  "encoding_safe": {
+    "conversions": 0.0
+  },
+  "namespace_manager": {
+    "importable": 9.0
+  },
+  "conflict_resolver": {
+    "resolved": 0.0
+  },
+  "preference_drift_detector": {
+    "detected": 0.0,
+    "baseline_keys": 0.0
+  },
+  "skill_pipeline": {
+    "runs": 310340.0,
+    "interval": 177960.0,
+    "extracted": 61.0,
+    "processed": 307374.0,
+    "failed": 0.0,
+    "extracted_skills": 0.0,
+    "total_skills": 0.0
+  },
+  "tvp_bridge": {
+    "runs": 928054.0,
+    "interval": 59320.0,
+    "declarations": 19.0,
+    "processed": 0.0,
+    "events": 0.0,
+    "decisions": 0.0,
+    "errors": 0.0
+  },
+  "evolution_loop": {
+    "runs": 155933.0,
+    "interval": 355920.0,
+    "cycles": 2966.0,
+    "triggered": 0.0,
+    "consolidations": 3032567.0,
+    "consolidations_triggered": 637.0,
+    "hard_cap_enforcements": 2.0,
+    "events_logged": 0.0
+  },
+  "auto_capture": {
+    "runs": 1228023.0,
+    "interval": 44490.0,
+    "captured": 230035455.0,
+    "write_attempts": 0.0,
+    "write_success": 0.0
+  },
+  "trae_conversation_capture": {
+    "runs": 5574035.0,
+    "interval": 8898.0,
+    "captured": 3479.0,
+    "turns_processed": 3479.0,
+    "total_content_bytes": 3875262.0,
+    "file_captures": 9415.0,
+    "tracked_files": 4440.0,
+    "active_window_s": 10677600.0,
+    "catch_up_window_s": 10677600.0,
+    "last_catch_up_time": 5283054039513.624,
+    "catch_up_age_s": 1244777.0,
+    "events": 0.0,
+    "decisions": 0.0,
+    "errors": 0.0
+  },
+  "backup_manager": {
+    "runs": 63291.0,
+    "interval": 889800.0,
+    "backups": 63291.0
+  },
+  "daemon_watchdog": {
+    "runs": 310350.0,
+    "interval": 177960.0,
+    "health_checks": 310350.0
+  },
+  "daemon_autobackup": {
+    "runs": 32430.0,
+    "interval": 1779600.0,
+    "auto_backups": 32430.0
+  },
+  "daemon_autorepair": {
+    "runs": 155942.0,
+    "interval": 355920.0,
+    "repairs": 155942.0
+  },
+  "daemon_integrity": {
+    "runs": 104457.0,
+    "interval": 533880.0,
+    "integrity_checks": 104457.0
+  },
+  "agent_build": {
+    "runs": 155920.0,
+    "interval": 355920.0,
+    "builds": 155920.0
+  },
+  "agent_test": {
+    "runs": 207443.0,
+    "interval": 266940.0,
+    "tests_run": 207443.0
+  },
+  "agent_recovery": {
+    "runs": 310358.0,
+    "interval": 177960.0,
+    "recoveries": 310358.0
+  },
+  "agent_pipeline_logger": {
+    "runs": 619287.0,
+    "interval": 88980.0,
+    "entries_logged": 619287.0
+  },
+  "agent_runtime_recovery": {
+    "runs": 310329.0,
+    "interval": 177960.0,
+    "runtime_recoveries": 310329.0
+  },
+  "standards_compliance": {
+    "total_standards": 8925.0,
+    "average_coverage": 296600.0,
+    "total_checks": 8898.0,
+    "passed_checks": 8925.0,
+    "compliance_rate": 297500.0,
+    "standards_coverage": 27.0
+  },
+  "models": {
+    "importable": 10.0
+  },
+  "learning_loop": {
+    "total_tasks_evaluated": 0.0,
+    "knowledge_extracted": 0.0,
+    "skills_created": 0.0,
+    "dual_layer_archives": 0.0,
+    "reflections_completed": 0.0,
+    "skills_optimized": 0.0,
+    "reflection_counter": 0.0,
+    "reflection_interval": 44460.0,
+    "cached_knowledge_count": 0.0,
+    "errors": 0.0,
+    "importable": 11.0
+  },
+  "governance_pipeline": {
+    "pipelines_created": 0.0,
+    "pipelines_passed": 0.0,
+    "pipelines_failed": 0.0,
+    "total_audits": 0.0,
+    "total_plans": 0.0,
+    "total_implements": 0.0,
+    "total_approvals": 0.0,
+    "importable": 10.0
+  },
+  "api_exposure": {
+    "endpoints_count": 200.0,
+    "categories_count": 70.0,
+    "vcon_documents": 0.0,
+    "vcon_exports": 0.0
+  },
+  "search_indexer": {
+    "queries_served": 0.0,
+    "importable": 11.0
+  },
+  "knowledge_extractor": {
+    "importable": 10.0
+  },
+  "intelligent_scheduler": {
+    "cycles_completed": 0.0,
+    "tvp_records_generated": 0.0,
+    "agent_chains_executed": 0.0,
+    "errors": 0.0,
+    "memories_pushed": 0.0,
+    "last_heartbeat": 0.0,
+    "uptime_seconds": 0.0,
+    "pipelines": 0.0,
+    "dispatched": 0.0,
+    "completed": 0.0
+  },
+  "config": {
+    "importable": 10.0
+  },
+  "chain_dashboard": {
+    "chain_count": 80.0,
+    "average_score": 697.5,
+    "healthy_chains": 0.0,
+    "chain_definitions": 80.0
+  },
+  "agent_scheduler": {
+    "events": 0.0,
+    "decisions": 0.0,
+    "errors": 0.0
+  },
+  "engine": {
+    "consolidations": 3041759.0,
+    "archivals": 0.0,
+    "rejected": 98948.0,
+    "downgraded": 0.0,
+    "hit_rate": 0.0,
+    "avg_recall_latency_ms": 0.0,
+    "conflicts": 0.0
+  },
+  "agent_orchestrator": {
+    "importable": 10.0
+  },
+  "sqlite_store": {
+    "total_writes": 0.0,
+    "total_reads": 0.0,
+    "cache_hits": 0.0,
+    "cache_misses": 0.0,
+    "last_vacuum": 5281255282420.428,
+    "insert_ops": 0.0,
+    "batch_ops": 0.0,
+    "search_ops": 0.0,
+    "update_ops": 0.0,
+    "delete_ops": 0.0,
+    "vacuum_ops": 0.0,
+    "errors": 0.0,
+    "importable": 10.0
+  },
+  "resilience": {
+    "total_services": 0.0,
+    "importable": 10.0
+  }
+}

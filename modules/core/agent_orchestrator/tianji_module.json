@@ -1,0 +1,36 @@
+﻿﻿﻿{
+    "id": "agent_orchestrator",
+    "display_name": "Agent编排器",
+    "version": "1.0.0",
+    "description": "多Agent协作编排引擎，支持TVP协议和依赖注入",
+    "author": "tianji_core",
+    "category": "core",
+    "type": "orchestrator",
+    "import_path": "core.agent_orchestrator.AgentPipeline",
+    "init_args": {
+        "_resolve": "agent_orchestrator"
+    },
+    "depends_on": [
+        "skill_tracker",
+        "event_bus"
+    ],
+    "provides": [
+        "agent_orchestration",
+        "tvp_scheduling",
+        "pipeline_execution"
+    ],
+    "tags": [
+        "agent",
+        "orchestrator",
+        "pipeline",
+        "tvp"
+    ],
+    "min_platform_version": "9.1.0""config_schema": {
+        "max_concurrent_agents": {
+            "type": "integer",
+            "description": "最大并发Agent数",
+            "default": 8
+        }
+    },
+    "health_check_interval": 30.0
+}

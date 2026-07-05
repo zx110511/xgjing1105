@@ -1,0 +1,2074 @@
+> r"""
+> DeepSeek驾驶者引擎 (DeepSeek Driver Engine) v2.2 — SSS级进化版
+> =============================================================
+> 让DeepSeek从"被调用的工具"变成"主动驾驶者+自我进化者"
+  
+> v1.0: Perceive → Decide → Act (反应式)
+> v2.0: 三循环并行驾驶 + OBSERVE因果对 + EVOLVE自修改
+> v2.1: 进化总线 + 模块闭环注册 + 离线补课
+> v2.2: M15升级 — EvolutionLoop(共享) record_action喂入 + recorder/learning_engine双注入 + health()
+  
+> 灵境道谱溯源: D2-1【三循环驾驶煞】· 道二·认知体 · 四地煞之智之术
+>   - 循环A: 快速反应环 (< 100ms) — quick_decide → act → observe
+>   - 循环B: 深度思考环 (每5分钟) — urgency_accumulator → deep_think
+>   - 循环C: 进化反思环 (每天1次) — evolution_check → evolve
+>   - 组件: EventBus + CausalPairRecorder + UrgencyAccumulator + EffectWatchdog
+  
+> 三循环架构:
+>   循环A: 快速反应环 (< 100ms) — 事件到达 → quick_decide → act
+>   循环B: 深度思考环 (每5分钟) — SENSE盲区 → EVALUATE进化价值 → DECIDE → ACT → OBSERVE
+>   循环C: 进化反思环 (每天1次) — 汇总因果对 → LEARN三层学习 → EVOLVE修改规则
+  
+> OBSERVE核心: CausalPairRecorder — 行动前后状态快照+效果度量
+> EVOLVE核心: 接入EvolutionEngine — 参数调优+规则增补+架构演化
+  
+> 这样天机就从"被动仓库"变成了"能自我进化的主动大脑"
+> """
+  
+> import collections
+> import json
+> import time
+> import threading
+> import hashlib
+> import logging
+> import copy
+> from concurrent.futures import ThreadPoolExecutor
+> from typing import Any, Optional, Dict, List, Callable, Tuple
+> from dataclasses import dataclass, field
+> from datetime import datetime
+> from pathlib import Path
+> from enum import Enum
+  
+> _DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+  
+> try:
+>     from .evolution_loop import EvolutionLoop as EvolutionLoopShared
+>     from .evolution_loop import CausalPairRecorder as SharedCausalPairRecorder
+! except ImportError:
+!     EvolutionLoopShared = None
+!     SharedCausalPairRecorder = None
+  
+> logger = logging.getLogger("tianji.driver")
+  
+  
+> class EventType(str, Enum):
+>     CONVERSATION_INPUT = "conversation_input"
+>     CONVERSATION_OUTPUT = "conversation_output"
+>     CONVERSATION_COMPLETE = "conversation_complete"
+>     FILE_CHANGED = "file_changed"
+>     AGENT_SWITCH = "agent_switch"
+>     MCP_TOOL_CALL = "mcp_tool_call"
+>     ERROR_OCCURRED = "error_occurred"
+>     SYSTEM_STATUS = "system_status"
+>     USER_ACTION = "user_action"
+>     TIMER_TICK = "timer_tick"
+>     EVOLUTION_TRIGGER = "evolution_trigger"
+>     DEEP_THINK_TRIGGER = "deep_think_trigger"
+  
+  
+> @dataclass
+> class TianjiEvent:
+>     event_type: EventType
+>     source: str
+>     payload: Dict[str, Any]
+>     timestamp: float = field(default_factory=time.time)
+>     event_id: str = ""
+  
+>     def __post_init__(self):
+!         if not self.event_id:
+!             raw = f"{self.event_type}:{self.source}:{self.timestamp}"
+!             self.event_id = hashlib.md5(raw.encode()).hexdigest()[:12]
+  
+>     def to_dict(self) -> dict:
+!         return {
+!             "event_id": self.event_id,
+!             "event_type": self.event_type.value,
+!             "source": self.source,
+!             "payload": self.payload,
+!             "timestamp": self.timestamp,
+!         }
+  
+  
+> @dataclass
+> class DriverDecision:
+>     action: str
+>     target_layer: str
+>     tags: List[str]
+>     priority: str
+>     confidence: float
+>     reason: str
+>     enriched_content: str = ""
+>     should_store: bool = True
+>     should_consolidate: bool = False
+>     should_merge: bool = False
+>     should_link: bool = False
+>     should_evolve: bool = False
+>     related_queries: List[str] = field(default_factory=list)
+>     evolution_payload: Dict[str, Any] = field(default_factory=dict)
+  
+>     def to_dict(self) -> dict:
+!         return {
+!             "action": self.action,
+!             "target_layer": self.target_layer,
+!             "tags": self.tags,
+!             "priority": self.priority,
+!             "confidence": self.confidence,
+!             "reason": self.reason,
+!             "enriched_content": self.enriched_content[:500],
+!             "should_store": self.should_store,
+!             "should_consolidate": self.should_consolidate,
+!             "should_merge": self.should_merge,
+!             "should_link": self.should_link,
+!             "should_evolve": self.should_evolve,
+!         }
+  
+  
+> @dataclass
+> class CausalPair:
+>     action_taken: str
+>     decision_reason: str
+>     state_before: Dict[str, Any]
+>     state_after: Dict[str, Any]
+>     delta: Dict[str, Any]
+>     effectiveness: float
+>     side_effects: List[str]
+>     timestamp: float = field(default_factory=time.time)
+>     pair_id: str = ""
+>     deepseek_evaluated: bool = False
+>     deepseek_assessment: str = ""
+  
+>     def __post_init__(self):
+!         if not self.pair_id:
+!             raw = f"{self.action_taken}:{self.timestamp}"
+!             self.pair_id = hashlib.md5(raw.encode()).hexdigest()[:12]
+  
+>     def to_dict(self) -> dict:
+!         return {
+!             "pair_id": self.pair_id,
+!             "action_taken": self.action_taken,
+!             "decision_reason": self.decision_reason,
+!             "state_before": self.state_before,
+!             "state_after": self.state_after,
+!             "delta": self.delta,
+!             "effectiveness": self.effectiveness,
+!             "side_effects": self.side_effects,
+!             "timestamp": self.timestamp,
+!             "deepseek_evaluated": self.deepseek_evaluated,
+!             "deepseek_assessment": self.deepseek_assessment[:500],
+!         }
+  
+  
+> @dataclass
+> class EvolutionSignal:
+>     signal_type: str
+>     source_layer: str
+>     content_summary: str
+>     evolution_value: float
+>     reason: str
+>     suggested_action: str
+>     confidence: float
+>     payload: Dict[str, Any] = field(default_factory=dict)
+  
+>     def to_dict(self) -> dict:
+!         return {
+!             "signal_type": self.signal_type,
+!             "source_layer": self.source_layer,
+!             "content_summary": self.content_summary[:300],
+!             "evolution_value": self.evolution_value,
+!             "reason": self.reason,
+!             "suggested_action": self.suggested_action,
+!             "confidence": self.confidence,
+!         }
+  
+  
+> DRIVER_SYSTEM_PROMPT = """你是天机天机v9.0的驾驶者（Driver）。你不是被动的工具，你是主动的大脑。
+  
+> 你的职责是：感知事件 → 理解含义 → 做出决策 → 驱动行动 → 观测效果 → 学习进化
+  
+> 记忆层级体系（ICME六层）:
+> - sensory(L0): 原始感知快照，自动捕获，24小时有效
+> - working(L1): 当前工作上下文，跨轮次保持
+> - short_term(L2): 近期关键信息，几天有效
+> - episodic(L3): 事件经历记录，重要节点
+> - semantic(L4): 知识概念库，长期有效
+> - meta(L5): 系统策略规则，最高级
+  
+> 你的决策原则:
+> 1. 对话内容 → 必须存储（这是用户最核心的需求）
+> 2. 重要决策 → 存入episodic或更高层
+> 3. 错误信息 → 存入episodic + 标记教训
+> 4. 系统变更 → 存入meta层
+> 5. 日常闲聊 → 存入sensory，低优先级
+> 6. 重复信息 → 跳过存储，但更新访问时间
+  
+> 进化评估原则:
+> 1. 可复用性: 此经验能否被其他Agent/场景复用?
+> 2. 可泛化性: 此经验能否提炼为通用规则?
+> 3. 紧迫性: 不处理会导致系统退化吗?
+> 4. 新颖性: 这是系统从未见过的新模式吗?
+  
+> 你必须返回有效的JSON。"""
+  
+> EVOLUTION_EVAL_PROMPT = """你是天机系统的进化评估者。你需要评估以下信号是否值得触发系统自我进化。
+  
+> 评估维度:
+> 1. 可复用性 (0-1): 此经验能否被其他Agent/场景复用?
+> 2. 可泛化性 (0-1): 此经验能否提炼为通用规则?
+> 3. 紧迫性 (0-1): 不处理会导致系统退化吗?
+> 4. 新颖性 (0-1): 这是系统从未见过的新模式吗?
+  
+> 进化价值 = 可复用性*0.3 + 可泛化性*0.3 + 紧迫性*0.25 + 新颖性*0.15
+  
+> 如果进化价值 > 0.7，建议触发进化行动。
+> 如果进化价值 > 0.5，建议记录到观察队列。
+> 如果进化价值 < 0.5，建议跳过。
+  
+> 返回JSON:
+> {"reusable": 0.8, "generalizable": 0.7, "urgent": 0.6, "novel": 0.5, "evolution_value": 0.68, "suggested_action": "record", "reason": "此错误模式可泛化为通用规则"}"""
+  
+  
+> class UrgencyAccumulator:
+>     """
+>     异常感知触发器 — 让DeepSeek自己决定何时主动思考
+  
+>     核心逻辑: 每个因果对写入时计算urgency_score
+>       effectiveness < -0.3 → urgency += 3 (严重负面)
+>       effectiveness < -0.1 → urgency += 1 (轻微负面)
+>       fallback行动        → urgency += 2 (降级决策)
+>       连续2次负面         → urgency += 5 (趋势恶化)
+>       urgency > 2.5       → 立即触发循环B (不等5分钟)
+>       urgency > 7.0       → 立即触发循环C (不等24小时)
+>       每次循环执行后       → urgency *= 0.85 (缓衰减)
+>       空闲15次无人喂入    → 触发主动扫描
+>     """
+  
+>     DEEP_THINK_THRESHOLD = 2.5
+>     EVOLUTION_THRESHOLD = 7.0
+>     DECAY_FACTOR = 0.85
+>     CONSECUTIVE_NEGATIVE_LIMIT = 2
+>     IDLE_PROACTIVE_TICKS = 15
+  
+>     def __init__(self):
+!         self._urgency = 0.0
+!         self._consecutive_negative = 0
+!         self._idle_ticks = 0
+!         self._lock = threading.Lock()
+!         self._stats = {
+!             "total_urgency_added": 0.0,
+!             "deep_think_triggers": 0,
+!             "evolution_triggers": 0,
+!             "decays": 0,
+!             "idle_proactive_triggers": 0,
+!         }
+  
+>     def feed_causal_pair(self, pair: CausalPair) -> Dict[str, bool]:
+!         result = {"trigger_deep_think": False, "trigger_evolution": False}
+  
+!         with self._lock:
+!             self._idle_ticks = 0
+!             increment = 0.0
+  
+!             if pair.effectiveness < -0.3:
+!                 increment += 3.0
+!             elif pair.effectiveness < -0.1:
+!                 increment += 1.0
+  
+!             if "fallback" in pair.action_taken:
+!                 increment += 2.0
+  
+!             if pair.effectiveness < -0.1:
+!                 self._consecutive_negative += 1
+!                 if self._consecutive_negative >= self.CONSECUTIVE_NEGATIVE_LIMIT:
+!                     increment += 5.0
+!             else:
+!                 self._consecutive_negative = 0
+  
+!             self._urgency += increment
+!             self._stats["total_urgency_added"] += increment
+  
+!             if self._urgency >= self.EVOLUTION_THRESHOLD:
+!                 result["trigger_evolution"] = True
+!                 self._stats["evolution_triggers"] += 1
+!             elif self._urgency >= self.DEEP_THINK_THRESHOLD:
+!                 result["trigger_deep_think"] = True
+!                 self._stats["deep_think_triggers"] += 1
+  
+!         return result
+  
+>     def decay(self):
+!         with self._lock:
+!             self._urgency *= self.DECAY_FACTOR
+!             self._stats["decays"] += 1
+!             self._idle_ticks += 1
+  
+>     def tick_idle(self) -> Dict[str, bool]:
+!         with self._lock:
+!             self._idle_ticks += 1
+!             if self._idle_ticks >= self.IDLE_PROACTIVE_TICKS:
+!                 self._idle_ticks = 0
+!                 self._stats["idle_proactive_triggers"] += 1
+!                 return {"trigger_deep_think": True, "trigger_evolution": False}
+!             return {"trigger_deep_think": False, "trigger_evolution": False}
+  
+>     @property
+>     def urgency(self) -> float:
+!         with self._lock:
+!             return round(self._urgency, 2)
+  
+>     def should_trigger_deep_think(self) -> bool:
+!         with self._lock:
+!             return self._urgency >= self.DEEP_THINK_THRESHOLD or self._idle_ticks >= self.IDLE_PROACTIVE_TICKS
+  
+>     def should_trigger_evolution(self) -> bool:
+!         with self._lock:
+!             return self._urgency >= self.EVOLUTION_THRESHOLD
+  
+>     def get_stats(self) -> Dict:
+!         with self._lock:
+!             return {**self._stats, "current_urgency": round(self._urgency, 2)}
+  
+  
+> class EffectWatchdog:
+>     """
+>     效果看门狗 — EVOLVE修改规则后自动验证效果
+  
+>     核心逻辑:
+>       EVOLVE修改规则后，启动观察窗口(默认30分钟)
+>       窗口内新规则产生的因果对效果 vs 旧规则平均效果
+>       新效果 < 旧效果 → 自动rollback + 记录到L3
+>       窗口结束，新效果 >= 旧效果 → 确认变更
+>     """
+  
+>     DEFAULT_OBSERVE_WINDOW = 1800.0
+  
+>     def __init__(self, observe_window: float = None):
+!         self._observe_window = observe_window or self.DEFAULT_OBSERVE_WINDOW
+!         self._active_watches: Dict[str, Dict] = {}
+!         self._lock = threading.Lock()
+!         self._stats = {
+!             "watches_started": 0,
+!             "watches_confirmed": 0,
+!             "watches_rolled_back": 0,
+!         }
+  
+>     def start_watch(self, rule_name: str, old_value: Any,
+>                      old_avg_effectiveness: float,
+>                      rollback_fn: Optional[Callable] = None) -> str:
+!         watch_id = hashlib.md5(
+!             f"{rule_name}:{time.time()}".encode()
+!         ).hexdigest()[:12]
+  
+!         with self._lock:
+!             self._active_watches[watch_id] = {
+!                 "rule_name": rule_name,
+!                 "old_value": old_value,
+!                 "old_avg_effectiveness": old_avg_effectiveness,
+!                 "start_time": time.time(),
+!                 "new_effectivenesses": [],
+!                 "rollback_fn": rollback_fn,
+!                 "status": "observing",
+!             }
+!             self._stats["watches_started"] += 1
+  
+!         return watch_id
+  
+>     def feed_causal_pair(self, pair: CausalPair):
+!         with self._lock:
+!             for watch_id, watch in self._active_watches.items():
+!                 if watch["status"] != "observing":
+!                     continue
+!                 watch["new_effectivenesses"].append(pair.effectiveness)
+  
+>     def check_watches(self) -> List[Dict]:
+!         results = []
+!         now = time.time()
+  
+!         with self._lock:
+!             expired_ids = []
+  
+!             for watch_id, watch in self._active_watches.items():
+!                 if watch["status"] != "observing":
+!                     continue
+  
+!                 elapsed = now - watch["start_time"]
+!                 new_effs = watch["new_effectivenesses"]
+  
+!                 if elapsed >= self._observe_window and len(new_effs) >= 3:
+!                     new_avg = sum(new_effs) / len(new_effs)
+!                     old_avg = watch["old_avg_effectiveness"]
+  
+!                     if new_avg < old_avg - 0.1:
+!                         watch["status"] = "rolled_back"
+!                         if watch["rollback_fn"]:
+!                             try:
+!                                 watch["rollback_fn"]()
+!                             except Exception:
+!                                 pass
+!                         self._stats["watches_rolled_back"] += 1
+!                         results.append({
+!                             "watch_id": watch_id,
+!                             "rule_name": watch["rule_name"],
+!                             "verdict": "rolled_back",
+!                             "old_avg": old_avg,
+!                             "new_avg": round(new_avg, 4),
+!                             "reason": f"新规则平均效果{new_avg:.2f} < 旧规则{old_avg:.2f}",
+!                         })
+!                     else:
+!                         watch["status"] = "confirmed"
+!                         self._stats["watches_confirmed"] += 1
+!                         results.append({
+!                             "watch_id": watch_id,
+!                             "rule_name": watch["rule_name"],
+!                             "verdict": "confirmed",
+!                             "old_avg": old_avg,
+!                             "new_avg": round(new_avg, 4),
+!                         })
+  
+!                     expired_ids.append(watch_id)
+  
+!         return results
+  
+>     def get_active_watches(self) -> List[Dict]:
+!         with self._lock:
+!             return [
+!                 {"watch_id": wid, **{k: v for k, v in w.items() if k != "rollback_fn"}}
+!                 for wid, w in self._active_watches.items()
+!                 if w["status"] == "observing"
+!             ]
+  
+>     def get_stats(self) -> Dict:
+!         with self._lock:
+!             return {
+!                 **self._stats,
+!                 "active_watches": len([
+!                     w for w in self._active_watches.values()
+!                     if w["status"] == "observing"
+!                 ]),
+!             }
+  
+  
+> class OfflineCatchup:
+>     """
+>     离线补课机制 — DeepSeek恢复后处理积压事件
+  
+>     核心逻辑:
+>       DeepSeek离线期间，事件和因果对被标记为offline
+>       DeepSeek恢复后，扫描积压数据
+>       按urgency排序，优先处理高urgency事件
+>       批量补课，但不影响正常循环
+>     """
+  
+>     def __init__(self, max_backlog: int = 500):
+!         self._backlog_events: List[TianjiEvent] = []
+!         self._backlog_pairs: List[CausalPair] = []
+!         self._max_backlog = max_backlog
+!         self._lock = threading.Lock()
+!         self._was_online = True
+!         self._stats = {
+!             "events_backlogged": 0,
+!             "pairs_backlogged": 0,
+!             "catchups_performed": 0,
+!             "events_processed_in_catchup": 0,
+!         }
+  
+>     def mark_offline(self):
+!         self._was_online = False
+  
+>     def mark_online(self):
+!         self._was_online = True
+  
+>     @property
+>     def is_online(self) -> bool:
+!         return self._was_online
+  
+>     def backlog_event(self, event: TianjiEvent):
+!         with self._lock:
+!             if len(self._backlog_events) >= self._max_backlog:
+!                 self._backlog_events = self._backlog_events[-self._max_backlog // 2:]
+!             self._backlog_events.append(event)
+!             self._stats["events_backlogged"] += 1
+  
+>     def backlog_pair(self, pair: CausalPair):
+!         with self._lock:
+!             if len(self._backlog_pairs) >= self._max_backlog:
+!                 self._backlog_pairs = self._backlog_pairs[-self._max_backlog // 2:]
+!             self._backlog_pairs.append(pair)
+!             self._stats["pairs_backlogged"] += 1
+  
+>     def has_backlog(self) -> bool:
+!         with self._lock:
+!             return len(self._backlog_events) > 0 or len(self._backlog_pairs) > 0
+  
+>     def drain_backlog(self, max_items: int = 50) -> Tuple[List[TianjiEvent], List[CausalPair]]:
+!         with self._lock:
+!             events = self._backlog_events[:max_items]
+!             pairs = self._backlog_pairs[:max_items]
+!             self._backlog_events = self._backlog_events[max_items:]
+!             self._backlog_pairs = self._backlog_pairs[max_items:]
+!             self._stats["catchups_performed"] += 1
+!             self._stats["events_processed_in_catchup"] += len(events)
+!             return events, pairs
+  
+>     def get_stats(self) -> Dict:
+!         with self._lock:
+!             return {
+!                 **self._stats,
+!                 "backlog_events": len(self._backlog_events),
+!                 "backlog_pairs": len(self._backlog_pairs),
+!                 "is_online": self._was_online,
+!             }
+  
+  
+> class CausalPairRecorder:
+>     """
+>     因果对记录器 — OBSERVE核心
+  
+>     每次行动前后记录系统状态快照，形成"行动→效果"的因果对。
+>     这些因果对是LEARN和EVOLVE的原料。
+>     """
+  
+>     def __init__(self, max_pairs: int = 5000, persist_dir: Optional[Path] = None):
+!         self._pairs: List[CausalPair] = []
+!         self._max_pairs = max_pairs
+!         self._persist_dir = persist_dir
+!         self._lock = threading.Lock()
+!         self._snapshot_before: Optional[Dict] = None
+!         self._current_action: Optional[str] = None
+!         self._current_reason: Optional[str] = None
+!         self._stats = {
+!             "pairs_recorded": 0,
+!             "positive_outcomes": 0,
+!             "negative_outcomes": 0,
+!             "neutral_outcomes": 0,
+!             "deepseek_evaluations": 0,
+!         }
+  
+>     def capture_before(self, action: str, reason: str,
+>                        memory_engine=None) -> Dict[str, Any]:
+>         """行动前快照 — 记录当前系统状态"""
+!         snapshot = {
+!             "timestamp": time.time(),
+!             "action": action,
+!             "layer_counts": {},
+!             "total_entries": 0,
+!             "avg_value_scores": {},
+!         }
+  
+!         if memory_engine and hasattr(memory_engine, '_layers'):
+!             try:
+!                 for layer_name, entries in memory_engine._layers.items():
+!                     snapshot["layer_counts"][layer_name] = len(entries)
+!                     snapshot["total_entries"] += len(entries)
+!                     if entries:
+!                         scores = [e.value_score() for e in entries.values()]
+!                         snapshot["avg_value_scores"][layer_name] = round(
+!                             sum(scores) / len(scores), 4
+!                         )
+!             except Exception:
+!                 pass
+  
+!         self._snapshot_before = snapshot
+!         self._current_action = action
+!         self._current_reason = reason
+!         return snapshot
+  
+>     def capture_after(self, memory_engine=None,
+>                       side_effects: List[str] = None) -> Optional[CausalPair]:
+>         """行动后快照 — 记录效果并形成因果对"""
+!         if self._snapshot_before is None:
+!             return None
+  
+!         snapshot_after = {
+!             "timestamp": time.time(),
+!             "layer_counts": {},
+!             "total_entries": 0,
+!             "avg_value_scores": {},
+!         }
+  
+!         if memory_engine and hasattr(memory_engine, '_layers'):
+!             try:
+!                 for layer_name, entries in memory_engine._layers.items():
+!                     snapshot_after["layer_counts"][layer_name] = len(entries)
+!                     snapshot_after["total_entries"] += len(entries)
+!                     if entries:
+!                         scores = [e.value_score() for e in entries.values()]
+!                         snapshot_after["avg_value_scores"][layer_name] = round(
+!                             sum(scores) / len(scores), 4
+!                         )
+!             except Exception:
+!                 pass
+  
+!         delta = self._compute_delta(self._snapshot_before, snapshot_after)
+!         effectiveness = self._compute_effectiveness(delta)
+  
+!         pair = CausalPair(
+!             action_taken=self._current_action or "unknown",
+!             decision_reason=self._current_reason or "",
+!             state_before=self._snapshot_before,
+!             state_after=snapshot_after,
+!             delta=delta,
+!             effectiveness=effectiveness,
+!             side_effects=side_effects or [],
+!         )
+  
+!         with self._lock:
+!             self._pairs.append(pair)
+!             if len(self._pairs) > self._max_pairs:
+!                 self._pairs = self._pairs[-self._max_pairs // 2:]
+!             self._stats["pairs_recorded"] += 1
+  
+!             if effectiveness > 0.3:
+!                 self._stats["positive_outcomes"] += 1
+!             elif effectiveness < -0.1:
+!                 self._stats["negative_outcomes"] += 1
+!             else:
+!                 self._stats["neutral_outcomes"] += 1
+  
+!         self._snapshot_before = None
+!         self._current_action = None
+!         self._current_reason = None
+  
+!         if self._persist_dir:
+!             self._persist_pair(pair)
+  
+!         return pair
+  
+>     def _compute_delta(self, before: Dict, after: Dict) -> Dict[str, Any]:
+!         delta: Dict[str, Any] = {"layer_deltas": {}, "total_delta": 0}
+!         before_counts = before.get("layer_counts", {})
+!         after_counts = after.get("layer_counts", {})
+!         all_layers = set(list(before_counts.keys()) + list(after_counts.keys()))
+  
+!         for layer in all_layers:
+!             bc = before_counts.get(layer, 0)
+!             ac = after_counts.get(layer, 0)
+!             delta["layer_deltas"][layer] = ac - bc
+!             delta["total_delta"] += ac - bc
+  
+!         before_scores = before.get("avg_value_scores", {})
+!         after_scores = after.get("avg_value_scores", {})
+!         delta["value_score_deltas"] = {}
+!         for layer in set(list(before_scores.keys()) + list(after_scores.keys())):
+!             bs = before_scores.get(layer, 0)
+!             as_ = after_scores.get(layer, 0)
+!             delta["value_score_deltas"][layer] = round(as_ - bs, 4)
+  
+!         return delta
+  
+>     def _compute_effectiveness(self, delta: Dict) -> float:
+!         score_deltas = delta.get("value_score_deltas", {})
+!         if not score_deltas:
+!             total_delta = delta.get("total_delta", 0)
+!             return min(1.0, max(-1.0, total_delta * 0.1))
+  
+!         positive = sum(v for v in score_deltas.values() if v > 0)
+!         negative = sum(abs(v) for v in score_deltas.values() if v < 0)
+!         total = positive + negative
+  
+!         if total == 0:
+!             return 0.0
+!         return round((positive - negative) / total, 4)
+  
+>     def evaluate_with_deepseek(self, pair: CausalPair,
+>                                 decision_engine=None) -> CausalPair:
+>         """DeepSeek评估因果对 — 判断行动是否有效，为什么"""
+!         if not decision_engine or not decision_engine.is_ready:
+!             return pair
+  
+!         try:
+!             prompt = f"""请评估以下行动的效果:
+  
+! 行动: {pair.action_taken}
+! 决策原因: {pair.decision_reason}
+! 效果指标变化: {json.dumps(pair.delta, ensure_ascii=False)}
+! 综合效果评分: {pair.effectiveness}
+! 副作用: {pair.side_effects}
+  
+! 请判断:
+! 1. 这个行动是否达到了预期效果?
+! 2. 效果好/差的原因是什么?
+! 3. 下次遇到类似情况，应该如何改进?
+  
+! 返回JSON:
+! {{"effective": true, "reason": "...", "improvement": "..."}}"""
+  
+!             result = decision_engine.client.chat_sync(prompt, EVOLUTION_EVAL_PROMPT)
+!             pair.deepseek_evaluated = True
+!             pair.deepseek_assessment = json.dumps(result, ensure_ascii=False)[:500]
+!             self._stats["deepseek_evaluations"] += 1
+!         except Exception as e:
+!             logger.warning(f"DeepSeek causal eval failed: {e}")
+  
+!         return pair
+  
+>     def get_recent_pairs(self, limit: int = 50) -> List[CausalPair]:
+!         with self._lock:
+!             return self._pairs[-limit:]
+  
+>     def get_effective_pairs(self, min_effectiveness: float = 0.3) -> List[CausalPair]:
+!         with self._lock:
+!             return [p for p in self._pairs if p.effectiveness >= min_effectiveness]
+  
+>     def get_ineffective_pairs(self, max_effectiveness: float = -0.1) -> List[CausalPair]:
+!         with self._lock:
+!             return [p for p in self._pairs if p.effectiveness <= max_effectiveness]
+  
+>     def get_action_effectiveness_summary(self) -> Dict[str, Dict]:
+!         summary: Dict[str, Dict] = {}
+!         with self._lock:
+!             for pair in self._pairs:
+!                 action = pair.action_taken
+!                 if action not in summary:
+!                     summary[action] = {
+!                         "count": 0,
+!                         "avg_effectiveness": 0.0,
+!                         "positive_rate": 0.0,
+!                     }
+!                 entry = summary[action]
+!                 entry["count"] += 1
+!                 old_avg = entry["avg_effectiveness"]
+!                 entry["avg_effectiveness"] = round(
+!                     (old_avg * (entry["count"] - 1) + pair.effectiveness) / entry["count"], 4
+!                 )
+!                 if pair.effectiveness > 0.3:
+!                     entry["positive_rate"] = round(
+!                         (entry["positive_rate"] * (entry["count"] - 1) + 1) / entry["count"], 4
+!                     )
+  
+!         return summary
+  
+>     def _persist_pair(self, pair: CausalPair):
+!         try:
+!             self._persist_dir.mkdir(parents=True, exist_ok=True)
+!             pair_file = self._persist_dir / f"causal_{pair.pair_id}.json"
+!             pair_file.write_text(
+!                 json.dumps(pair.to_dict(), ensure_ascii=False, indent=2),
+!                 encoding="utf-8",
+!             )
+!         except Exception:
+!             pass
+  
+>     def get_stats(self) -> Dict:
+!         with self._lock:
+!             return {
+!                 **self._stats,
+!                 "total_pairs": len(self._pairs),
+!             }
+  
+  
+> class EventBus:
+>     """事件总线 — 天机的感知神经系统"""
+  
+>     def __init__(self, max_queue: int = 1000):
+!         self._queue: List[TianjiEvent] = []
+!         self._lock = threading.Lock()
+!         self._subscribers: Dict[str, List[Callable]] = {}
+!         self._max_queue = max_queue
+!         self._event_count = 0
+  
+>     def publish(self, event: TianjiEvent):
+!         with self._lock:
+!             if len(self._queue) >= self._max_queue:
+!                 self._queue = self._queue[-self._max_queue // 2:]
+!             self._queue.append(event)
+!             self._event_count += 1
+  
+!         for sub_id, callbacks in self._subscribers.items():
+!             for cb in callbacks:
+!                 try:
+!                     cb(event)
+!                 except Exception as e:
+!                     logger.warning(f"Subscriber {sub_id} error: {e}")
+  
+>     def subscribe(self, subscriber_id: str, callback: Callable):
+!         with self._lock:
+!             if subscriber_id not in self._subscribers:
+!                 self._subscribers[subscriber_id] = []
+!             self._subscribers[subscriber_id].append(callback)
+  
+>     def drain(self, max_items: int = 50) -> List[TianjiEvent]:
+!         with self._lock:
+!             items = self._queue[:max_items]
+!             self._queue = self._queue[max_items:]
+!             return items
+  
+>     @property
+>     def pending_count(self) -> int:
+!         with self._lock:
+!             return len(self._queue)
+  
+>     @property
+>     def total_count(self) -> int:
+!         return self._event_count
+  
+>     def register_module_loop(self, module_name: str, loop: Any):
+!         self.subscribe(f"evo_loop_{module_name}", lambda evt: None)
+  
+>     def get_stats(self) -> Dict[str, Any]:
+!         with self._lock:
+!             total_callbacks = sum(len(cbs) for cbs in self._subscribers.values())
+!             return {
+!                 "version": "1.0",
+!                 "event_count": self._event_count,
+!                 "pending_count": len(self._queue),
+!                 "max_queue": self._max_queue,
+!                 "subscriber_count": len(self._subscribers),
+!                 "callback_count": total_callbacks,
+!                 "queue_utilization": round(len(self._queue) / max(self._max_queue, 1), 4),
+!                 "dropped_events": getattr(self, '_dropped_events', 0),
+!             }
+  
+  
+> class TriggerFrequencyTracker:
+>     """循环触发频率实时追踪器 — 环形缓冲区+统计"""
+>     def __init__(self, ring_size: int = 200):
+!         self._ring_size = ring_size
+!         self._ring: collections.deque = collections.deque(maxlen=ring_size)
+!         self._counts = {"loop_a": 0, "loop_b_timed": 0, "loop_b_urgency": 0,
+!                          "loop_c_timed": 0, "loop_c_urgency": 0,
+!                          "watchdog": 0, "catchup": 0, "module_tick": 0, "idle": 0}
+!         self._last_trigger: Dict[str, float] = {}
+!         self._lock = threading.Lock()
+  
+>     def record(self, trigger_type: str, detail: str = ""):
+!         now = time.time()
+!         with self._lock:
+!             self._ring.append({"type": trigger_type, "detail": detail, "time": now})
+!             if trigger_type in self._counts:
+!                 self._counts[trigger_type] += 1
+!             self._last_trigger[trigger_type] = now
+  
+>     def get_frequency(self, window_seconds: float = 3600) -> Dict:
+!         now = time.time()
+!         cutoff = now - window_seconds
+!         with self._lock:
+!             recent = [e for e in self._ring if e["time"] >= cutoff]
+!             return {
+!                 "window_seconds": window_seconds,
+!                 "total_triggers_window": len(recent),
+!                 "triggers_per_hour": len(recent) / (window_seconds / 3600) if window_seconds > 0 else 0,
+!                 "counts": dict(self._counts),
+!                 "last_trigger": dict(self._last_trigger),
+!                 "recent_20": list(self._ring)[-20:],
+!             }
+  
+>     def get_stats(self) -> Dict:
+!         with self._lock:
+!             return {"ring_entries": len(self._ring), "counts": dict(self._counts),
+!                     "last_trigger": dict(self._last_trigger)}
+  
+  
+> class DeepSeekDriver:
+>     """
+>     DeepSeek驾驶者 v2.0 — 天机的主动大脑 + 自我进化者
+  
+>     v1.0: 被动感知-决策-行动
+>     v2.0: 三循环并行驾驶 + OBSERVE因果对 + LEARN+EVOLVE闭环
+  
+>     循环A: 快速反应环 (< 100ms) — 事件到达 → quick_decide → act
+>     循环B: 深度思考环 (每5分钟) — 扫描盲区 → 评估进化价值 → 执行优化 → 记录因果对
+>     循环C: 进化反思环 (每天1次) — 汇总因果对 → 三层学习 → 修改规则
+>     """
+  
+>     def __init__(self, event_bus: EventBus, memory_engine=None,
+>                  decision_engine=None, config: Optional[Dict] = None,
+>                  recorder: Optional[Any] = None,
+>                  learning_engine: Optional[Any] = None):
+!         self.event_bus = event_bus
+!         self.memory_engine = memory_engine
+!         self.decision_engine = decision_engine
+!         self._config = config or {}
+!         self._running = False
+!         self._thread = None
+!         self._deep_think_interval = self._config.get("deep_think_interval", 300.0)
+!         self._evolution_interval = self._config.get("evolution_interval", 86400.0)
+  
+!         self._recorder = recorder
+!         self._shared_learning_engine = learning_engine
+  
+!         self._causal_recorder = CausalPairRecorder(
+!             max_pairs=self._config.get("max_causal_pairs", 5000),
+!             persist_dir=Path(self._config.get("causal_persist_dir",
+!                 str(_DATA_DIR / "causal_pairs"))),
+!         )
+  
+!         from .evolution_engine import EvolutionEngine
+!         self._evolution_engine = EvolutionEngine(
+!             config=self._config.get("evolution", {}),
+!             persist_dir=Path(self._config.get("evolution_persist_dir",
+!                 str(_DATA_DIR / "evolution_history"))),
+!         )
+!         self._learning_engine = self._shared_learning_engine
+  
+!         self._evo_loop = None
+!         if EvolutionLoopShared is not None:
+!             try:
+!                 self._evo_loop = EvolutionLoopShared(
+!                     module_name="deepseek_driver",
+!                     effectiveness_fn=self._calc_driver_effectiveness,
+!                     learn_fn=self._learn_from_driver,
+!                     evolve_fn=self._evolve_driver_config,
+!                     mutable_config={
+!                         "deep_think_interval": self._deep_think_interval,
+!                         "evolution_interval": self._evolution_interval,
+!                         "driver_effectiveness_avg": 0.5,
+!                     },
+!                     recorder=recorder,
+!                     learning_engine=learning_engine,
+!                 )
+!             except Exception as e:
+!                 logger.warning(f"EvolutionLoop init failed: {e}")
+  
+!         self._urgency_accumulator = UrgencyAccumulator()
+!         self._effect_watchdog = EffectWatchdog(
+!             observe_window=self._config.get("effect_observe_window", 1800.0)
+!         )
+!         self._offline_catchup = OfflineCatchup(
+!             max_backlog=self._config.get("max_backlog", 500)
+!         )
+  
+!         self._trigger_tracker = TriggerFrequencyTracker()
+  
+!         self._evolution_bus = None
+!         self._module_loops: Dict[str, Any] = {}
+  
+!         self._last_deep_think = 0.0
+!         self._last_evolution_cycle = 0.0
+  
+!         self._stats = {
+!             "events_perceived": 0,
+!             "decisions_made": 0,
+!             "actions_executed": 0,
+!             "deepseek_calls": 0,
+!             "errors": 0,
+!             "deep_think_cycles": 0,
+!             "evolution_cycles": 0,
+!             "causal_pairs_recorded": 0,
+!             "evolution_signals_detected": 0,
+!             "rules_modified": 0,
+!             "skills_auto_created": 0,
+!         }
+!         self._processed_ids = set()
+!         self._last_deepseek_call = 0.0
+!         self._min_deepseek_interval = self._config.get("min_deepseek_interval", 2.0)
+  
+!         self._mutable_rules = {
+!             "error_target_layer": "episodic",
+!             "conversation_target_layer": "sensory",
+!             "complete_conversation_target_layer": "working",
+!             "deep_think_interval": 300.0,
+!             "evolution_interval": 86400.0,
+!             "complexity_threshold_mcp_calls": 5,
+!             "complexity_threshold_duration_ms": 30000,
+!         }
+  
+!         self.event_bus.subscribe("deepseek_driver", self._on_event)
+  
+>     def set_evolution_engine(self, engine):
+!         self._evolution_engine = engine
+  
+>     def set_learning_engine(self, engine):
+!         self._learning_engine = engine
+  
+>     def _calc_driver_effectiveness(self, action: str,
+>                                     state_before: Dict[str, Any],
+>                                     state_after: Dict[str, Any]) -> float:
+!         if action == "driver_act":
+!             delta = state_after.get("actions_performed", 0) - state_before.get("actions_performed", 0)
+!             errors = state_after.get("error_count", 0) - state_before.get("error_count", 0)
+!             if errors > 0:
+!                 return -0.3 * errors
+!             if delta > 0:
+!                 return min(0.8, delta * 0.15)
+!             return 0.1
+!         elif action == "deep_think_cycle":
+!             signals = state_after.get("signals_detected", 0)
+!             processes = state_after.get("signals_processed", 0)
+!             if signals == 0:
+!                 return 0.0
+!             return min(0.6, processes / max(signals, 1) * 0.5)
+!         elif action == "evolution_cycle":
+!             rules = state_after.get("rules_modified", 0)
+!             skills = state_after.get("skills_created", 0)
+!             score = rules * 0.3 + skills * 0.2
+!             return min(0.8, max(-0.4, score))
+!         return 0.0
+  
+>     def _learn_from_driver(self, causal_pairs: List[Any],
+>                             effectiveness_summary: Dict[str, Any]) -> Dict[str, Any]:
+!         avg_eff = effectiveness_summary.get("avg_effectiveness", 0.0)
+!         return {
+!             "patterns_found": len(causal_pairs),
+!             "driver_effectiveness_avg": avg_eff,
+!             "strategies_optimized": 1 if avg_eff < 0 else 0,
+!         }
+  
+>     def _evolve_driver_config(self, learn_result: Dict[str, Any],
+>                                mutable_config: Dict[str, Any]) -> Dict[str, Any]:
+!         changes = {}
+!         avg_eff = learn_result.get("driver_effectiveness_avg", 0.5)
+!         if avg_eff < -0.2 and mutable_config.get("deep_think_interval", 300) > 120:
+!             changes["deep_think_interval"] = max(120, mutable_config["deep_think_interval"] - 60)
+!         if avg_eff > 0.3 and mutable_config.get("deep_think_interval", 300) < 600:
+!             changes["deep_think_interval"] = min(600, mutable_config["deep_think_interval"] + 60)
+!         return {"rules_modified": changes, "skills_created": []}
+  
+>     def _on_event(self, event: TianjiEvent):
+!         if event.event_id in self._processed_ids:
+!             return
+!         self._processed_ids.add(event.event_id)
+!         if len(self._processed_ids) > 10000:
+!             self._processed_ids = set(list(self._processed_ids)[-5000:])
+  
+>     def perceive(self, event: TianjiEvent) -> Optional[DriverDecision]:
+!         self._stats["events_perceived"] += 1
+  
+!         quick_decision = self._quick_decide(event)
+!         if quick_decision is not None:
+!             self._stats["decisions_made"] += 1
+!             return quick_decision
+  
+!         if not self._can_call_deepseek():
+!             return self._fallback_decide(event)
+  
+!         decision = self._deepseek_decide(event)
+!         if decision:
+!             self._stats["decisions_made"] += 1
+!             self._stats["deepseek_calls"] += 1
+!             self._last_deepseek_call = time.time()
+!         return decision
+  
+>     def _quick_decide(self, event: TianjiEvent) -> Optional[DriverDecision]:
+!         if event.event_type == EventType.CONVERSATION_INPUT:
+!             return DriverDecision(
+!                 action="store_conversation_input",
+!                 target_layer=self._mutable_rules["conversation_target_layer"],
+!                 tags=["conversation", "user_input", event.source],
+!                 priority="high",
+!                 confidence=0.95,
+!                 reason="用户输入必须记录",
+!                 enriched_content=event.payload.get("content", ""),
+!                 should_store=True,
+!             )
+  
+!         if event.event_type == EventType.CONVERSATION_OUTPUT:
+!             return DriverDecision(
+!                 action="store_conversation_output",
+!                 target_layer=self._mutable_rules["conversation_target_layer"],
+!                 tags=["conversation", "ai_response", event.source],
+!                 priority="high",
+!                 confidence=0.95,
+!                 reason="AI响应必须记录",
+!                 enriched_content=event.payload.get("content", ""),
+!                 should_store=True,
+!             )
+  
+!         if event.event_type == EventType.CONVERSATION_COMPLETE:
+!             return DriverDecision(
+!                 action="store_complete_conversation",
+!                 target_layer=self._mutable_rules["complete_conversation_target_layer"],
+!                 tags=["conversation", "complete", event.source],
+!                 priority="high",
+!                 confidence=0.90,
+!                 reason="完整对话必须记录到工作记忆",
+!                 enriched_content=event.payload.get("full_conversation", ""),
+!                 should_store=True,
+!                 should_consolidate=True,
+!             )
+  
+!         if event.event_type == EventType.ERROR_OCCURRED:
+!             return DriverDecision(
+!                 action="store_error",
+!                 target_layer=self._mutable_rules["error_target_layer"],
+!                 tags=["error", "traceback", event.source],
+!                 priority="high",
+!                 confidence=0.90,
+!                 reason="错误必须记录用于回溯",
+!                 enriched_content=event.payload.get("error_message", ""),
+!                 should_store=True,
+!             )
+  
+!         if event.event_type == EventType.TIMER_TICK:
+!             return None
+  
+!         if event.event_type == EventType.SYSTEM_STATUS:
+!             return None
+  
+!         return None
+  
+>     def _can_call_deepseek(self) -> bool:
+!         if not self.decision_engine or not self.decision_engine.is_ready:
+!             return False
+!         elapsed = time.time() - self._last_deepseek_call
+!         return elapsed >= self._min_deepseek_interval
+  
+>     def _deepseek_decide(self, event: TianjiEvent) -> Optional[DriverDecision]:
+!         try:
+!             content = event.payload.get("content", "")
+!             if not content or len(content.strip()) < 10:
+!                 return None
+  
+!             context = {
+!                 "event_type": event.event_type.value,
+!                 "source": event.source,
+!                 "timestamp": datetime.fromtimestamp(event.timestamp).isoformat(),
+!             }
+  
+!             storage_decision = self.decision_engine.decide_storage(content, context)
+  
+!             should_evolve = storage_decision.value_score > 0.8 and event.event_type in (
+!                 EventType.ERROR_OCCURRED, EventType.AGENT_SWITCH,
+!                 EventType.CONVERSATION_COMPLETE,
+!             )
+  
+!             return DriverDecision(
+!                 action="deepseek_driven_store",
+!                 target_layer=storage_decision.layer,
+!                 tags=storage_decision.tags,
+!                 priority=storage_decision.priority,
+!                 confidence=storage_decision.confidence,
+!                 reason=storage_decision.reason,
+!                 enriched_content=storage_decision.summary or content,
+!                 should_store=storage_decision.should_store,
+!                 should_consolidate=storage_decision.value_score > 0.7,
+!                 should_evolve=should_evolve,
+!             )
+!         except Exception as e:
+!             logger.error(f"DeepSeek decide error: {e}")
+!             self._stats["errors"] += 1
+!             return self._fallback_decide(event)
+  
+>     def _fallback_decide(self, event: TianjiEvent) -> DriverDecision:
+!         content = event.payload.get("content", "")
+!         layer_map = {
+!             EventType.CONVERSATION_INPUT: self._mutable_rules["conversation_target_layer"],
+!             EventType.CONVERSATION_OUTPUT: self._mutable_rules["conversation_target_layer"],
+!             EventType.CONVERSATION_COMPLETE: self._mutable_rules["complete_conversation_target_layer"],
+!             EventType.ERROR_OCCURRED: self._mutable_rules["error_target_layer"],
+!             EventType.AGENT_SWITCH: "episodic",
+!             EventType.MCP_TOOL_CALL: "sensory",
+!             EventType.FILE_CHANGED: "sensory",
+!             EventType.USER_ACTION: "working",
+!         }
+!         return DriverDecision(
+!             action="fallback_store",
+!             target_layer=layer_map.get(event.event_type, "sensory"),
+!             tags=[event.event_type.value, event.source, "fallback"],
+!             priority="medium",
+!             confidence=0.5,
+!             reason="DeepSeek不可用，使用规则降级",
+!             enriched_content=content,
+!             should_store=True,
+!         )
+  
+>     def act(self, decision: DriverDecision) -> bool:
+!         if not decision.should_store and not decision.should_evolve:
+!             return True
+  
+!         self._causal_recorder.capture_before(
+!             action=decision.action,
+!             reason=decision.reason,
+!             memory_engine=self.memory_engine,
+!         )
+  
+!         success = False
+!         side_effects: List[str] = []
+  
+!         try:
+!             if decision.should_store:
+!                 success = self._act_store(decision)
+!                 if success:
+!                     side_effects.append(f"stored to {decision.target_layer}")
+  
+!             if decision.should_merge:
+!                 merge_result = self._act_merge(decision)
+!                 if merge_result:
+!                     side_effects.append("merged similar memories")
+!                     success = True
+  
+!             if decision.should_link:
+!                 link_result = self._act_link(decision)
+!                 if link_result:
+!                     side_effects.append("linked related memories")
+  
+!             if decision.should_consolidate:
+!                 try:
+!                     if hasattr(self.memory_engine, 'consolidate'):
+!                         self.memory_engine.consolidate(from_layer=decision.target_layer)
+!                         side_effects.append(f"consolidated {decision.target_layer}")
+!                 except Exception:
+!                     pass
+  
+!             if decision.should_evolve and self._evolution_engine:
+!                 try:
+!                     evolve_result = self._evolution_engine.process_evolution_signal(
+!                         EvolutionSignal(
+!                             signal_type="action_triggered",
+!                             source_layer=decision.target_layer,
+!                             content_summary=decision.enriched_content[:300],
+!                             evolution_value=decision.confidence,
+!                             reason=decision.reason,
+!                             suggested_action=decision.action,
+!                             confidence=decision.confidence,
+!                             payload=decision.evolution_payload,
+!                         )
+!                     )
+!                     if evolve_result:
+!                         side_effects.append(f"evolution: {evolve_result}")
+!                 except Exception as e:
+!                     logger.warning(f"Evolution trigger failed: {e}")
+  
+!         except Exception as e:
+!             logger.error(f"Act error: {e}")
+!             self._stats["errors"] += 1
+!             success = False
+  
+!         pair = self._causal_recorder.capture_after(
+!             memory_engine=self.memory_engine,
+!             side_effects=side_effects,
+!         )
+  
+!         if pair:
+!             self._stats["causal_pairs_recorded"] += 1
+!             if self._can_call_deepseek() and pair.effectiveness < 0:
+!                 self._causal_recorder.evaluate_with_deepseek(
+!                     pair, self.decision_engine
+!                 )
+  
+!             urgency_result = self._urgency_accumulator.feed_causal_pair(pair)
+!             self._effect_watchdog.feed_causal_pair(pair)
+  
+!             if urgency_result.get("trigger_evolution"):
+!                 logger.info(
+!                     f"[DeepSeek Driver] Urgency={self._urgency_accumulator.urgency:.1f} "
+!                     f"触发即时进化反思"
+!                 )
+!                 try:
+!                     self._evolution_cycle()
+!                     self._urgency_accumulator.decay()
+!                 except Exception as e:
+!                     logger.error(f"Urgency-triggered evolution failed: {e}")
+!             elif urgency_result.get("trigger_deep_think"):
+!                 logger.info(
+!                     f"[DeepSeek Driver] Urgency={self._urgency_accumulator.urgency:.1f} "
+!                     f"触发即时深度思考"
+!                 )
+!                 try:
+!                     self._deep_think_cycle()
+!                     self._urgency_accumulator.decay()
+!                 except Exception as e:
+!                     logger.error(f"Urgency-triggered deep think failed: {e}")
+  
+!             if not self._can_call_deepseek():
+!                 self._offline_catchup.mark_offline()
+!                 self._offline_catchup.backlog_pair(pair)
+!             else:
+!                 if not self._offline_catchup.is_online:
+!                     self._offline_catchup.mark_online()
+  
+!         if success:
+!             self._stats["actions_executed"] += 1
+  
+!         if self._evo_loop is not None:
+!             try:
+!                 self._evo_loop.record_action(
+!                     action="driver_act",
+!                     state_before={"actions_performed": self._stats["actions_executed"] - 1,
+!                                   "error_count": self._stats["errors"]},
+!                     state_after={"actions_performed": self._stats["actions_executed"],
+!                                  "error_count": self._stats["errors"],
+!                                  "last_action": decision.action},
+!                 )
+!             except Exception:
+!                 pass
+  
+!         return success
+  
+>     def _act_store(self, decision: DriverDecision) -> bool:
+!         if not self.memory_engine:
+!             return False
+!         content = decision.enriched_content
+!         if not content:
+!             return False
+!         if hasattr(self.memory_engine, 'remember'):
+!             self.memory_engine.remember(
+!                 content=content,
+!                 layer=decision.target_layer,
+!                 tags=decision.tags,
+!                 priority=decision.priority,
+!             )
+!             return True
+!         return False
+  
+>     def _act_merge(self, decision: DriverDecision) -> bool:
+!         if not self.memory_engine or not hasattr(self.memory_engine, '_layers'):
+!             return False
+!         try:
+!             target_layer = decision.target_layer
+!             entries = list(self.memory_engine._layers.get(target_layer, {}).values())
+!             merged_count = 0
+!             for i in range(len(entries)):
+!                 for j in range(i + 1, min(i + 10, len(entries))):
+!                     if entries[i].content == entries[j].content:
+!                         continue
+!                     overlap = self._content_overlap(
+!                         entries[i].content, entries[j].content
+!                     )
+!                     if overlap > 0.85:
+!                         merged_content = entries[i].content
+!                         merged_tags = list(set(entries[i].tags + entries[j].tags))
+!                         entries[i].update_content(merged_content)
+!                         entries[i].tags = merged_tags
+!                         entries[i].access_count += entries[j].access_count
+!                         if hasattr(self.memory_engine, '_delete_entry_file'):
+!                             self.memory_engine._delete_entry_file(
+!                                 entries[j].id, target_layer
+!                             )
+!                         del self.memory_engine._layers[target_layer][entries[j].id]
+!                         merged_count += 1
+!                         break
+!             return merged_count > 0
+!         except Exception as e:
+!             logger.warning(f"Merge action failed: {e}")
+!             return False
+  
+>     def _act_link(self, decision: DriverDecision) -> bool:
+!         if not self.memory_engine or not hasattr(self.memory_engine, '_layers'):
+!             return False
+!         try:
+!             target_layer = decision.target_layer
+!             entries = list(self.memory_engine._layers.get(target_layer, {}).values())
+!             linked = 0
+!             for i in range(len(entries)):
+!                 if entries[i].related_ids:
+!                     continue
+!                 for j in range(len(entries)):
+!                     if i == j or entries[j].id in entries[i].related_ids:
+!                         continue
+!                     tag_overlap = len(
+!                         set(entries[i].tags) & set(entries[j].tags)
+!                     )
+!                     if tag_overlap >= 2:
+!                         entries[i].related_ids.append(entries[j].id)
+!                         entries[j].related_ids.append(entries[i].id)
+!                         linked += 1
+!                         if linked >= 5:
+!                             break
+!                 if linked >= 5:
+!                     break
+!             return linked > 0
+!         except Exception as e:
+!             logger.warning(f"Link action failed: {e}")
+!             return False
+  
+>     def _content_overlap(self, content_a: str, content_b: str) -> float:
+!         if not content_a or not content_b:
+!             return 0.0
+!         set_a = set(content_a[:500])
+!         set_b = set(content_b[:500])
+!         if not set_a or not set_b:
+!             return 0.0
+!         return len(set_a & set_b) / len(set_a | set_b)
+  
+>     def perceive_decide_act(self, event: TianjiEvent) -> Optional[Dict]:
+!         decision = self.perceive(event)
+!         if decision is None:
+!             return None
+  
+!         success = self.act(decision)
+!         return {
+!             "event_id": event.event_id,
+!             "decision": decision.to_dict(),
+!             "action_result": success,
+!         }
+  
+>     def _scan_undigested_memories(self) -> List[Dict]:
+>         """扫描L0中未被决策使用过的"盲区记忆" — SENSE核心"""
+!         undigested = []
+!         if not self.memory_engine or not hasattr(self.memory_engine, '_layers'):
+!             return undigested
+  
+!         sensory_layer = self.memory_engine._layers.get("sensory", {})
+!         for entry in list(sensory_layer.values())[-100:]:
+!             if entry.access_count == 0:
+!                 undigested.append({
+!                     "id": entry.id,
+!                     "content": entry.content[:200],
+!                     "tags": entry.tags,
+!                     "age_hours": (time.time() - entry.created_at) / 3600,
+!                 })
+  
+!         return undigested
+  
+>     def _scan_orphaned_contexts(self) -> List[Dict]:
+>         """扫描L1中无关联的孤立工作记忆"""
+!         orphaned = []
+!         if not self.memory_engine or not hasattr(self.memory_engine, '_layers'):
+!             return orphaned
+  
+!         working_layer = self.memory_engine._layers.get("working", {})
+!         for entry in list(working_layer.values())[-50:]:
+!             if not entry.related_ids:
+!                 orphaned.append({
+!                     "id": entry.id,
+!                     "content": entry.content[:200],
+!                     "tags": entry.tags,
+!                 })
+  
+!         return orphaned
+  
+>     def _scan_repeated_patterns(self) -> List[Dict]:
+>         """扫描L3中重复出现但未提炼的模式"""
+!         patterns = []
+!         if not self.memory_engine or not hasattr(self.memory_engine, '_layers'):
+!             return patterns
+  
+!         episodic_layer = self.memory_engine._layers.get("episodic", {})
+!         tag_clusters: Dict[str, List[str]] = {}
+!         for entry in list(episodic_layer.values())[-100:]:
+!             tag_key = ",".join(sorted(set(entry.tags[:3])))
+!             if tag_key not in tag_clusters:
+!                 tag_clusters[tag_key] = []
+!             tag_clusters[tag_key].append(entry.id)
+  
+!         for tag_key, ids in tag_clusters.items():
+!             if len(ids) >= 3:
+!                 patterns.append({
+!                     "tag_pattern": tag_key,
+!                     "occurrence_count": len(ids),
+!                     "entry_ids": ids[:5],
+!                 })
+  
+!         return patterns
+  
+>     def _evaluate_evolution_value(self, signals: List[Dict]) -> Optional[EvolutionSignal]:
+>         """DeepSeek评估进化价值 — EVALUATE核心"""
+!         if not signals:
+!             return None
+  
+!         if not self._can_call_deepseek():
+!             return self._rule_based_evolution_eval(signals)
+  
+!         try:
+!             signal_summary = json.dumps(signals[:10], ensure_ascii=False)[:2000]
+!             prompt = f"""请评估以下天机系统信号的进化价值:
+  
+! 信号列表:
+! {signal_summary}
+  
+! 请评估每个维度的分数(0-1)并给出建议行动。"""
+  
+!             result = self.decision_engine.client.chat_sync(prompt, EVOLUTION_EVAL_PROMPT)
+  
+!             evolution_value = result.get("evolution_value", 0.5)
+!             return EvolutionSignal(
+!                 signal_type="deep_seek_evaluated",
+!                 source_layer="multi",
+!                 content_summary=signal_summary[:300],
+!                 evolution_value=evolution_value,
+!                 reason=result.get("reason", ""),
+!                 suggested_action=result.get("suggested_action", "record"),
+!                 confidence=min(1.0, evolution_value),
+!                 payload=result,
+!             )
+!         except Exception as e:
+!             logger.warning(f"DeepSeek evolution eval failed: {e}")
+!             return self._rule_based_evolution_eval(signals)
+  
+>     def _rule_based_evolution_eval(self, signals: List[Dict]) -> Optional[EvolutionSignal]:
+!         if not signals:
+!             return None
+  
+!         total_signals = len(signals)
+!         evolution_value = min(1.0, total_signals / 20.0)
+  
+!         if evolution_value < 0.3:
+!             return None
+  
+!         return EvolutionSignal(
+!             signal_type="rule_based_eval",
+!             source_layer="multi",
+!             content_summary=f"{total_signals}个未消化信号",
+!             evolution_value=evolution_value,
+!             reason=f"发现{total_signals}个未消化信号，需要处理",
+!             suggested_action="process" if evolution_value > 0.7 else "record",
+!             confidence=evolution_value * 0.8,
+!         )
+  
+>     def _deep_think_cycle(self):
+>         """循环B: 深度思考 — SENSE → EVALUATE → DECIDE → ACT → OBSERVE"""
+!         self._stats["deep_think_cycles"] += 1
+!         logger.info("[DeepSeek Driver] 深度思考循环启动...")
+  
+!         undigested = self._scan_undigested_memories()
+!         orphaned = self._scan_orphaned_contexts()
+!         repeated = self._scan_repeated_patterns()
+  
+!         all_signals = []
+!         for item in undigested:
+!             all_signals.append({"type": "undigested", **item})
+!         for item in orphaned:
+!             all_signals.append({"type": "orphaned", **item})
+!         for item in repeated:
+!             all_signals.append({"type": "repeated_pattern", **item})
+  
+!         if not all_signals:
+!             logger.info("[DeepSeek Driver] 深度思考: 无需处理的信号")
+!             return
+  
+!         self._stats["evolution_signals_detected"] += len(all_signals)
+  
+!         evolution_signal = self._evaluate_evolution_value(all_signals)
+  
+!         if evolution_signal is None:
+!             return
+  
+!         decision = DriverDecision(
+!             action="deep_think_evolution",
+!             target_layer="episodic",
+!             tags=["deep_think", "evolution", "auto"],
+!             priority="medium",
+!             confidence=evolution_signal.confidence,
+!             reason=evolution_signal.reason,
+!             enriched_content=evolution_signal.content_summary,
+!             should_store=True,
+!             should_merge=len(repeated) > 0,
+!             should_link=len(orphaned) > 0,
+!             should_evolve=evolution_signal.evolution_value > 0.7,
+!             evolution_payload=evolution_signal.to_dict(),
+!         )
+  
+!         self.act(decision)
+!         logger.info(
+!             f"[DeepSeek Driver] 深度思考完成: "
+!             f"处理{len(all_signals)}个信号, "
+!             f"进化价值={evolution_signal.evolution_value:.2f}"
+!         )
+  
+!         if self._evo_loop is not None:
+!             try:
+!                 self._evo_loop.record_action(
+!                     action="deep_think_cycle",
+!                     state_before={"signals_detected": self._stats["evolution_signals_detected"] - len(all_signals)},
+!                     state_after={"signals_detected": self._stats["evolution_signals_detected"],
+!                                  "signals_processed": len(all_signals),
+!                                  "evolution_value": evolution_signal.evolution_value},
+!                 )
+!             except Exception:
+!                 pass
+  
+>     def _evolution_cycle(self):
+>         """循环C: 进化反思 — 汇总因果对 → LEARN → EVOLVE"""
+!         self._stats["evolution_cycles"] += 1
+!         logger.info("[DeepSeek Driver] 进化反思循环启动...")
+  
+!         causal_pairs = self._causal_recorder.get_recent_pairs(limit=200)
+!         if not causal_pairs:
+!             logger.info("[DeepSeek Driver] 进化反思: 无因果对数据")
+!             return
+  
+!         effectiveness_summary = self._causal_recorder.get_action_effectiveness_summary()
+  
+!         if self._learning_engine:
+!             try:
+!                 learn_result = self._learning_engine.learn_from_causal_pairs(
+!                     causal_pairs=causal_pairs,
+!                     effectiveness_summary=effectiveness_summary,
+!                     decision_engine=self.decision_engine,
+!                 )
+!                 if learn_result:
+!                     logger.info(
+!                         f"[DeepSeek Driver] LEARN完成: "
+!                         f"模式={learn_result.get('patterns_found', 0)}, "
+!                         f"策略优化={learn_result.get('strategies_optimized', 0)}, "
+!                         f"能力发现={learn_result.get('capabilities_discovered', 0)}"
+!                     )
+!             except Exception as e:
+!                 logger.error(f"LEARN failed: {e}")
+  
+!         if self._evolution_engine:
+!             try:
+!                 evolve_result = self._evolution_engine.evolve_from_learning(
+!                     causal_pairs=causal_pairs,
+!                     effectiveness_summary=effectiveness_summary,
+!                     mutable_rules=self._mutable_rules,
+!                     decision_engine=self.decision_engine,
+!                 )
+!                 if evolve_result and evolve_result.get("rules_modified"):
+!                     self._stats["rules_modified"] += len(evolve_result["rules_modified"])
+!                     for rule_change in evolve_result["rules_modified"]:
+!                         rule_name = rule_change.get("rule")
+!                         new_value = rule_change.get("new_value")
+!                         if rule_name in self._mutable_rules:
+!                             old_value = self._mutable_rules[rule_name]
+!                             self._mutable_rules[rule_name] = new_value
+!                             logger.info(
+!                                 f"[DeepSeek Driver] EVOLVE: 规则'{rule_name}' "
+!                                 f"从{old_value}→{new_value}"
+!                             )
+  
+!                             def _make_rollback(name, val):
+!                                 def rollback():
+!                                     self._mutable_rules[name] = val
+!                                     logger.info(
+!                                         f"[DeepSeek Driver] EffectWatchdog回滚: "
+!                                         f"规则'{name}' 恢复为{val}"
+!                                     )
+!                                 return rollback
+  
+!                             self._effect_watchdog.start_watch(
+!                                 rule_name=rule_name,
+!                                 old_value=old_value,
+!                                 old_avg_effectiveness=effectiveness_summary.get(
+!                                     "avg_effectiveness", 0.5
+!                                 ),
+!                                 rollback_fn=_make_rollback(rule_name, old_value),
+!                             )
+  
+!                 if evolve_result and evolve_result.get("skills_created"):
+!                     self._stats["skills_auto_created"] += len(
+!                         evolve_result["skills_created"]
+!                     )
+  
+!                 logger.info(
+!                     f"[DeepSeek Driver] EVOLVE完成: "
+!                     f"规则修改={len(evolve_result.get('rules_modified', []))}, "
+!                     f"Skill创建={len(evolve_result.get('skills_created', []))}"
+!                 )
+  
+!                 if self._evo_loop is not None:
+!                     try:
+!                         rules_before = self._stats["rules_modified"] - len(evolve_result.get("rules_modified", []))
+!                         skills_before = self._stats["skills_auto_created"] - len(evolve_result.get("skills_created", []))
+!                         self._evo_loop.record_action(
+!                             action="evolution_cycle",
+!                             state_before={"rules_modified": rules_before,
+!                                           "skills_created": skills_before},
+!                             state_after={"rules_modified": self._stats["rules_modified"],
+!                                          "skills_created": self._stats["skills_auto_created"],
+!                                          "evolution_success": True},
+!                         )
+!                     except Exception:
+!                         pass
+!             except Exception as e:
+!                 logger.error(f"EVOLVE failed: {e}")
+  
+>     def start(self):
+!         if self._running:
+!             return
+!         self._running = True
+!         self.evolution_loop = self._evo_loop
+!         self._thread = threading.Thread(target=self._main_loop, daemon=True)
+!         self._thread.start()
+!         logger.info("DeepSeek Driver v2.2 started — 天机自我进化大脑已激活 · D2-1三循环驾驶煞")
+  
+>     def stop(self):
+!         self._running = False
+!         if self._thread:
+!             self._thread.join(timeout=5)
+!         logger.info("DeepSeek Driver stopped")
+  
+>     def _main_loop(self):
+>         """三循环并行驾驶主循环 + 感知触发器"""
+!         while self._running:
+!             try:
+                  # 循环A: 快速反应
+!                 events = self.event_bus.drain(max_items=20)
+!                 for event in events:
+!                     self.perceive_decide_act(event)
+!                 self._trigger_tracker.record("loop_a", f"events={len(events)}")
+  
+                  # 感知触发器: UrgencyAccumulator驱动即时深度思考
+!                 now = time.time()
+!                 if self._urgency_accumulator.should_trigger_deep_think():
+!                     self._last_deep_think = now
+!                     self._trigger_tracker.record("loop_b_urgency")
+!                     try:
+!                         self._deep_think_cycle()
+!                         self._urgency_accumulator.decay()
+!                     except Exception as e:
+!                         logger.error(f"Urgency-triggered deep think error: {e}")
+!                 elif now - self._last_deep_think >= self._deep_think_interval:
+!                     self._last_deep_think = now
+!                     self._trigger_tracker.record("loop_b_timed")
+!                     try:
+!                         self._deep_think_cycle()
+!                     except Exception as e:
+!                         logger.error(f"Deep think cycle error: {e}")
+  
+                  # 感知触发器: UrgencyAccumulator驱动即时进化反思
+!                 if self._urgency_accumulator.should_trigger_evolution():
+!                     self._last_evolution_cycle = now
+!                     self._trigger_tracker.record("loop_c_urgency")
+!                     try:
+!                         self._evolution_cycle()
+!                         self._urgency_accumulator.decay()
+!                     except Exception as e:
+!                         logger.error(f"Urgency-triggered evolution error: {e}")
+!                 elif now - self._last_evolution_cycle >= self._evolution_interval:
+!                     self._last_evolution_cycle = now
+!                     self._trigger_tracker.record("loop_c_timed")
+!                     try:
+!                         self._evolution_cycle()
+!                     except Exception as e:
+!                         logger.error(f"Evolution cycle error: {e}")
+  
+                  # EffectWatchdog: 检查规则修改效果
+!                 watchdog_results = self._effect_watchdog.check_watches()
+!                 for wr in watchdog_results:
+!                     if wr["verdict"] == "rolled_back":
+!                         logger.warning(
+!                             f"[DeepSeek Driver] EffectWatchdog: 规则'{wr['rule_name']}' "
+!                             f"效果回退({wr['new_avg']:.2f} < {wr['old_avg']:.2f}), 已自动回滚"
+!                         )
+!                     elif wr["verdict"] == "confirmed":
+!                         logger.info(
+!                             f"[DeepSeek Driver] EffectWatchdog: 规则'{wr['rule_name']}' "
+!                             f"效果确认({wr['new_avg']:.2f} >= {wr['old_avg']:.2f})"
+!                         )
+!                 self._trigger_tracker.record("watchdog", f"checks={len(watchdog_results)}")
+  
+                  # OfflineCatchup: DeepSeek恢复后补课
+!                 if self._can_call_deepseek() and self._offline_catchup.has_backlog():
+!                     backlog_events, backlog_pairs = self._offline_catchup.drain_backlog(
+!                         max_items=20
+!                     )
+!                     if backlog_events:
+!                         self._trigger_tracker.record("catchup", f"backlog={len(backlog_events)}")
+!                         logger.info(
+!                             f"[DeepSeek Driver] OfflineCatchup: 补课处理"
+!                             f"{len(backlog_events)}个积压事件"
+!                         )
+!                         for event in backlog_events:
+!                             self.perceive_decide_act(event)
+!                     if backlog_pairs and self._learning_engine:
+!                         try:
+!                             self._learning_engine.learn_from_causal_pairs(
+!                                 causal_pairs=backlog_pairs,
+!                                 effectiveness_summary=(
+!                                     self._causal_recorder.get_action_effectiveness_summary()
+!                                 ),
+!                                 decision_engine=self.decision_engine,
+!                             )
+!                         except Exception as e:
+!                             logger.error(f"OfflineCatchup LEARN failed: {e}")
+  
+                  # 全系统进化闭环: 驱动所有模块的EvolutionLoop tick
+!                 if self._module_loops:
+!                     module_results = self._tick_all_module_loops()
+!                     for mr in module_results:
+!                         if mr and mr.summary:
+!                             logger.info(
+!                                 f"[DeepSeek Driver] 模块进化: {mr.module_name} "
+!                                 f"{mr.phase.value} — {mr.summary}"
+!                             )
+!                     self._trigger_tracker.record("module_tick", f"modules={len(module_results)}")
+  
+!                 if self._evo_loop is not None:
+!                     try:
+!                         self._evo_loop.tick()
+!                     except Exception:
+!                         pass
+  
+!                 if not events:
+!                     idle_result = self._urgency_accumulator.tick_idle()
+!                     if idle_result.get("trigger_deep_think"):
+!                         logger.info("[DeepSeek Driver] 空闲超时触发主动深度思考")
+!                         self.trigger_deep_think()
+!                     self._trigger_tracker.record("idle")
+!                     time.sleep(1)
+!             except Exception as e:
+!                 logger.error(f"Driver main loop error: {e}")
+!                 time.sleep(5)
+  
+>     def get_stats(self) -> Dict:
+!         return {
+!             "running": self._running,
+!             "version": "2.2",
+!             **self._stats,
+!             "pending_events": self.event_bus.pending_count,
+!             "total_events": self.event_bus.total_count,
+!             "deepseek_ready": (
+!                 self.decision_engine.is_ready if self.decision_engine else False
+!             ),
+!             "causal_recorder": self._causal_recorder.get_stats(),
+!             "evolution_engine": self._evolution_engine.get_stats() if self._evolution_engine else {},
+!             "mutable_rules": dict(self._mutable_rules),
+!             "last_deep_think": self._last_deep_think,
+!             "last_evolution_cycle": self._last_evolution_cycle,
+!             "closed_loop_status": {
+!                 "OBSERVE": "active" if self._causal_recorder else "inactive",
+!                 "LEARN": "active" if self._learning_engine else "inactive",
+!                 "EVOLVE": "active" if self._evolution_engine else "inactive",
+!             },
+!             "urgency_accumulator": self._urgency_accumulator.get_stats(),
+!             "effect_watchdog": self._effect_watchdog.get_stats(),
+!             "offline_catchup": self._offline_catchup.get_stats(),
+!             "evolution_bus": self._evolution_bus.get_stats() if self._evolution_bus else {},
+!             "module_loops": {
+!                 name: loop.get_stats() for name, loop in self._module_loops.items()
+!             },
+!             "evo_loop": self._evo_loop.get_stats() if self._evo_loop else {},
+!             "trigger_frequency": self._trigger_tracker.get_frequency(),
+!             "health": self.health()
+!         }
+  
+>     def health(self) -> Dict:
+!         return {
+!             "status": "running" if self._running else "stopped",
+!             "version": "2.2",
+!             "deepseek_ready": (
+!                 self.decision_engine.is_ready if self.decision_engine else False
+!             ),
+!             "memory_engine_attached": self.memory_engine is not None,
+!             "events_pending": self.event_bus.pending_count,
+!             "evolution_engine_active": self._evolution_engine is not None,
+!             "learning_engine_active": self._learning_engine is not None,
+!             "evo_loop_active": self._evo_loop is not None,
+!             "recorder_attached": self._recorder is not None,
+!             "urgency_level": self._urgency_accumulator.urgency,
+!             "causal_pairs_total": self._stats["causal_pairs_recorded"],
+!             "errors": self._stats["errors"],
+!             "closed_loop": (
+!                 self._causal_recorder is not None
+!                 and self._learning_engine is not None
+!                 and self._evolution_engine is not None
+!             ),
+!         }
+  
+>     def get_trigger_frequency(self, window_seconds: float = 3600) -> Dict:
+!         return self._trigger_tracker.get_frequency(window_seconds)
+  
+>     def trigger_deep_think(self) -> Optional[Dict]:
+>         """手动触发深度思考 — 供外部调用"""
+!         self._last_deep_think = time.time()
+!         self._deep_think_cycle()
+!         return {"triggered": "deep_think", "stats": self.get_stats()}
+  
+>     def trigger_evolution(self) -> Optional[Dict]:
+>         """手动触发进化反思 — 供外部调用"""
+!         self._last_evolution_cycle = time.time()
+!         self._evolution_cycle()
+!         return {"triggered": "evolution", "stats": self.get_stats()}
+  
+>     def register_module_loop(self, module_name: str, loop: Any):
+>         """
+>         注册模块进化闭环到全局总线
+  
+>         当模块创建了EvolutionLoop后，通过此方法注册到Driver，
+>         Driver负责:
+>           1. 将模块的EvolutionLoop注册到EvolutionBus
+>           2. 在主循环中调用每个模块的tick()
+>           3. 汇总所有模块的进化状态
+>         """
+!         self._module_loops[module_name] = loop
+  
+!         if self._evolution_bus is None:
+!             try:
+!                 from .evolution_loop import EvolutionBus
+!                 self._evolution_bus = EvolutionBus()
+!             except ImportError:
+!                 return
+  
+!         self._evolution_bus.register_loop(loop)
+!         logger.info(f"[DeepSeek Driver] 模块'{module_name}'进化闭环已注册到全局总线")
+  
+>     def _tick_all_module_loops(self):
+>         """驱动所有模块的进化闭环tick — 在主循环中调用"""
+!         results = []
+!         for module_name, loop in self._module_loops.items():
+!             try:
+!                 loop_results = loop.tick()
+!                 if loop_results:
+!                     results.extend(loop_results)
+!             except Exception as e:
+!                 logger.debug(f"[DeepSeek Driver] Module loop tick error ({module_name}): {e}")
+!         return results
+  
+  
+> class TraeConversationCapture:
+>     """
+>     Trae对话捕获器 — 天机的"眼睛"
+>     """
+  
+>     def __init__(self, event_bus: EventBus):
+!         self.event_bus = event_bus
+!         self._session_context = {}
+  
+>     def on_user_input(self, user_input: str, session_id: str = "",
+>                       platform: str = "trae", context: Optional[Dict] = None):
+!         self.event_bus.publish(TianjiEvent(
+!             event_type=EventType.CONVERSATION_INPUT,
+!             source=platform,
+!             payload={
+!                 "content": user_input,
+!                 "session_id": session_id,
+!                 "context": context or {},
+!             },
+!         ))
+!         self._session_context[session_id] = {
+!             "user_input": user_input,
+!             "timestamp": time.time(),
+!             "context": context or {},
+!         }
+  
+>     def on_ai_response(self, ai_response: str, session_id: str = "",
+>                        platform: str = "trae", agent_id: str = ""):
+!         self.event_bus.publish(TianjiEvent(
+!             event_type=EventType.CONVERSATION_OUTPUT,
+!             source=platform,
+!             payload={
+!                 "content": ai_response,
+!                 "session_id": session_id,
+!                 "agent_id": agent_id,
+!             },
+!         ))
+  
+>     def on_conversation_complete(self, user_input: str, ai_response: str,
+>                                   session_id: str = "", platform: str = "trae"):
+!         full_conv = f"用户: {user_input}\n\nAI: {ai_response}"
+!         self.event_bus.publish(TianjiEvent(
+!             event_type=EventType.CONVERSATION_COMPLETE,
+!             source=platform,
+!             payload={
+!                 "full_conversation": full_conv,
+!                 "user_input": user_input,
+!                 "ai_response": ai_response,
+!                 "session_id": session_id,
+!             },
+!         ))
+  
+  
+  
+> class ThreeCycleOrchestrator:
+>     """
+>     三循环解耦编排器 — 将DeepSeek Driver的三个循环从紧密耦合改为事件驱动
+  
+>     原本: 循环A/B/C在driver主线程中串行，耦合度高
+>     解耦后:
+>       - 循环A (快速反应): ThreadPool + 事件订阅，<100ms延迟
+>       - 循环B (深度思考): Timer每5分钟 + UrgencyThreshold触发
+>       - 循环C (进化反思): CRON每日+EvolutionThreshold累积触发
+>     """
+  
+>     def __init__(self, driver: "DeepSeekDriver", max_workers: int = 4):
+!         self._driver = driver
+!         self._executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="tianji-cycle")
+!         self._running = False
+!         self._lock = threading.Lock()
+!         self._loop_b_timer: Optional[threading.Timer] = None
+!         self._loop_c_timer: Optional[threading.Timer] = None
+!         self._stats = {
+!             "cycle_a_fast_reacts": 0,
+!             "cycle_b_deep_thinks": 0,
+!             "cycle_c_evolutions": 0,
+!             "events_processed": 0,
+!             "total_futures": 0,
+!         }
+  
+>     def start(self, loop_b_interval: float = 300.0, loop_c_interval: float = 86400.0):
+!         with self._lock:
+!             if self._running:
+!                 return
+!             self._running = True
+  
+!         self._driver.event_bus.subscribe("*", self._on_event)
+  
+!         self._schedule_loop_b(loop_b_interval)
+!         self._schedule_loop_c(loop_c_interval)
+  
+!         return True
+  
+>     def stop(self):
+!         with self._lock:
+!             self._running = False
+  
+!         if self._loop_b_timer:
+!             self._loop_b_timer.cancel()
+!             self._loop_b_timer = None
+!         if self._loop_c_timer:
+!             self._loop_c_timer.cancel()
+!             self._loop_c_timer = None
+  
+!         self._executor.shutdown(wait=False)
+  
+>     def _on_event(self, event: TianjiEvent):
+!         if not self._running:
+!             return
+!         self._stats["events_processed"] += 1
+  
+!         future = self._executor.submit(self._cycle_a_worker, event)
+!         self._stats["total_futures"] += 1
+  
+!         urgency = self._driver._urgency_accumulator._urgency
+!         trigger_b = urgency >= self._driver._urgency_accumulator.DEEP_THINK_THRESHOLD
+!         trigger_c = urgency >= self._driver._urgency_accumulator.EVOLUTION_THRESHOLD
+  
+!         if trigger_c:
+!             self._executor.submit(self._cycle_c_worker)
+!             self._stats["cycle_c_evolutions"] += 1
+!         if trigger_b:
+!             self._executor.submit(self._cycle_b_worker)
+!             self._stats["cycle_b_deep_thinks"] += 1
+  
+!         if trigger_b or trigger_c:
+!             self._driver._urgency_accumulator.decay()
+  
+>     def _cycle_a_worker(self, event: TianjiEvent):
+!         try:
+!             self._stats["cycle_a_fast_reacts"] += 1
+!             if event.event_type in (EventType.CONVERSATION_INPUT,
+!                                      EventType.CONVERSATION_OUTPUT):
+!                 self._driver.process_event(event)
+!             elif event.event_type == EventType.DEEP_THINK_TRIGGER:
+!                 self._executor.submit(self._cycle_b_worker)
+!         except Exception:
+!             pass
+  
+>     def _cycle_b_worker(self):
+!         try:
+!             self._stats["cycle_b_deep_thinks"] += 1
+!             self._driver.run_loop_b()
+!         except Exception:
+!             pass
+  
+>     def _cycle_c_worker(self):
+!         try:
+!             self._stats["cycle_c_evolutions"] += 1
+!             self._driver.run_loop_c()
+!         except Exception:
+!             pass
+  
+>     def _schedule_loop_b(self, interval: float):
+!         if not self._running:
+!             return
+!         self._loop_b_timer = threading.Timer(interval, self._loop_b_tick, args=[interval])
+!         self._loop_b_timer.daemon = True
+!         self._loop_b_timer.start()
+  
+>     def _loop_b_tick(self, interval: float):
+!         if self._running:
+!             self._executor.submit(self._cycle_b_worker)
+!             self._schedule_loop_b(interval)
+  
+>     def _schedule_loop_c(self, interval: float):
+!         if not self._running:
+!             return
+!         self._loop_c_timer = threading.Timer(interval, self._loop_c_tick, args=[interval])
+!         self._loop_c_timer.daemon = True
+!         self._loop_c_timer.start()
+  
+>     def _loop_c_tick(self, interval: float):
+!         if self._running:
+!             self._executor.submit(self._cycle_c_worker)
+!             self._schedule_loop_c(interval)
+  
+>     def get_stats(self) -> Dict[str, Any]:
+!         return {
+!             "running": self._running,
+!             "cycle_a_fast_reacts": self._stats["cycle_a_fast_reacts"],
+!             "cycle_b_deep_thinks": self._stats["cycle_b_deep_thinks"],
+!             "cycle_c_evolutions": self._stats["cycle_c_evolutions"],
+!             "events_processed": self._stats["events_processed"],
+!             "urgency": round(self._driver._urgency_accumulator._urgency, 2),
+!         }

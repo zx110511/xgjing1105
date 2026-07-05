@@ -1,0 +1,583 @@
+{
+  "time": "2026-06-09T09:22:34.078112",
+  "grade": "A+",
+  "verdict": "产品级就绪",
+  "summary": {
+    "total": 73,
+    "passed": 73,
+    "failed": 0,
+    "critical": 0,
+    "warnings": 0,
+    "passRate": 100.0
+  },
+  "categories": {
+    "环境": {
+      "total": 1,
+      "passed": 1,
+      "rate": 100.0
+    },
+    "依赖": {
+      "total": 6,
+      "passed": 6,
+      "rate": 100.0
+    },
+    "后端": {
+      "total": 8,
+      "passed": 8,
+      "rate": 100.0
+    },
+    "API": {
+      "total": 5,
+      "passed": 5,
+      "rate": 100.0
+    },
+    "核心": {
+      "total": 19,
+      "passed": 19,
+      "rate": 100.0
+    },
+    "数据": {
+      "total": 17,
+      "passed": 17,
+      "rate": 100.0
+    },
+    "MCP": {
+      "total": 7,
+      "passed": 7,
+      "rate": 100.0
+    },
+    "适配": {
+      "total": 1,
+      "passed": 1,
+      "rate": 100.0
+    },
+    "前端": {
+      "total": 4,
+      "passed": 4,
+      "rate": 100.0
+    },
+    "部署": {
+      "total": 2,
+      "passed": 2,
+      "rate": 100.0
+    },
+    "安装包": {
+      "total": 3,
+      "passed": 3,
+      "rate": 100.0
+    }
+  },
+  "details": [
+    {
+      "c": "环境",
+      "n": "Python运行时",
+      "ok": true,
+      "l": "Critical",
+      "d": "3.12.9 (tags/v3.12.9:fdb8142, Feb  4 2025, 15:27:58) [MSC v.1942 64 bit (AMD64)]"
+    },
+    {
+      "c": "依赖",
+      "n": "FastAPI框架",
+      "ok": true,
+      "l": "Critical",
+      "d": ""
+    },
+    {
+      "c": "依赖",
+      "n": "Uvicorn服务器",
+      "ok": true,
+      "l": "Critical",
+      "d": ""
+    },
+    {
+      "c": "依赖",
+      "n": "Pydantic校验",
+      "ok": true,
+      "l": "Critical",
+      "d": ""
+    },
+    {
+      "c": "依赖",
+      "n": "异步文件IO",
+      "ok": true,
+      "l": "Warning",
+      "d": ""
+    },
+    {
+      "c": "依赖",
+      "n": "scikit-learn嵌入",
+      "ok": true,
+      "l": "Warning",
+      "d": ""
+    },
+    {
+      "c": "依赖",
+      "n": "SQLite3数据库",
+      "ok": true,
+      "l": "Critical",
+      "d": "v3.45.3"
+    },
+    {
+      "c": "后端",
+      "n": "服务入口",
+      "ok": true,
+      "l": "Critical",
+      "d": ""
+    },
+    {
+      "c": "后端",
+      "n": "FastAPI实例",
+      "ok": true,
+      "l": "Normal",
+      "d": ""
+    },
+    {
+      "c": "后端",
+      "n": "Uvicorn配置",
+      "ok": true,
+      "l": "Normal",
+      "d": ""
+    },
+    {
+      "c": "后端",
+      "n": "路由定义(GET)",
+      "ok": true,
+      "l": "Normal",
+      "d": ""
+    },
+    {
+      "c": "后端",
+      "n": "路由定义(POST)",
+      "ok": true,
+      "l": "Normal",
+      "d": ""
+    },
+    {
+      "c": "后端",
+      "n": "跨域配置",
+      "ok": true,
+      "l": "Normal",
+      "d": ""
+    },
+    {
+      "c": "后端",
+      "n": "启动事件",
+      "ok": true,
+      "l": "Normal",
+      "d": ""
+    },
+    {
+      "c": "后端",
+      "n": "端口已占用(服务已在运行)",
+      "ok": true,
+      "l": "Normal",
+      "d": ":8778"
+    },
+    {
+      "c": "API",
+      "n": "健康检查",
+      "ok": true,
+      "l": "Normal",
+      "d": "HTTP 200"
+    },
+    {
+      "c": "API",
+      "n": "根路径",
+      "ok": true,
+      "l": "Normal",
+      "d": "HTTP 200"
+    },
+    {
+      "c": "API",
+      "n": "系统统计",
+      "ok": true,
+      "l": "Normal",
+      "d": "HTTP 200"
+    },
+    {
+      "c": "API",
+      "n": "系统配置",
+      "ok": true,
+      "l": "Normal",
+      "d": "HTTP 200"
+    },
+    {
+      "c": "API",
+      "n": "OpenAPI规范",
+      "ok": true,
+      "l": "Normal",
+      "d": "HTTP 200"
+    },
+    {
+      "c": "核心",
+      "n": "ICME引擎(核心)",
+      "ok": true,
+      "l": "Critical",
+      "d": ""
+    },
+    {
+      "c": "核心",
+      "n": "混合存储引擎",
+      "ok": true,
+      "l": "Critical",
+      "d": ""
+    },
+    {
+      "c": "核心",
+      "n": "Pydantic数据模型",
+      "ok": true,
+      "l": "Normal",
+      "d": ""
+    },
+    {
+      "c": "核心",
+      "n": "配置管理",
+      "ok": true,
+      "l": "Normal",
+      "d": ""
+    },
+    {
+      "c": "核心",
+      "n": "SQLite存储",
+      "ok": true,
+      "l": "Normal",
+      "d": ""
+    },
+    {
+      "c": "核心",
+      "n": "智能路由",
+      "ok": true,
+      "l": "Normal",
+      "d": ""
+    },
+    {
+      "c": "核心",
+      "n": "记忆写入器",
+      "ok": true,
+      "l": "Normal",
+      "d": ""
+    },
+    {
+      "c": "核心",
+      "n": "层级晋升器",
+      "ok": true,
+      "l": "Normal",
+      "d": ""
+    },
+    {
+      "c": "核心",
+      "n": "归档管理器",
+      "ok": true,
+      "l": "Normal",
+      "d": ""
+    },
+    {
+      "c": "核心",
+      "n": "检索索引器",
+      "ok": true,
+      "l": "Normal",
+      "d": ""
+    },
+    {
+      "c": "核心",
+      "n": "记忆核心基类",
+      "ok": true,
+      "l": "Normal",
+      "d": ""
+    },
+    {
+      "c": "核心",
+      "n": "工作记忆层",
+      "ok": true,
+      "l": "Normal",
+      "d": ""
+    },
+    {
+      "c": "核心",
+      "n": "感知记忆层",
+      "ok": true,
+      "l": "Normal",
+      "d": ""
+    },
+    {
+      "c": "核心",
+      "n": "情景记忆层",
+      "ok": true,
+      "l": "Normal",
+      "d": ""
+    },
+    {
+      "c": "核心",
+      "n": "语义记忆层",
+      "ok": true,
+      "l": "Normal",
+      "d": ""
+    },
+    {
+      "c": "核心",
+      "n": "元认知层",
+      "ok": true,
+      "l": "Normal",
+      "d": ""
+    },
+    {
+      "c": "核心",
+      "n": "FTS5搜索策略",
+      "ok": true,
+      "l": "Normal",
+      "d": ""
+    },
+    {
+      "c": "核心",
+      "n": "语义搜索策略",
+      "ok": true,
+      "l": "Normal",
+      "d": ""
+    },
+    {
+      "c": "核心",
+      "n": "融合搜索策略",
+      "ok": true,
+      "l": "Normal",
+      "d": ""
+    },
+    {
+      "c": "数据",
+      "n": "ICME主数据库",
+      "ok": true,
+      "l": "Normal",
+      "d": "187716KB"
+    },
+    {
+      "c": "数据",
+      "n": "ICME共享内存",
+      "ok": true,
+      "l": "Normal",
+      "d": "32KB"
+    },
+    {
+      "c": "数据",
+      "n": "对话日志DB",
+      "ok": true,
+      "l": "Normal",
+      "d": "32KB"
+    },
+    {
+      "c": "数据",
+      "n": "记忆数据文件",
+      "ok": true,
+      "l": "Critical",
+      "d": "1311条, 13层"
+    },
+    {
+      "c": "数据",
+      "n": "  backups层",
+      "ok": true,
+      "l": "Normal",
+      "d": "0条(辅助层)"
+    },
+    {
+      "c": "数据",
+      "n": "  causal_pairs层",
+      "ok": true,
+      "l": "Normal",
+      "d": "38条"
+    },
+    {
+      "c": "数据",
+      "n": "  episodic层",
+      "ok": true,
+      "l": "Normal",
+      "d": "100条"
+    },
+    {
+      "c": "数据",
+      "n": "  evolution_history层",
+      "ok": true,
+      "l": "Normal",
+      "d": "7条"
+    },
+    {
+      "c": "数据",
+      "n": "  knowledge_graph层",
+      "ok": true,
+      "l": "Normal",
+      "d": "1条"
+    },
+    {
+      "c": "数据",
+      "n": "  meta层",
+      "ok": true,
+      "l": "Normal",
+      "d": "34条"
+    },
+    {
+      "c": "数据",
+      "n": "  metrics层",
+      "ok": true,
+      "l": "Normal",
+      "d": "0条(辅助层)"
+    },
+    {
+      "c": "数据",
+      "n": "  procedural_memory层",
+      "ok": true,
+      "l": "Normal",
+      "d": "1条"
+    },
+    {
+      "c": "数据",
+      "n": "  semantic层",
+      "ok": true,
+      "l": "Normal",
+      "d": "18条"
+    },
+    {
+      "c": "数据",
+      "n": "  sensory层",
+      "ok": true,
+      "l": "Normal",
+      "d": "103条"
+    },
+    {
+      "c": "数据",
+      "n": "  short_term层",
+      "ok": true,
+      "l": "Normal",
+      "d": "953条"
+    },
+    {
+      "c": "数据",
+      "n": "  test_engine层",
+      "ok": true,
+      "l": "Normal",
+      "d": "0条(辅助层)"
+    },
+    {
+      "c": "数据",
+      "n": "  working层",
+      "ok": true,
+      "l": "Normal",
+      "d": "56条"
+    },
+    {
+      "c": "MCP",
+      "n": "配置有效",
+      "ok": true,
+      "l": "Critical",
+      "d": "6个服务器"
+    },
+    {
+      "c": "MCP",
+      "n": "agent-framework-global",
+      "ok": true,
+      "l": "Normal",
+      "d": "D:\\元初系统\\天机v9.1\\python\\python.exe"
+    },
+    {
+      "c": "MCP",
+      "n": "command-executor",
+      "ok": true,
+      "l": "Normal",
+      "d": "D:\\元初系统\\天机v9.1\\python\\python.exe"
+    },
+    {
+      "c": "MCP",
+      "n": "memory-engine-global",
+      "ok": true,
+      "l": "Normal",
+      "d": "D:\\元初系统\\天机v9.1\\python\\python.exe"
+    },
+    {
+      "c": "MCP",
+      "n": "ops-engine",
+      "ok": true,
+      "l": "Normal",
+      "d": "D:\\元初系统\\天机v9.1\\python\\python.exe"
+    },
+    {
+      "c": "MCP",
+      "n": "performance-profiler",
+      "ok": true,
+      "l": "Normal",
+      "d": "D:\\元初系统\\天机v9.1\\python\\python.exe"
+    },
+    {
+      "c": "MCP",
+      "n": "security-scanner",
+      "ok": true,
+      "l": "Normal",
+      "d": "D:\\元初系统\\天机v9.1\\python\\python.exe"
+    },
+    {
+      "c": "适配",
+      "n": "AI平台适配器",
+      "ok": true,
+      "l": "Normal",
+      "d": "多平台适配"
+    },
+    {
+      "c": "前端",
+      "n": "Tauri桌面应用",
+      "ok": true,
+      "l": "Normal",
+      "d": "17.6MB"
+    },
+    {
+      "c": "前端",
+      "n": "HTML构建产物",
+      "ok": true,
+      "l": "Critical",
+      "d": "1页"
+    },
+    {
+      "c": "前端",
+      "n": "JS资源",
+      "ok": true,
+      "l": "Normal",
+      "d": "16个"
+    },
+    {
+      "c": "前端",
+      "n": "CSS资源",
+      "ok": true,
+      "l": "Normal",
+      "d": "1个"
+    },
+    {
+      "c": "部署",
+      "n": "无窗口启动器",
+      "ok": true,
+      "l": "Normal",
+      "d": ""
+    },
+    {
+      "c": "部署",
+      "n": "安装说明",
+      "ok": true,
+      "l": "Normal",
+      "d": ""
+    },
+    {
+      "c": "安装包",
+      "n": "发布仓库目录",
+      "ok": true,
+      "l": "Normal",
+      "d": ""
+    },
+    {
+      "c": "安装包",
+      "n": "一键安装包",
+      "ok": true,
+      "l": "Critical",
+      "d": "297.7MB"
+    },
+    {
+      "c": "安装包",
+      "n": "NSIS安装程序",
+      "ok": true,
+      "l": "Normal",
+      "d": "天机v9.1_9.1.0_x64-setup.exe"
+    }
+  ]
+}

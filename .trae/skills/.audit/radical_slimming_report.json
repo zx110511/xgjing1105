@@ -1,0 +1,44 @@
+﻿{
+  "timestamp": "2026-07-03T10:12:22.247080",
+  "phase": "batch1_completed",
+  "original_skill_count": 38,
+  "current_skill_count": 23,
+  "deleted_count": 15,
+  "delete_ratio": 0.39473684210526316,
+  "remaining_skills": {
+    "novel_creation": [
+      "dialogue-quality",
+      "novel-chapter-create",
+      "novel-consistency-check",
+      "novel-format-export",
+      "novel-multi-schedule",
+      "novel-setting-consistency-deep",
+      "novel-version-track",
+      "novel-worldbuilding-expand"
+    ],
+    "corpus_management": [
+      "corpus-batch-import",
+      "corpus-extract",
+      "corpus-quality-score",
+      "corpus-retrieve"
+    ],
+    "lingjing_framework": [
+      "lingjing-14questions",
+      "lingjing-9dao-orchestrate",
+      "lingjing-dao-compliance",
+      "lingjing-memory",
+      "lingjing-triple-chain"
+    ],
+    "system_governance": [
+      "agent-transparent-dispatch",
+      "editor-review",
+      "memory-audit",
+      "memory-test",
+      "system-audit",
+      "tianji-orchestrate"
+    ]
+  },
+  "enhanced_mcp_tools": 4,
+  "knowledge_migration": "local_staged",
+  "archive_batches": 1
+}

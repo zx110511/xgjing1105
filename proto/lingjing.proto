@@ -1,0 +1,290 @@
+// 灵境 (Lingjing) gRPC Service Protocol v1.0
+// ==================================================
+// 天机分布式AI记忆操作系统 — 跨服务通信层
+//
+// 灵境道谱溯源: D8-9【通信未通煞】· 道八·通信体道 · 四地煞之序之术
+
+syntax = "proto3";
+
+package lingjing.v1;
+
+// ──── 核心服务: 记忆引擎 ────
+
+service MemoryService {
+    rpc Remember(RememberRequest) returns (RememberResponse);
+    rpc Recall(RecallRequest) returns (RecallResponse);
+    rpc Forget(ForgetRequest) returns (ForgetResponse);
+    rpc Stats(StatsRequest) returns (StatsResponse);
+    rpc Classify(ClassifyRequest) returns (ClassifyResponse);
+    rpc ExtractKnowledge(ExtractKnowledgeRequest) returns (ExtractKnowledgeResponse);
+    rpc Summarize(SummarizeRequest) returns (SummarizeResponse);
+    rpc SemanticSearch(SemanticSearchRequest) returns (SemanticSearchResponse);
+    rpc Health(HealthRequest) returns (HealthResponse);
+}
+
+// ──── 服务发现: 灵境注册中心 ────
+
+service LingjingRegistry {
+    rpc Register(RegisterRequest) returns (RegisterResponse);
+    rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+    rpc Discover(DiscoverRequest) returns (DiscoverResponse);
+    rpc Deregister(DeregisterRequest) returns (DeregisterResponse);
+}
+
+// ──── 事件总线 ────
+
+service LingjingEventBus {
+    rpc Publish(PublishRequest) returns (PublishResponse);
+    rpc Subscribe(stream SubscribeRequest) returns (stream BusEvent);
+}
+
+// ──── Agent调度 ────
+
+service AgentService {
+    rpc Dispatch(DispatchRequest) returns (DispatchResponse);
+    rpc GetStatus(AgentStatusRequest) returns (AgentStatusResponse);
+    rpc ListCapabilities(ListCapabilitiesRequest) returns (ListCapabilitiesResponse);
+}
+
+// ──── 消息类型 ────
+
+message RememberRequest {
+    string content = 1;
+    string layer = 2;
+    repeated string tags = 3;
+    string priority = 4;
+}
+
+message RememberResponse {
+    string memory_id = 1;
+    string layer = 2;
+    string gate_verdict = 3;
+    string system = 4;
+}
+
+message RecallRequest {
+    string query = 1;
+    repeated string layers = 2;
+    int32 limit = 3;
+}
+
+message MemoryItem {
+    string memory_id = 1;
+    string content = 2;
+    string layer = 3;
+    repeated string tags = 4;
+    double score = 5;
+}
+
+message RecallResponse {
+    repeated MemoryItem items = 1;
+    int32 total = 2;
+}
+
+message ForgetRequest {
+    string memory_id = 1;
+}
+
+message ForgetResponse {
+    string memory_id = 1;
+    string status = 2;
+}
+
+message StatsRequest {}
+
+message LayerStats {
+    string layer = 1;
+    int64 entry_count = 2;
+    int64 size_bytes = 3;
+    double usage_ratio = 4;
+}
+
+message StatsResponse {
+    string status = 1;
+    int64 total_entries = 2;
+    repeated LayerStats layers = 3;
+    double uptime_seconds = 4;
+}
+
+message ClassifyRequest {
+    string content = 1;
+    string context = 2;
+}
+
+message ClassifyResponse {
+    string content = 1;
+    string recommended_layer = 2;
+    double confidence = 3;
+}
+
+message ExtractKnowledgeRequest {
+    string content = 1;
+}
+
+message KnowledgeTriple {
+    string subject = 1;
+    string relation = 2;
+    string object = 3;
+    double confidence = 4;
+}
+
+message ExtractKnowledgeResponse {
+    repeated KnowledgeTriple triples = 1;
+    int32 total = 2;
+}
+
+message SummarizeRequest {
+    string content = 1;
+    int32 max_length = 2;
+}
+
+message SummarizeResponse {
+    string summary = 1;
+    int32 original_length = 2;
+    int32 summary_length = 3;
+}
+
+message SemanticSearchRequest {
+    string query = 1;
+    int32 limit = 2;
+    double threshold = 3;
+}
+
+message SearchResult {
+    string memory_id = 1;
+    string content = 2;
+    double similarity = 3;
+    string layer = 4;
+}
+
+message SemanticSearchResponse {
+    repeated SearchResult results = 1;
+    int32 total = 2;
+}
+
+message HealthRequest {}
+message HealthResponse {
+    string status = 1;
+    string version = 2;
+    bool engine_ready = 3;
+    double uptime_seconds = 4;
+}
+
+message RegisterRequest {
+    string service_id = 1;
+    string name = 2;
+    string host = 3;
+    int32 port = 4;
+    string layer = 5;
+    repeated string capabilities = 6;
+    string health_endpoint = 7;
+    string version = 8;
+}
+
+message RegisterResponse {
+    string service_id = 1;
+    bool registered = 2;
+    string message = 3;
+}
+
+message HeartbeatRequest {
+    string service_id = 1;
+}
+
+message HeartbeatResponse {
+    string service_id = 1;
+    bool acknowledged = 2;
+}
+
+message DiscoverRequest {
+    string layer = 1;
+    string capability = 2;
+}
+
+message ServiceInfo {
+    string service_id = 1;
+    string name = 2;
+    string host = 3;
+    int32 port = 4;
+    string layer = 5;
+    repeated string capabilities = 6;
+    string status = 7;
+    bool is_alive = 8;
+}
+
+message DiscoverResponse {
+    repeated ServiceInfo services = 1;
+    int32 total = 2;
+}
+
+message DeregisterRequest {
+    string service_id = 1;
+}
+
+message DeregisterResponse {
+    string service_id = 1;
+    bool deregistered = 2;
+}
+
+message PublishRequest {
+    string event_type = 1;
+    string source = 2;
+    string payload_json = 3;
+}
+
+message PublishResponse {
+    string event_id = 1;
+    bool published = 2;
+}
+
+message SubscribeRequest {
+    string subscriber_id = 1;
+    string event_type = 2;
+}
+
+message BusEvent {
+    string event_id = 1;
+    string event_type = 2;
+    string source = 3;
+    string payload_json = 4;
+    double timestamp = 5;
+}
+
+message DispatchRequest {
+    string task_type = 1;
+    string task_data_json = 2;
+    string priority = 3;
+}
+
+message DispatchResponse {
+    string task_id = 1;
+    string agent_id = 2;
+    string status = 3;
+}
+
+message AgentStatusRequest {
+    string agent_id = 1;
+}
+
+message AgentStatusResponse {
+    string agent_id = 1;
+    string name = 2;
+    string status = 3;
+    double uptime_seconds = 4;
+    int32 tasks_handled = 5;
+}
+
+message ListCapabilitiesRequest {}
+
+message AgentCapability {
+    string agent_id = 1;
+    string name = 2;
+    string layer = 3;
+    repeated string capabilities = 4;
+    string health_endpoint = 5;
+}
+
+message ListCapabilitiesResponse {
+    repeated AgentCapability agents = 1;
+    int32 total = 2;
+}

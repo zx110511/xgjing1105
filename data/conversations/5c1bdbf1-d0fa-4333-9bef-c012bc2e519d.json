@@ -1,0 +1,76 @@
+{
+  "id": "5c1bdbf1-d0fa-4333-9bef-c012bc2e519d",
+  "title": "新对话",
+  "messages": [
+    {
+      "id": "msg-279d7fd4",
+      "role": "user",
+      "content": "搜索天机v10.0.1信息",
+      "timestamp": 1781908112.1861506,
+      "token_count": 13,
+      "fidelity": "full"
+    },
+    {
+      "id": "msg-c5cdf56b",
+      "role": "assistant",
+      "content": "好的！我来搜索天机v10.0.1的相关信息。根据 **常识3（记忆优先决策）**，所有决策必须先查询天机记忆。让我同时使用多种搜索方式。语义搜索暂时连接不上，但我可以通过文件系统直接探索。让我查看天机v10.0.1的完整结构。\n\n<｜｜DSML｜｜tool_calls>\n<｜｜DSML｜｜invoke name=\"execute_command\">\n<｜｜DSML｜｜parameter name=\"command\" string=\"true\">dir /s \"d:\\元初系统\\天机v10.0系列\" /b 2>nul | findstr /n . | head -200</｜｜DSML｜｜parameter>\n<｜｜DSML｜｜parameter name=\"timeout\" string=\"false\">30</｜｜DSML｜｜parameter>\n</｜｜DSML｜｜invoke>\n</｜｜DSML｜｜tool_calls>",
+      "timestamp": 1781908138.18942,
+      "token_count": 161,
+      "fidelity": "full"
+    },
+    {
+      "id": "msg-ba007ca8",
+      "role": "user",
+      "content": "搜索: 使用TF-IDF或MiniLM向量模型进行语义搜索，比关键词",
+      "timestamp": 1781908264.069222,
+      "token_count": 34,
+      "fidelity": "full"
+    },
+    {
+      "id": "msg-25a5dd25",
+      "role": "assistant",
+      "content": "<｜｜DSML｜｜tool_calls>\n<｜｜DSML｜｜invoke name=\"execute_command\">\n<｜｜DSML｜｜parameter name=\"command\" string=\"true\">dir D:\\元初系统\\ /B</｜｜DSML｜｜parameter>\n<｜｜DSML｜｜parameter name=\"timeout\" string=\"false\">10</｜｜DSML｜｜parameter>\n</｜｜DSML｜｜invoke>\n</｜｜DSML｜｜tool_calls>",
+      "timestamp": 1781908280.8677227,
+      "token_count": 67,
+      "fidelity": "full"
+    },
+    {
+      "id": "msg-6ef4eda9",
+      "role": "user",
+      "content": "继续继续继续",
+      "timestamp": 1781908341.6231465,
+      "token_count": 6,
+      "fidelity": "full"
+    },
+    {
+      "id": "msg-a225c05e",
+      "role": "assistant",
+      "content": "<｜｜DSML｜｜tool_calls>\n<｜｜DSML｜｜invoke name=\"execute_command\">\n<｜｜DSML｜｜parameter name=\"command\" string=\"true\">pwd</｜｜DSML｜｜parameter>\n<｜｜DSML｜｜parameter name=\"timeout\" string=\"false\">5</｜｜DSML｜｜parameter>\n</｜｜DSML｜｜invoke>\n<｜｜DSML｜｜invoke name=\"execute_command\">\n<｜｜DSML｜｜parameter name=\"command\" string=\"true\">ls -la /</｜｜DSML｜｜parameter>\n<｜｜DSML｜｜parameter name=\"timeout\" string=\"false\">5</｜｜DSML｜｜parameter>\n</｜｜DSML｜｜invoke>\n</｜｜DSML｜｜tool_calls>",
+      "timestamp": 1781908357.2322633,
+      "token_count": 110,
+      "fidelity": "full"
+    },
+    {
+      "id": "msg-51abf265",
+      "role": "user",
+      "content": "搜索天机v10.0.1的相关信息。",
+      "timestamp": 1782088260.4971597,
+      "token_count": 17,
+      "fidelity": "full"
+    },
+    {
+      "id": "msg-6e8528ff",
+      "role": "assistant",
+      "content": "好的，我继续搜索天机v10.0.1的信息。让我同时使用记忆检索和文件系统探索。这是Windows系统，让我用正确的命令来探索。记忆中没有找到记录，我来直接探索文件系统。\n\n<｜｜DSML｜｜tool_calls>\n<｜｜DSML｜｜invoke name=\"execute_command\">\n<｜｜DSML｜｜parameter name=\"command\" string=\"true\">cd /d C:\\ && echo C: && dir /B /AD 2>nul</｜｜DSML｜｜parameter>\n<｜｜DSML｜｜parameter name=\"timeout\" string=\"false\">10</｜｜DSML｜｜parameter>\n</｜｜DSML｜｜invoke>\n<｜｜DSML｜｜invoke name=\"execute_command\">\n<｜｜DSML｜｜parameter name=\"command\" string=\"true\">dir C:\\Users\\%USERNAME% /B /AD 2>nul</｜｜DSML｜｜parameter>\n<｜｜DSML｜｜parameter name=\"timeout\" string=\"false\">10</｜｜DSML｜｜parameter>\n</｜｜DSML｜｜invoke>\n<｜｜DSML｜｜invoke name=\"execute_command\">\n<｜｜DSML｜｜parameter name=\"command\" string=\"true\">echo Current dir: && cd</｜｜DSML｜｜parameter>\n<｜｜DSML｜｜parameter name=\"timeout\" string=\"false\">5</｜｜DSML｜｜parameter>\n</｜｜DSML｜｜invoke>\n</｜｜DSML｜｜tool_calls>",
+      "timestamp": 1782088323.313932,
+      "token_count": 240,
+      "fidelity": "full"
+    }
+  ],
+  "total_tokens": 578,
+  "summary": "",
+  "created_at": 1781908112.183144,
+  "updated_at": 1782088323.313932,
+  "message_count": 8,
+  "pinned": false
+}

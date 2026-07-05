@@ -1,0 +1,490 @@
+> r"""
+> TVP透明调度桥接器 v1.1 (TVP Bridge for Tianji Intelligent Scheduler)
+> ====================================================================
+> 将 core/orchestrator/tvp_protocol.py 的 TVPProtocol 织入
+> 天机智能调度器的每一个调度决策点，实现100%透明调度。
+  
+> M16升级: EvolutionLoop闭环 + record_action喂入 + health() + 双注入
+> 灵境道谱溯源: D4-3【漂移检测煞】· 道四·质量体道 · 四地煞之制之术
+>   - Agent调度切换检测+上下文漂移声明+透明审计追踪
+>   - 源文件: core/tvp_bridge.py → TVPBridge
+  
+> 桥接点:
+>   1. 委派决策 → PARALLEL_FORK / SINGLE_SUBAGENT 声明
+>   2. 子代理启动 → AGENT_START 声明
+>   3. 子代理完成 → AGENT_COMPLETE / AGENT_FAILED 声明
+>   4. 定时任务触发 → AGENT_START 声明
+>   5. 中断传播 → AGENT_DEGRADED 声明
+>   6. 工具调用 → TOOL_CALL 声明
+  
+> 集成为TianjiIntelligentScheduler的透明层，
+> 所有调度行为100%可见。
+> """
+  
+! import sys
+! import time
+! import uuid
+! import threading
+! import logging
+! from dataclasses import dataclass, field
+! from typing import Any, Optional, Dict, List, Callable
+! from pathlib import Path
+  
+! logger = logging.getLogger("tianji.tvpbridge")
+  
+! try:
+!     from .evolution_loop import EvolutionLoop
+! except ImportError:
+!     EvolutionLoop = None
+  
+  
+! def _resolve_tvp():
+!     """解析TVPProtocol — 从项目根core/orchestrator加载"""
+!     project_root = Path(__file__).resolve().parent.parent.parent
+!     if str(project_root) not in sys.path:
+!         sys.path.insert(0, str(project_root))
+!     try:
+!         from core.orchestrator.tvp_protocol import (
+!             TVPProtocol, TVPEventType, AgentWorkStatus, TVPEvent,
+!             AGENT_ROLE_MAP, AGENT_EMOJI_MAP,
+!         )
+!         return TVPProtocol, TVPEventType, AgentWorkStatus, TVPEvent, AGENT_ROLE_MAP, AGENT_EMOJI_MAP
+!     except ImportError:
+!         logger.warning("TVPProtocol not available, using stub")
+!         return None, None, None, None, None, None
+  
+  
+! class TVPBridge:
+!     """
+!     TVP桥接器 - 将TVP协议织入智能调度器
+  
+!     这不是一个新的协议，而是连接现有TVPProtocol到智能调度器的桥梁。
+!     """
+  
+!     def __init__(self, output_handler: Optional[Callable[[str], None]] = None,
+!                  event_bus=None,
+!                  recorder: Optional[Any] = None,
+!                  learning_engine: Optional[Any] = None):
+!         TVPProtocol, TVPEventType, AgentWorkStatus, TVPEvent, AGENT_ROLE_MAP, AGENT_EMOJI_MAP = _resolve_tvp()
+!         self._TVPProtocol = TVPProtocol
+!         self._TVPEventType = TVPEventType
+!         self._AgentWorkStatus = AgentWorkStatus
+!         self._TVPEvent = TVPEvent
+!         self._AGENT_ROLE_MAP = AGENT_ROLE_MAP or {}
+!         self._AGENT_EMOJI_MAP = AGENT_EMOJI_MAP or {}
+!         self._recorder = recorder
+!         self._learning_engine = learning_engine
+!         self._errors = 0
+  
+!         self._evo_loop = None
+!         if EvolutionLoop is not None:
+!             try:
+!                 self._evo_loop = EvolutionLoop(
+!                     module_name="tvp_bridge",
+!                     effectiveness_fn=self._calc_tvp_effectiveness,
+!                     learn_fn=self._learn_from_tvp,
+!                     evolve_fn=self._evolve_tvp_config,
+!                     mutable_config={
+!                         "max_concurrency_default": 4,
+!                         "trace_id_prefix": "tvp",
+!                     },
+!                     recorder=recorder,
+!                     learning_engine=learning_engine,
+!                 )
+!             except Exception:
+!                 pass
+  
+!         self._tvp = None
+!         if TVPProtocol:
+!             def handler(msg: str):
+!                 logger.info(msg)
+!                 if output_handler:
+!                     output_handler(msg)
+!                 if event_bus:
+!                     try:
+!                         from core.deepseek_driver import TianjiEvent, EventType
+!                         event_bus.publish(TianjiEvent(
+!                             event_type=EventType.AGENT_SWITCH,
+!                             source="tvp_bridge",
+!                             payload={"tvp_message": msg},
+!                         ))
+!                     except Exception:
+!                         pass
+  
+!             self._tvp = TVPProtocol(output_handler=handler)
+!             self._active = True
+!         else:
+!             self._active = False
+  
+!         self._stats = {
+!             "delegation_declarations": 0,
+!             "subagent_declarations": 0,
+!             "cron_declarations": 0,
+!             "tool_declarations": 0,
+!         }
+  
+!     @property
+!     def is_active(self) -> bool:
+!         return self._active and self._tvp is not None
+  
+!     def _role(self, agent_id: str) -> str:
+!         return self._AGENT_ROLE_MAP.get(agent_id, agent_id)
+  
+!     def _emoji(self, agent_id: str) -> str:
+!         return self._AGENT_EMOJI_MAP.get(agent_id, "\U0001f916")
+  
+!     def _trace(self) -> str:
+!         return f"trace-{uuid.uuid4().hex[:8]}"
+  
+!     def declare_delegation_decision(self, strategy: str, sub_tasks_count: int,
+!                                      max_concurrency: int, reason: str,
+!                                      confidence: float) -> Optional[str]:
+!         """委派决策声明 — 智能调度器决定委派时调用"""
+!         if not self.is_active or strategy == "direct":
+!             return None
+  
+!         trace_id = self._trace()
+!         agents = [
+!             {"id": f"subagent-{i+1}", "role": "子代理"}
+!             for i in range(sub_tasks_count)
+!         ]
+  
+!         if sub_tasks_count > 1:
+!             self._tvp.declare_parallel(
+!                 coordinator="tianji_scheduler",
+!                 parallel_agents=agents,
+!                 task_type=f"智能委派({strategy}, {sub_tasks_count}个子代理, 并发{max_concurrency})",
+!                 work_status=self._AgentWorkStatus.EXECUTING,
+!                 trace_id=trace_id,
+!             )
+!         else:
+!             self._tvp.declare_switch(
+!                 from_agent="tianji_scheduler",
+!                 to_agent="subagent-1",
+!                 task_type=f"子代理委派: {reason[:60]}",
+!                 work_status=self._AgentWorkStatus.EXECUTING,
+!                 estimated_duration_s=300.0,
+!                 reason=f"信心度:{confidence:.0%}",
+!                 trace_id=trace_id,
+!             )
+  
+!         self._stats["delegation_declarations"] += 1
+  
+!         if self._evo_loop is not None:
+!             try:
+!                 self._evo_loop.record_action(
+!                     action="delegation_decision",
+!                     state_before={"delegation_declarations": self._stats["delegation_declarations"] - 1},
+!                     state_after={"strategy": strategy,
+!                                  "sub_tasks_count": sub_tasks_count,
+!                                  "max_concurrency": max_concurrency,
+!                                  "confidence": confidence,
+!                                  "delegation_declarations": self._stats["delegation_declarations"]},
+!                 )
+!             except Exception:
+!                 pass
+  
+!         return trace_id
+  
+!     def declare_subagent_start(self, task_id: str, goal: str,
+!                                 toolsets: List[str],
+!                                 trace_id: str = "") -> Optional[str]:
+!         """子代理启动声明"""
+!         if not self.is_active:
+!             return None
+  
+!         tid = trace_id or self._trace()
+!         self._tvp.declare_agent_start(
+!             agent=f"subagent:{task_id}",
+!             task_type=f"子代理任务: {goal[:50]}",
+!             work_status=self._AgentWorkStatus.EXECUTING,
+!             estimated_duration_s=300.0,
+!             trace_id=tid,
+!         )
+  
+!         for tool in toolsets[:3]:
+!             self._tvp.declare_tool_call(
+!                 agent=f"subagent:{task_id}",
+!                 tool_name=tool,
+!                 task_type="subagent_tool",
+!                 trace_id=tid,
+!             )
+  
+!         self._stats["subagent_declarations"] += 1
+  
+!         if self._evo_loop is not None:
+!             try:
+!                 self._evo_loop.record_action(
+!                     action="subagent_start",
+!                     state_before={"subagent_declarations": self._stats["subagent_declarations"] - 1},
+!                     state_after={"task_id": task_id,
+!                                  "goal": goal[:80],
+!                                  "toolsets": toolsets[:5],
+!                                  "subagent_declarations": self._stats["subagent_declarations"]},
+!                 )
+!             except Exception:
+!                 pass
+  
+!         return tid
+  
+!     def declare_subagent_complete(self, task_id: str, status: str,
+!                                    summary: str, duration_s: float,
+!                                    trace_id: str = "") -> Optional[str]:
+!         """子代理完成声明"""
+!         if not self.is_active:
+!             return None
+  
+!         tid = trace_id or self._trace()
+!         success = status in ("completed",)
+!         self._tvp.declare_agent_complete(
+!             agent=f"subagent:{task_id}",
+!             task_type=f"子代理{'成功' if success else '失败'}: {summary[:50]}",
+!             success=success,
+!             duration_ms=duration_s * 1000,
+!             trace_id=tid,
+!         )
+  
+!         if self._evo_loop is not None:
+!             try:
+!                 self._evo_loop.record_action(
+!                     action="subagent_complete",
+!                     state_before={"task_id": task_id, "status": "executing"},
+!                     state_after={"task_id": task_id,
+!                                  "status": status,
+!                                  "success": success,
+!                                  "duration_s": duration_s},
+!                 )
+!             except Exception:
+!                 pass
+  
+!         return tid
+  
+!     def declare_cron_trigger(self, cron_id: str, schedule: str,
+!                               goal: str) -> Optional[str]:
+!         """定时任务触发声明"""
+!         if not self.is_active:
+!             return None
+  
+!         trace_id = self._trace()
+!         self._tvp.declare_agent_start(
+!             agent=f"cron:{cron_id}",
+!             task_type=f"定时任务: {goal[:50]}",
+!             work_status=self._AgentWorkStatus.EXECUTING,
+!             estimated_duration_s=300.0,
+!             trace_id=trace_id,
+!         )
+!         self._stats["cron_declarations"] += 1
+!         return trace_id
+  
+!     def declare_cron_complete(self, cron_id: str, success: bool,
+!                                run_count: int,
+!                                trace_id: str = "") -> Optional[str]:
+!         """定时任务完成声明"""
+!         if not self.is_active:
+!             return None
+  
+!         tid = trace_id or self._trace()
+!         self._tvp.declare_agent_complete(
+!             agent=f"cron:{cron_id}",
+!             task_type=f"定时任务完成(第{run_count}次)",
+!             success=success,
+!             trace_id=tid,
+!         )
+!         return tid
+  
+!     def declare_interrupt(self, agent: str, reason: str = ""):
+!         """中断声明"""
+!         if not self.is_active:
+!             return
+!         self._tvp.declare_degradation(
+!             from_agent=agent,
+!             to_agent="tianji_scheduler",
+!             reason=reason or "用户中断",
+!             task_type="interrupt",
+!         )
+  
+!         if self._evo_loop is not None:
+!             try:
+!                 self._evo_loop.record_action(
+!                     action="interrupt",
+!                     state_before={"agent": agent},
+!                     state_after={"agent": agent,
+!                                  "interrupted": True,
+!                                  "reason": reason[:80]},
+!                 )
+!             except Exception:
+!                 pass
+  
+!     def declare_tool_call(self, agent: str, tool_name: str):
+!         """工具调用声明"""
+!         if not self.is_active:
+!             return
+!         self._stats["tool_declarations"] += 1
+!         self._tvp.declare_tool_call(
+!             agent=agent,
+!             tool_name=tool_name,
+!         )
+  
+!     def get_pipeline_summary(self) -> str:
+!         """生成调度流水线摘要"""
+!         if not self.is_active:
+!             return "[TVP] 透明调度不可用"
+  
+!         stats = self._tvp.get_stats()
+!         trace_ids = list(self._tvp._active_traces.keys())
+  
+!         lines = [
+!             "[TVP] 🏁 智能调度流水线摘要:",
+!             f"├─ 总事件: {stats.get('total_events', 0)}",
+!             f"├─ Agent切换: {stats.get('agent_switches', 0)}",
+!             f"├─ 并行分支: {stats.get('parallel_forks', 0)}",
+!             f"├─ 降级事件: {stats.get('degradations', 0)}",
+!             f"├─ 活跃追踪: {len(trace_ids)}",
+!             f"├─ 委派声明: {self._stats['delegation_declarations']}",
+!             f"├─ 子代理声明: {self._stats['subagent_declarations']}",
+!             f"├─ 定时声明: {self._stats['cron_declarations']}",
+!             f"└─ 工具声明: {self._stats['tool_declarations']}",
+!         ]
+!         return "\n".join(lines)
+  
+!     def get_stats(self) -> Dict:
+!         return {
+!             "active": self.is_active,
+!             **self._stats,
+!             "tvp_events": self._tvp.get_stats() if self._tvp else {},
+!             "version": "1.1",
+!             "health": self.health(),
+!             "evo_loop": self._evo_loop.get_stats() if self._evo_loop else {},
+!         }
+  
+!     def health(self) -> Dict[str, Any]:
+!         tvp_events = self._tvp.get_stats() if self._tvp else {}
+!         return {
+!             "status": "ready",
+!             "version": "1.1",
+!             "active": self.is_active,
+!             "total_events": tvp_events.get("total_events", 0),
+!             "agent_switches": tvp_events.get("agent_switches", 0),
+!             "degradations": tvp_events.get("degradations", 0),
+!             "delegation_declarations": self._stats["delegation_declarations"],
+!             "subagent_declarations": self._stats["subagent_declarations"],
+!             "errors": self._errors,
+!             "evo_loop_active": self._evo_loop is not None,
+!             "recorder_attached": self._recorder is not None,
+!         }
+  
+!     def tick(self):
+!         if self._evo_loop is not None:
+!             try:
+!                 self._evo_loop.tick()
+!             except Exception:
+!                 pass
+  
+!     def _calc_tvp_effectiveness(self, action: str,
+!                                   state_before: Dict[str, Any],
+!                                   state_after: Dict[str, Any]) -> float:
+!         if action == "delegation_decision":
+!             confidence = state_after.get("confidence", 0.0)
+!             return 0.3 + min(0.6, confidence)
+!         elif action == "subagent_start":
+!             tools = len(state_after.get("toolsets", []))
+!             return 0.4 + min(0.3, tools * 0.1) if tools > 0 else 0.3
+!         elif action == "subagent_complete":
+!             return 0.8 if state_after.get("success", False) else 0.1
+!         elif action == "interrupt":
+!             return 0.5 if state_after.get("interrupted", False) else 0.0
+!         return 0.0
+  
+!     def _learn_from_tvp(self, causal_pairs: List[Any],
+!                          effectiveness_summary: Dict[str, Any]) -> Dict[str, Any]:
+!         return {
+!             "patterns_found": len(causal_pairs),
+!             "avg_effectiveness": effectiveness_summary.get("avg_effectiveness", 0.0),
+!             "delegation_declarations": self._stats["delegation_declarations"],
+!             "subagent_declarations": self._stats["subagent_declarations"],
+!             "cron_declarations": self._stats["cron_declarations"],
+!             "tool_declarations": self._stats["tool_declarations"],
+!         }
+  
+!     def _evolve_tvp_config(self, learn_result: Dict[str, Any],
+!                             mutable_config: Dict[str, Any]) -> Dict[str, Any]:
+!         changes = {}
+!         delegations = learn_result.get("delegation_declarations", 0)
+!         if delegations > 100:
+!             changes["max_concurrency_default"] = min(8,
+!                 mutable_config.get("max_concurrency_default", 4) + 2)
+!         elif delegations < 10:
+!             changes["max_concurrency_default"] = 4
+!         return {"rules_modified": changes, "skills_created": []}
+  
+  
+  # ═══════════════════════════════════════════════════════════════
+  # TVP织入函数 — 直接修改 intelligent_scheduler 的类方法
+  # ═══════════════════════════════════════════════════════════════
+  
+! def weave_tvp_into_scheduler(scheduler, tvp_bridge: TVPBridge):
+!     """将TVP桥接器织入智能调度器的每个决策点"""
+  
+!     if not tvp_bridge.is_active:
+!         logger.warning("TVP bridge not active, skipping weave")
+!         return
+  
+!     Decider = type(scheduler.decider)
+!     Delegator = type(scheduler.delegator)
+!     Cron = type(scheduler.cron)
+  
+!     original_decider_decide = Decider.decide
+!     original_delegator_single = Delegator.delegate_single
+!     original_delegator_batch = Delegator.delegate_batch
+!     original_cron_execute = Cron._execute_cron_task
+  
+!     def _decide_with_tvp(decider_self, task_description, available_agents, complexity="medium"):
+!         decision = original_decider_decide(decider_self, task_description, available_agents, complexity)
+!         tvp_bridge.declare_delegation_decision(
+!             strategy=decision.strategy.value,
+!             sub_tasks_count=len(decision.sub_tasks),
+!             max_concurrency=decision.max_concurrency,
+!             reason=decision.reason,
+!             confidence=decision.confidence,
+!         )
+!         return decision
+  
+!     def _delegate_single_with_tvp(delegator_self, task):
+!         tvp_bridge.declare_subagent_start(
+!             task.task_id, task.goal, task.toolsets
+!         )
+!         result = original_delegator_single(delegator_self, task)
+!         tvp_bridge.declare_subagent_complete(
+!             task.task_id, result.status.value, result.summary, result.duration_s
+!         )
+!         return result
+  
+!     def _delegate_batch_with_tvp(delegator_self, tasks):
+!         tvp_bridge.declare_delegation_decision(
+!             strategy="parallel_batch",
+!             sub_tasks_count=len(tasks),
+!             max_concurrency=delegator_self.max_concurrency,
+!             reason="批量并行委派",
+!             confidence=0.9,
+!         )
+!         return original_delegator_batch(delegator_self, tasks)
+  
+!     def _cron_execute_with_tvp(cron_self, task):
+!         tvp_bridge.declare_cron_trigger(
+!             task.cron_id, task.natural_language_schedule, task.goal
+!         )
+!         try:
+!             original_cron_execute(cron_self, task)
+!             tvp_bridge.declare_cron_complete(
+!                 task.cron_id, task.error_count == 0, task.run_count
+!             )
+!         except Exception as e:
+!             tvp_bridge.declare_cron_complete(task.cron_id, False, task.run_count)
+!             raise
+  
+!     Decider.decide = _decide_with_tvp
+!     Delegator.delegate_single = _delegate_single_with_tvp
+!     Delegator.delegate_batch = _delegate_batch_with_tvp
+!     Cron._execute_cron_task = _cron_execute_with_tvp
+  
+!     logger.info("TVP bridge woven into Intelligent Scheduler — 100% transparency")

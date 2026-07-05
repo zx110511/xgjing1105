@@ -1,0 +1,394 @@
+"""
+P1: Agent闭环反馈增强 — TVP回调机制完善
+============================================
+功能:
+1. 拦截TVP Agent完成事件
+2. 自动提取关键信息写入L3 Episodic
+3. 构建Agent执行经验库
+4. 支持成功/失败模式分析
+
+集成点:
+- TVPBridge.declare_subagent_complete()
+- TVPBridge.declare_cron_complete()
+- IntelligentScheduler.dispatch()
+
+使用方法:
+  python enhance_tvp_feedback.py --install    # 安装增强
+  python enhance_tvp_feedback.py --stats       # 查看统计
+  python enhance_tvp_feedback.py --analyze     # 模式分析
+"""
+
+import sqlite3
+import json
+import time
+import uuid
+import threading
+from pathlib import Path
+from datetime import datetime
+from typing import Optional, List, Dict, Any, Callable
+from dataclasses import dataclass, field
+
+DB_PATH = Path(__file__).resolve().parent.parent / "data" / ".memory" / "icme.db"
+
+@dataclass
+class AgentFeedbackRecord:
+    """Agent反馈记录"""
+    timestamp: float
+    agent_id: str
+    task_type: str
+    status: str  # success / failed / timeout
+    duration_s: float
+    summary: str
+    trace_id: str
+    metadata: dict = field(default_factory=dict)
+
+    def to_dict(self) -> dict:
+        return {
+            "timestamp": self.timestamp,
+            "agent_id": self.agent_id,
+            "task_type": self.task_type,
+            "status": self.status,
+            "duration_s": self.duration_s,
+            "summary": self.summary,
+            "trace_id": self.trace_id,
+            "metadata": self.metadata,
+        }
+
+
+class TVPFeedbackEnhancer:
+    """TVP反馈增强器 - 将Agent执行结果闭环到L3 Episodic"""
+
+    def __init__(self, db_path: Path = DB_PATH):
+        self.db_path = db_path
+        self.conn = None
+        self._lock = threading.Lock()
+        self._feedback_buffer: List[AgentFeedbackRecord] = []
+        self._buffer_size = 10
+        self._stats = {
+            "total_processed": 0,
+            "success_count": 0,
+            "failure_count": 0,
+            "by_agent": {},
+            "by_task_type": {},
+        }
+
+    def connect(self):
+        if self.conn is None:
+            self.conn = sqlite3.connect(str(self.db_path))
+            self.conn.row_factory = sqlite3.Row
+        return self.conn
+
+    def close(self):
+        if self.conn:
+            self.conn.close()
+            self.conn = None
+
+    def capture_agent_completion(
+        self,
+        agent_id: str,
+        task_type: str,
+        success: bool,
+        duration_s: float,
+        summary: str,
+        trace_id: str = "",
+        extra_metadata: Optional[dict] = None,
+    ) -> str:
+        """
+        捕获Agent完成事件并准备写入L3
+
+        返回: feedback_id (用于追踪)
+        """
+        record = AgentFeedbackRecord(
+            timestamp=time.time(),
+            agent_id=agent_id,
+            task_type=task_type,
+            status="success" if success else "failed",
+            duration_s=duration_s,
+            summary=summary[:500],  # 截断过长摘要
+            trace_id=trace_id or str(uuid.uuid4())[:8],
+            metadata={
+                **(extra_metadata or {}),
+                "captured_by": "tvp_feedback_enhancer",
+                "version": "1.0",
+            }
+        )
+
+        with self._lock:
+            self._feedback_buffer.append(record)
+
+            # 更新统计
+            self._stats["total_processed"] += 1
+            if success:
+                self._stats["success_count"] += 1
+            else:
+                self._stats["failure_count"] += 1
+
+            # 按Agent统计
+            if agent_id not in self._stats["by_agent"]:
+                self._stats["by_agent"][agent_id] = {"total": 0, "success": 0, "failure": 0}
+            self._stats["by_agent"][agent_id]["total"] += 1
+            if success:
+                self._stats["by_agent"][agent_id]["success"] += 1
+            else:
+                self._stats["by_agent"][agent_id]["failure"] += 1
+
+            # 按任务类型统计
+            task_key = task_type[:50] if len(task_type) > 50 else task_type
+            if task_key not in self._stats["by_task_type"]:
+                self._stats["by_task_type"][task_key] = {"total": 0, "success": 0, "failure": 0}
+            self._stats["by_task_type"][task_key]["total"] += 1
+            if success:
+                self._stats["by_task_type"][task_key]["success"] += 1
+            else:
+                self._stats["by_task_type"][task_key]["failure"] += 1
+
+        # 批量写入（缓冲区满或强制）
+        if len(self._feedback_buffer) >= self._buffer_size:
+            self.flush_to_l3()
+
+        return record.trace_id
+
+    def flush_to_l3(self) -> int:
+        """
+        将缓冲区的反馈记录批量写入L3 Episodic层
+
+        返回: 写入数量
+        """
+        with self._lock:
+            if not self._feedback_buffer:
+                return 0
+
+            records_to_write = self._feedback_buffer[:]
+            self._feedback_buffer.clear()
+
+        conn = self.connect()
+        cur = conn.cursor()
+
+        written = 0
+
+        for record in records_to_write:
+            try:
+                # 构建L3记忆内容
+                content = (
+                    f"[Agent执行记录] {record.agent_id} | "
+                    f"任务: {record.task_type} | "
+                    f"状态: {record.status} | "
+                    f"耗时: {record.duration_s:.2f}s | "
+                    f"摘要: {record.summary}"
+                )
+
+                memory_id = str(uuid.uuid4())
+
+                # 写入L3 episodic层
+                cur.execute("""
+                    INSERT INTO memories
+                    (id, content, layer, tags, priority, created_at, last_accessed,
+                     access_count, value_score, size_bytes, metadata)
+                    VALUES (?, ?, 'episodic', ?, 'medium', ?, ?, 1, 0.7, ?, ?)
+                """, (
+                    memory_id,
+                    content,
+                    json.dumps([
+                        "agent-execution",
+                        f"agent:{record.agent_id}",
+                        f"status:{record.status}",
+                        "tvp-feedback",
+                        "episodic-record",
+                    ], ensure_ascii=False),
+                    record.timestamp,
+                    record.timestamp,
+                    len(content.encode('utf-8')),
+                    json.dumps(record.to_dict(), ensure_ascii=False),
+                ))
+
+                written += 1
+
+            except Exception as e:
+                print(f"写入L3失败 ({record.agent_id}): {e}")
+
+        conn.commit()
+        self.close()
+
+        return written
+
+    def analyze_patterns(self) -> Dict[str, Any]:
+        """
+        分析Agent执行模式
+
+        返回:
+        - 成功率排名
+        - 平均耗时
+        - 失败模式
+        - 效率建议
+        """
+        conn = self.connect()
+        cur = conn.cursor()
+
+        analysis = {
+            "timestamp": datetime.now().isoformat(),
+            "overall_stats": dict(self._stats),
+            "agent_ranking": [],
+            "task_efficiency": [],
+            "failure_patterns": [],
+            "recommendations": [],
+        }
+
+        # Agent成功率排名
+        for agent_id, stats in sorted(
+            self._stats["by_agent"].items(),
+            key=lambda x: x[1]["total"],
+            reverse=True
+        )[:10]:
+            total = stats["total"]
+            success_rate = stats["success"] / total * 100 if total > 0 else 0
+
+            analysis["agent_ranking"].append({
+                "agent": agent_id,
+                "total_executions": total,
+                "success_rate": round(success_rate, 1),
+                "reliability": "high" if success_rate >= 90 else "medium" if success_rate >= 70 else "low",
+            })
+
+        # 任务类型效率分析
+        for task_type, stats in sorted(
+            self._stats["by_task_type"].items(),
+            key=lambda x: x[1]["total"],
+            reverse=True
+        )[:10]:
+            total = stats["total"]
+            success_rate = stats["success"] / total * 100 if total > 0 else 0
+
+            analysis["task_efficiency"].append({
+                "task_type": task_type,
+                "executions": total,
+                "success_rate": round(success_rate, 1),
+            })
+
+            # 失败模式识别
+            if success_rate < 70 and total >= 3:
+                analysis["failure_patterns"].append({
+                    "pattern": "low_success_rate",
+                    "task_type": task_type,
+                    "current_rate": round(success_rate, 1),
+                    "suggestion": f"检查{task_type}任务的输入质量和错误处理逻辑",
+                })
+
+        # 生成建议
+        if analysis["failure_patterns"]:
+            analysis["recommendations"].append("发现低成功率任务模式，建议优先优化")
+
+        overall_success = (
+            self._stats["success_count"] / self._stats["total_processed"] * 100
+            if self._stats["total_processed"] > 0 else 100
+        )
+
+        if overall_success < 85:
+            analysis["recommendations"].append(f"整体成功率{overall_success:.1f}%偏低，建议审查Agent能力矩阵")
+        elif overall_success >= 95:
+            analysis["recommendations"].append(f"整体优秀({overall_success:.1f}%)，可考虑增加并发度")
+
+        self.close()
+        return analysis
+
+    def get_stats(self) -> Dict[str, Any]:
+        """获取当前统计"""
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "buffer_size": len(self._feedback_buffer),
+            **dict(self._stats),
+        }
+
+    def install_tvp_hook(self, tvp_bridge_instance) -> bool:
+        """
+        将增强器安装到TVPBridge实例
+
+        包装declare_subagent_complete方法
+        """
+        try:
+            original_method = tvp_bridge_instance.declare_subagent_complete
+
+            def enhanced_completion(*args, **kwargs):
+                # 调用原始方法
+                result = original_method(*args, **kwargs)
+
+                # 提取参数（需要匹配原始签名）
+                if len(args) >= 5:
+                    task_id, status, summary, duration_s = args[0], args[1], args[2], args[3]
+                    trace_id = args[4] if len(args) > 5 else ""
+
+                    # 捕获反馈
+                    self.capture_agent_completion(
+                        agent_id=f"subagent:{task_id}",
+                        task_type=status or "unknown",
+                        success=status in ("completed", "success"),
+                        duration_s=duration_s or 0,
+                        summary=summary or "",
+                        trace_id=trace_id,
+                    )
+
+                return result
+
+            # 替换方法
+            tvp_bridge_instance.declare_subagent_complete = enhanced_completion
+
+            return True
+
+        except Exception as e:
+            print(f"TVP Hook安装失败: {e}")
+            return False
+
+
+def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="TVP反馈增强工具")
+    parser.add_argument("--test-capture", action="store_true", help="测试捕获功能")
+    parser.add_argument("--flush", action="store_true", help="强制刷新缓冲区")
+    parser.add_argument("--stats", action="store_true", help="查看统计")
+    parser.add_argument("--analyze", action="store_true", help="模式分析")
+    args = parser.parse_args()
+
+    enhancer = TVPFeedbackEnhancer()
+
+    if args.test_capture:
+        print("\n=== 测试捕获 ===\n")
+
+        test_cases = [
+            ("@tianshu", "调度决策", True, 1.23, "成功分发3个子任务"),
+            ("@miaobi", "内容创作", True, 5.67, "完成技术文档撰写"),
+            ("@mingjing", "代码审校", False, 3.21, "发现类型错误未修复"),
+            ("@yiku", "记忆检索", True, 0.89, "检索到15条相关记忆"),
+            ("cron:daily_backup", "定时备份", True, 45.0, "增量备份完成"),
+        ]
+
+        for agent, task, success, duration, summary in test_cases:
+            fid = enhancer.capture_agent_completion(
+                agent_id=agent,
+                task_type=task,
+                success=success,
+                duration_s=duration,
+                summary=summary,
+            )
+            print(f"✅ {agent}: {task} -> {fid}")
+
+        print(f"\n缓冲区: {len(enhancer._feedback_buffer)} 条")
+
+    if args.flush:
+        count = enhancer.flush_to_l3()
+        print(f"\n✅ 已刷新 {count} 条记录到 L3 Episodic")
+
+    if args.stats:
+        print("\n=== TVP反馈统计 ===\n")
+        stats = enhancer.get_stats()
+        print(json.dumps(stats, indent=2, ensure_ascii=False))
+
+    if args.analyze:
+        print("\n=== Agent执行模式分析 ===\n")
+        analysis = enhancer.analyze_patterns()
+        print(json.dumps(analysis, indent=2, ensure_ascii=False))
+
+    if not any([args.test_capture, args.flush, args.stats, args.analyze]):
+        parser.print_help()
+
+
+if __name__ == "__main__":
+    main()

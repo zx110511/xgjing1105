@@ -1,0 +1,339 @@
+{
+  "AuditType": "安装包功能审计",
+  "AuditDate": "2026-06-09 05:46:48",
+  "InstallerPath": "D:\\元初系统\\天机v9.1\\web\\src-tauri\\target\\release\\bundle\\nsis\\天机v9.1_9.1.0_x64-setup.exe",
+  "Summary": {
+    "TotalItems": 40,
+    "PassedItems": 39,
+    "FailedItems": 1,
+    "CriticalIssues": 0,
+    "Warnings": 1,
+    "PassRate": 97.5
+  },
+  "CriticalIssues": [],
+  "Warnings": [
+    "完整性 - 数字签名"
+  ],
+  "Results": [
+    {
+      "Category": "完整性",
+      "Item": "安装包文件存在",
+      "Passed": true,
+      "Severity": "Critical",
+      "Detail": "路径: D:\\元初系统\\天机v9.1\\web\\src-tauri\\target\\release\\bundle\\nsis\\天机v9.1_9.1.0_x64-setup.exe",
+      "Timestamp": "2026-06-09 05:46:48"
+    },
+    {
+      "Category": "完整性",
+      "Item": "安装包大小合理",
+      "Passed": true,
+      "Severity": "Critical",
+      "Detail": "大小: 4.34 MB",
+      "Timestamp": "2026-06-09 05:46:48"
+    },
+    {
+      "Category": "完整性",
+      "Item": "PE文件头验证",
+      "Passed": true,
+      "Severity": "Critical",
+      "Detail": "Header: 4d5a",
+      "Timestamp": "2026-06-09 05:46:48"
+    },
+    {
+      "Category": "完整性",
+      "Item": "SHA256哈希计算",
+      "Passed": true,
+      "Severity": "Warning",
+      "Detail": "SHA256: 3f281561e9888f5c80b31e43385826ab...",
+      "Timestamp": "2026-06-09 05:46:48"
+    },
+    {
+      "Category": "完整性",
+      "Item": "数字签名",
+      "Passed": false,
+      "Severity": "Warning",
+      "Detail": "签名状态: NotSigned(需商业代码签名证书)",
+      "Timestamp": "2026-06-09 05:46:48"
+    },
+    {
+      "Category": "内容",
+      "Item": "Tauri主程序存在",
+      "Passed": true,
+      "Severity": "Critical",
+      "Detail": "",
+      "Timestamp": "2026-06-09 05:46:48"
+    },
+    {
+      "Category": "内容",
+      "Item": "Tauri主程序大小合理",
+      "Passed": true,
+      "Severity": "Critical",
+      "Detail": "大小: 17.64 MB",
+      "Timestamp": "2026-06-09 05:46:48"
+    },
+    {
+      "Category": "内容",
+      "Item": "前端构建产物存在",
+      "Passed": true,
+      "Severity": "Critical",
+      "Detail": "",
+      "Timestamp": "2026-06-09 05:46:48"
+    },
+    {
+      "Category": "内容",
+      "Item": "前端资源完整",
+      "Passed": true,
+      "Severity": "Critical",
+      "Detail": "HTML: 1, JS: 16, CSS: 1",
+      "Timestamp": "2026-06-09 05:46:48"
+    },
+    {
+      "Category": "内容",
+      "Item": "图标资源完整",
+      "Passed": true,
+      "Severity": "Warning",
+      "Detail": "",
+      "Timestamp": "2026-06-09 05:46:48"
+    },
+    {
+      "Category": "内容",
+      "Item": "Tauri动态库存在",
+      "Passed": true,
+      "Severity": "Critical",
+      "Detail": "",
+      "Timestamp": "2026-06-09 05:46:48"
+    },
+    {
+      "Category": "内容",
+      "Item": "Tauri动态库大小合理",
+      "Passed": true,
+      "Severity": "Warning",
+      "Detail": "大小: 0.44 MB",
+      "Timestamp": "2026-06-09 05:46:48"
+    },
+    {
+      "Category": "配置",
+      "Item": "产品名称正确",
+      "Passed": true,
+      "Severity": "Critical",
+      "Detail": "值: 天机v9.1",
+      "Timestamp": "2026-06-09 05:46:48"
+    },
+    {
+      "Category": "配置",
+      "Item": "版本号正确",
+      "Passed": true,
+      "Severity": "Critical",
+      "Detail": "值: 9.1.0",
+      "Timestamp": "2026-06-09 05:46:48"
+    },
+    {
+      "Category": "配置",
+      "Item": "标识符正确",
+      "Passed": true,
+      "Severity": "Critical",
+      "Detail": "值: com.yuanchu.tianji",
+      "Timestamp": "2026-06-09 05:46:48"
+    },
+    {
+      "Category": "配置",
+      "Item": "窗口标题正确",
+      "Passed": true,
+      "Severity": "Warning",
+      "Detail": "值: 天机v9.1 · AI智能记忆平台",
+      "Timestamp": "2026-06-09 05:46:48"
+    },
+    {
+      "Category": "配置",
+      "Item": "系统托盘配置",
+      "Passed": true,
+      "Severity": "Warning",
+      "Detail": "",
+      "Timestamp": "2026-06-09 05:46:48"
+    },
+    {
+      "Category": "配置",
+      "Item": "NSIS打包目标",
+      "Passed": true,
+      "Severity": "Critical",
+      "Detail": "目标: ['nsis', 'msi']",
+      "Timestamp": "2026-06-09 05:46:48"
+    },
+    {
+      "Category": "配置",
+      "Item": "WebView安装模式",
+      "Passed": true,
+      "Severity": "Warning",
+      "Detail": "模式: downloadBootstrapper",
+      "Timestamp": "2026-06-09 05:46:48"
+    },
+    {
+      "Category": "配置",
+      "Item": "Tauri依赖声明",
+      "Passed": true,
+      "Severity": "Critical",
+      "Detail": "",
+      "Timestamp": "2026-06-09 05:46:48"
+    },
+    {
+      "Category": "配置",
+      "Item": "托盘图标特性",
+      "Passed": true,
+      "Severity": "Warning",
+      "Detail": "",
+      "Timestamp": "2026-06-09 05:46:48"
+    },
+    {
+      "Category": "配置",
+      "Item": "Shell插件",
+      "Passed": true,
+      "Severity": "Warning",
+      "Detail": "",
+      "Timestamp": "2026-06-09 05:46:48"
+    },
+    {
+      "Category": "配置",
+      "Item": "自启动插件",
+      "Passed": true,
+      "Severity": "Warning",
+      "Detail": "",
+      "Timestamp": "2026-06-09 05:46:48"
+    },
+    {
+      "Category": "配置",
+      "Item": "更新器插件",
+      "Passed": true,
+      "Severity": "Warning",
+      "Detail": "",
+      "Timestamp": "2026-06-09 05:46:48"
+    },
+    {
+      "Category": "功能",
+      "Item": "后端启动命令",
+      "Passed": true,
+      "Severity": "Critical",
+      "Detail": "",
+      "Timestamp": "2026-06-09 05:46:48"
+    },
+    {
+      "Category": "功能",
+      "Item": "后端停止命令",
+      "Passed": true,
+      "Severity": "Critical",
+      "Detail": "",
+      "Timestamp": "2026-06-09 05:46:48"
+    },
+    {
+      "Category": "功能",
+      "Item": "后端状态查询",
+      "Passed": true,
+      "Severity": "Critical",
+      "Detail": "",
+      "Timestamp": "2026-06-09 05:46:48"
+    },
+    {
+      "Category": "功能",
+      "Item": "系统托盘实现",
+      "Passed": true,
+      "Severity": "Warning",
+      "Detail": "",
+      "Timestamp": "2026-06-09 05:46:48"
+    },
+    {
+      "Category": "功能",
+      "Item": "自动启动后端",
+      "Passed": true,
+      "Severity": "Critical",
+      "Detail": "",
+      "Timestamp": "2026-06-09 05:46:48"
+    },
+    {
+      "Category": "功能",
+      "Item": "退出处理",
+      "Passed": true,
+      "Severity": "Warning",
+      "Detail": "",
+      "Timestamp": "2026-06-09 05:46:48"
+    },
+    {
+      "Category": "功能",
+      "Item": "端口自动选择",
+      "Passed": true,
+      "Severity": "Warning",
+      "Detail": "",
+      "Timestamp": "2026-06-09 05:46:48"
+    },
+    {
+      "Category": "功能",
+      "Item": "前端路由配置",
+      "Passed": true,
+      "Severity": "Warning",
+      "Detail": "",
+      "Timestamp": "2026-06-09 05:46:48"
+    },
+    {
+      "Category": "功能",
+      "Item": "后端服务入口存在",
+      "Passed": true,
+      "Severity": "Critical",
+      "Detail": "",
+      "Timestamp": "2026-06-09 05:46:48"
+    },
+    {
+      "Category": "功能",
+      "Item": "MCP配置存在",
+      "Passed": true,
+      "Severity": "Warning",
+      "Detail": "",
+      "Timestamp": "2026-06-09 05:46:48"
+    },
+    {
+      "Category": "功能",
+      "Item": "数据目录存在",
+      "Passed": true,
+      "Severity": "Warning",
+      "Detail": "",
+      "Timestamp": "2026-06-09 05:46:48"
+    },
+    {
+      "Category": "功能",
+      "Item": "环境配置文件存在",
+      "Passed": true,
+      "Severity": "Warning",
+      "Detail": "",
+      "Timestamp": "2026-06-09 05:46:48"
+    },
+    {
+      "Category": "安全",
+      "Item": "CSP安全策略",
+      "Passed": true,
+      "Severity": "Critical",
+      "Detail": "当前: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://127.0.0.1:* ws://127.0.0.1:*",
+      "Timestamp": "2026-06-09 05:46:48"
+    },
+    {
+      "Category": "安全",
+      "Item": "环境变量无硬编码密钥",
+      "Passed": true,
+      "Severity": "Critical",
+      "Detail": "",
+      "Timestamp": "2026-06-09 05:46:48"
+    },
+    {
+      "Category": "安全",
+      "Item": ".gitignore排除.env",
+      "Passed": true,
+      "Severity": "Critical",
+      "Detail": "",
+      "Timestamp": "2026-06-09 05:46:48"
+    },
+    {
+      "Category": "安全",
+      "Item": "WebView静默安装",
+      "Passed": true,
+      "Severity": "Warning",
+      "Detail": "silent: True",
+      "Timestamp": "2026-06-09 05:46:48"
+    }
+  ]
+}

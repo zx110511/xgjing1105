@@ -1,0 +1,216 @@
+天机v9.1 Web全链路10轮审计指令 (3x细化版)
+数据源: D:\元初系统\天机v9.1\server\api\*.py + D:\元初系统\天机v9.1\web\src\**\*.ts(x)
+
+R1: Web服务基础架构审计 (3×9=27检查点)
+R1.1 路由注册完整性
+验证 main.py 中 app.include_router() 注册的20+路由模块是否与 server/api/ 目录下的 .py 文件一一对应
+检查每个 router 的 prefix 和 tags 是否与 api.config.ts 的 endpoints 对象键名对齐
+验证 /api/memories 别名路由 (include_in_schema=False) 是否正确代理到 memory_router
+检查 SPA 路由 (_SPA_ROUTES) 是否覆盖前端所有页面路径，对比 App.tsx 的路由定义
+验证 create_search_router(embeddings_service) 和 create_summary_router(embeddings_service) 工厂模式是否正确注入依赖
+检查 orchestrator_v10_router 无 prefix 注册是否导致路由冲突
+验证静态资源挂载 /assets 是否与 WEB_DIST / "assets" 目录一致
+检查所有路由的 response_model 声明是否与实际返回类型匹配
+验证 audit_router 的 prefix="/api/audit" 是否与路由文件内 APIRouter(prefix="/api/audit") 双重前缀冲突
+R1.2 中间件链审计
+验证 CORSMiddleware(allow_origins=["*"]) 在生产环境是否安全，检查是否有环境变量控制
+验证 GZipMiddleware(minimum_size=500) 对 SSE/WebSocket 流式响应是否产生压缩干扰
+检查中间件注册顺序: CORS → GZip 是否为正确执行链
+验证请求拦截器 (api.ts interceptors.request) 的 Authorization: Bearer token 注入是否与后端认证逻辑对齐
+检查响应拦截器的 401 自动刷新 token 机制是否与后端 /api/auth/refresh 端点对应
+验证重试逻辑 (retryAttempts=3, retryDelay=1000) 对幂等/非幂等请求的区分
+检查 isRetryableError 对 429/502/503/504 的退避策略是否合理
+验证 requestId 追踪是否贯穿前后端日志
+检查是否有请求超时中间件 (当前 timeout=30000ms 是否对所有端点合理)
+R1.3 静态资源+错误处理+CORS
+验证 _MIME_TYPES 字典是否覆盖所有前端构建产物格式 (.mjs, .wasm, .woff2 等)
+检查 _is_hashed_filename() 的 hash 检测正则是否匹配 Vite 的 [name]-[hash].[ext] 输出模式
+验证 Cache-Control 策略: hash文件 immutable vs 非hash文件 max-age=3600 vs HTML no-cache
+检查 favicon /vite.svg 路径是否指向 WEB_DIST.parent / "public" / "vite.svg" (可能不存在)
+验证根路径 / 在无 index.html 时的 JSON 降级响应是否正确
+检查全局异常处理器是否注册 (@app.exception_handler)，未捕获异常是否返回结构化 JSON
+验证 HTTPException 的 detail 字段是否泄露内部路径/堆栈
+检查 CORS allow_credentials=True + allow_origins=["*"] 的安全矛盾
+验证 serve_assets 的路径遍历防护 (full_path.exists() 是否足够)
+R2: 记忆CRUD Web API全链路 (3×9=27检查点)
+R2.1 六层写入全链路
+验证 POST /api/memory/ → memory_routes.py 的 MemoryCreate 模型是否包含 layer 枚举的6个值 (sensory→meta)
+检查 engine.remember() 的 use_llm 参数是否根据层级和优先级自动决策
+验证 QualityGate 拒绝时返回的 reason 字段是否传递到 HTTP 响应
+检查 POST /api/platform/remember 与 POST /api/memory/ 的写入路径差异 (前者 use_llm=False)
+验证 POST /api/mcp/tools/store_memory 的 _category_to_layer() 映射是否覆盖所有6层
+检查 POST /api/active/capture_conversation 的三层写入 (sensory→working→episodic) 是否原子性
+验证 LayerRouter 分发到 L2-L5 的 deduplicate() 去重逻辑是否生效
+检查写入操作日志 _op_log("memory", ...) 是否与 _log_operation 对齐
+验证前端 memory-service.ts create() 的请求体与后端 MemoryCreate 模型字段一致
+R2.2 读取/更新/删除全链路
+验证 GET /api/memory/{id} 的查找逻辑: _find_entry() 先查内存层再查存储层
+检查 GET /api/memory/ 列表查询的 layer 参数验证是否拒绝无效层级名
+验证 PUT /api/memory/{id} 是否实现 (代码中未见显式 PUT 路由)
+检查 DELETE /api/memory/{id} → engine.forget() 是否为软删除
+验证 POST /api/memory/batch-delete 的 BatchDeleteRequest 是否有数量上限
+检查 GET /api/memory/stats → MemoryStats 模型字段是否与前端 MemoryStats 接口对齐
+验证 GET /api/memory/layers/info 返回的 physical_storage 路径是否使用 data/.memory/
+检查 GET /api/memory/storage/management 的30秒缓存 TTL 是否导致数据不一致
+验证 _safe_memory_response() 工具函数是否正确处理 dict vs MemoryEntry 对象
+R2.3 搜索/导出/统计全链路
+验证 GET /api/search/ → engine.recall() 的 min_score=0.0 是否返回过多低相关结果
+检查 POST /api/search/semantic 的 embeddings_service 降级到 FTS5 的逻辑
+验证 POST /api/search/fusion 四通道融合检索的 channel_stats 返回结构
+检查 GET /api/search/by-tag/{tag} 是否利用 SQLite 索引
+验证 GET /api/search/index/status 的 FTS5 状态报告是否准确
+检查 POST /api/memory/export → engine.build_export_data() 的数据完整性
+验证 POST /api/memory/import 是否存在 (代码中未见显式路由)
+检查 GET /api/stats 与 GET /api/memory/stats 的数据源是否一致
+验证前端 memoryService.search() 的 SearchMemoriesRequest 与后端 MemorySearchQuery 模型对齐
+R3: MCP工具Web API全链路 (3×5=15检查点)
+R3.1 存储/搜索/获取/列表
+验证 POST /api/mcp/tools/store_memory → StoreMemoryRequest 的 category 字段映射到6层的完整性
+检查 POST /api/mcp/tools/search_memories 的 threshold=0.1 默认值是否合理
+验证 POST /api/mcp/tools/get_memory 的双重查找 (内存层→存储层) 是否有竞态
+检查 POST /api/mcp/tools/list_memories 的分页 offset+limit 是否支持大偏移量性能
+验证 POST /api/mcp/tools/delete_memory 的 engine.forget() 返回值语义
+R3.2 统计/命名空间/会话摘要/反思循环
+验证 GET /api/mcp/tools/get_stats 返回的 engine + cognition 双统计结构
+检查 GET /api/mcp/tools/list_namespaces 的层级名来源 (stats.layers vs config.layers)
+验证 POST /api/mcp/tools/get_session_digest 的 digest_kind 过滤逻辑
+检查 POST /api/mcp/tools/run_reflective_cycle 的 cognition.dream() 调用是否线程安全
+验证 POST /api/mcp/tools/explain_memory_lineage 的谱系追踪深度
+R3.3 工作表征/视角搜索/Nexus/帮助/Schema
+验证 POST /api/mcp/tools/build_working_representation 的语义匹配+派生洞察+矛盾检测三阶段
+检查 POST /api/mcp/tools/search_perspective_memories 的 observer+subject 拼接查询策略
+验证 POST /api/mcp/tools/initialize_nexus_system 的幂等性
+检查 GET /api/mcp/tools/tool_help 的15工具列表是否与 MCP_TOOLS 常量同步
+验证 GET /api/mcp/tools/tool_schema 当前只返回 store_memory schema，其他14个是否缺失
+R4: LLM增强Web API全链路 (3×3=9检查点)
+R4.1 分类/标签/摘要
+验证 POST /api/llm/classify → ds.classify_layer() 返回的 layer 字段是否为6层枚举值
+检查 POST /api/llm/auto_tag → ds.auto_tag() 返回的标签权重结构
+验证 POST /api/llm/summarize 的 max_length 参数是否被 DeepSeek API 实际遵守
+R4.2 知识抽取/查询扩展/价值评估/存储决策
+验证 POST /api/llm/extract_knowledge → ds.extract_knowledge() 的三元组结构 (主体-关系-客体)
+检查 POST /api/llm/expand_query → ds.expand_query() 的同义词/上下位词扩展格式
+验证 POST /api/llm/analyze_value 和 POST /api/llm/decide_storage 的降级处理
+R4.3 状态/统计/重载
+验证 GET /api/llm/status 的 llm_layer + llm_bridge 双源状态聚合
+检查 GET /api/llm/stats 的 _build_llm_stats_payload() 扁平结构是否与前端 CycleStats 对齐
+验证 POST /api/llm/reload 的热重载是否影响进行中的请求
+R5: 编排器Web API全链路 (3×5=15检查点)
+R5.1 概览/流水线/阶段切换
+验证 GET /api/orchestrator/ 根信息与 GET /api/orchestrator/v9.1/ 的版本差异
+检查 POST /api/orchestrator/pipeline/create → scheduler.create_pipeline() 的3种流水线类型
+验证 POST /api/orchestrator/pipeline/stage/switch 的 TVP 协议声明
+检查 POST /api/orchestrator/pipeline/stage/complete 的阶段完成记录
+验证 POST /api/orchestrator/track 的 ToolCallTracker 记录是否包含 agent_name/emoji
+R5.2 DAG构建/执行/拓扑
+验证 POST /api/orchestrator/v9.1/dag/build → DAGBuilder 的节点+边构建完整性
+检查 POST /api/orchestrator/v9.1/dag/execute 的并行执行模式 (parallel=True)
+验证 GET /api/orchestrator/v9.1/dag/{id}/topology 的自动布局算法 (拓扑层级→XY坐标)
+检查 DAG 环检测 has_cycle() 是否在构建时自动执行
+验证前端 orchestrator-service.ts buildDAG() 的请求体与 DAGBuildRequest 对齐
+R5.3 工作流/统计/追踪/延迟/A2A
+验证 POST /api/orchestrator/v9.1/workflow/create 的 Saga 补偿步骤定义
+检查 POST /api/orchestrator/v9.1/workflow/resume 的检查点恢复机制
+验证 GET /api/orchestrator/v9.1/stats 的 dag_scheduler + checkpoint + planner + observability 四源聚合
+检查 GET /api/orchestrator/v9.1/latency 的 P50/P90/P99 延迟统计
+验证 GET /api/orchestrator/v9.1/a2a/agent-cards 的 A2A 协议兼容性
+R6: 主动记忆Web API全链路 (3×5=15检查点)
+R6.1 拦截/捕获/平台适配
+验证 POST /api/active/intercept_input 的记忆上下文注入 + LayerRouter 分发双路径
+检查 POST /api/active/intercept_response 的 episodic 层写入 + LayerDecomposer 分解
+验证 POST /api/active/capture_conversation 的三层写入 (sensory→working→episodic) + LayerRouter 分发
+检查 GET /api/active/platforms 是否返回 SUPPORTED_PLATFORMS 完整列表
+验证 capture_conversation 的 turn_id 生成是否幂等
+R6.2 事件消费/TCL/层分解
+验证 POST /api/platform/event → PlatformEvent 模型的 event_type 枚举完整性
+检查 LayerDecomposer 的 decompose_and_store() 是否对长内容进行分层拆分
+验证 TCL 归一化在写入路径中的调用点 (lr.reorganize())
+检查 lr.deduplicate() 去重的判重键生成算法
+验证 lr.deredundate() 的冗余消除策略
+R6.3 捕获统计/健康/子Agent
+验证 GET /api/active/capture_stats 的 by_platform + by_layer + capture_rate 三维统计
+检查 GET /api/active/capture_health 的钩子系统 + 存储后端 + 最近记录三重检查
+验证 POST /api/active/subagent_execute 的超时控制 (timeout_s=300)
+检查捕获对话同步到 chat_routes 的 _ensure_conversation() 逻辑
+验证 use_llm 参数在 capture 路径中始终为 False (避免捕获循环)
+R7: 知识图谱+资产+审计Web API全链路 (3×5=15检查点)
+R7.1 KG CRUD/拓扑/指标
+验证 GET /api/kg/nodes 的分页 + 类型筛选 + 搜索三维度查询
+检查 POST /api/kg/nodes 创建实体是否触发 kg_sync_hook 同步
+验证 GET /api/kg/topology 的三种模式 (sample/community/full) + 采样率控制
+检查 GET /api/kg/metrics 的幂律R² + 平均路径 + 聚类系数 + 模块度计算
+验证 GET /api/kg/sss-audit 的8维度44指标审计完整性
+R7.2 资产注册/版本链/回滚
+验证 GET /api/asset/versions/{memory_id} 的版本链是否按版本号倒序
+检查 GET /api/asset/content/{memory_id}/{version} 的 DIFF→FULL 递归重建算法
+验证 POST /api/asset/compare 的 unified diff 生成 + 统计摘要
+检查 POST /api/asset/rollback 的新版本创建 (非覆盖) 语义
+验证 GET /api/asset/stats 的全局快照存储统计
+R7.3 审计维度/历史/报告
+验证 POST /api/audit/run 的5维×N轮审计流水线执行
+检查 GET /api/audit/dimensions 的5维能力矩阵 (functionality/stability/performance/security/data_accuracy)
+验证 GET /api/audit/history 的磁盘持久化 + 内存缓存双源
+检查 GET /api/audit/report/{id} 的完整维度详情 + 逐检查项状态
+验证审计引擎的线程安全 (_running 标志防并发)
+R8: WebSocket/SSE实时通信全链路 (3×5=15检查点)
+R8.1 连接/订阅/消息协议
+验证 WS /ws/connect 的 client_id 生成唯一性 (ws-{timestamp}-{count})
+检查 subscribe 消息的 platform 字段绑定到 connection_platforms 字典
+验证 ping/pong 心跳机制的间隔和超时
+检查 memory_event 消息的广播排除 (exclude=client_id)
+验证 echo 消息对未知消息类型的降级处理
+R8.2 记忆流/推送/断线检测
+验证 WS /ws/memory/stream 的5秒轮询检测记忆变更
+检查 memory_changed 消息的 delta 字段是否准确反映增量
+验证 receive_text() 的0.5秒超时非阻塞读取
+检查 WebSocketDisconnect 的清理逻辑 (active_connections.pop)
+验证 broadcast() 的死连接清理 (dead 列表)
+R8.3 SSE/前端集成/重连
+检查是否有 SSE 端点实现 (代码中未见显式 SSE 路由)
+验证前端 WebSocket 连接的 createPipelineSocket() URL 构建
+检查前端是否有断线重连机制 (指数退避)
+验证 WebSocket 消息的 timestamp 是否为服务器时间
+检查并发连接数是否有上限控制
+R9: Web安全与性能审计 (3×5=15检查点)
+R9.1 认证/授权/输入校验
+验证 Bearer token 认证是否在所有写操作端点强制执行
+检查 POST /api/config 的配置保存是否有权限控制
+验证 MemoryCreate.content 的长度限制
+检查 BatchDeleteRequest.ids 的数量上限
+验证 SQL 注入防护: KG 路由的 LIKE ? 参数化查询
+R9.2 限流/并发/资源控制
+检查是否有请求速率限制中间件
+验证 _run() 线程池的并发上限配置
+检查 KG 路由的 _cache_get/_cache_set TTL 缓存是否防止缓存穿透
+验证 storage_management 的30秒缓存是否防止重复计算超时
+检查 WebSocket 的 active_connections 字典是否有内存泄漏风险
+R9.3 响应时间/大数据集/编码安全
+验证 GET /api/kg/metrics 的图算法计算在大图 (>10000节点) 上的响应时间
+检查 GET /api/orchestrator/v9.1/metrics 的 Prometheus 指标聚合延迟 (>10s 问题)
+验证 GET /api/memory/ 的 limit=200 上限是否防止大数据集 OOM
+检查 export 端点对百万级记忆的流式响应支持
+验证 UTF-8 编码在 Windows GBK 终端环境下的安全处理
+R10: 端到端Web全流程闭环 (3×4=12检查点)
+R10.1 完整用户旅程: 记忆写入→检索→增强
+写入旅程: 前端 memoryService.create() → POST /api/memory/ → engine.remember() → QualityGate → ICME六层 → 返回 MemoryResponse → 前端刷新列表
+检索旅程: 前端搜索框 → GET /api/search/quick?q=... → engine.recall() → FTS5+语义融合 → 返回排序结果 → 前端高亮渲染
+增强旅程: 前端触发 POST /api/llm/classify → DeepSeek API → 层级决策 → POST /api/llm/auto_tag → 标签生成 → POST /api/llm/summarize → 摘要压缩 → 前端展示增强结果
+验证: 三步旅程的数据流是否端到端一致，无字段丢失或类型不匹配
+R10.2 完整用户旅程: 对话捕获→图谱→审计
+捕获旅程: POST /api/active/capture_conversation → 三层写入 → LayerRouter分发 → chat_routes同步 → WebSocket推送变更
+图谱旅程: POST /api/kg/rebuild → TASK-001~006重建 → GET /api/kg/topology → Cytoscape渲染 → GET /api/kg/metrics → SSS指标面板
+审计旅程: POST /api/audit/run → 5维×N轮 → GET /api/audit/report/{id} → 维度详情 → 前端审计仪表盘
+验证: 三步旅程的触发→执行→结果→展示是否形成闭环
+R10.3 完整用户旅程: 编排→工作流→监控
+编排旅程: POST /api/orchestrator/v9.1/plan → LLM规划 → POST /dag/build → DAG构建 → POST /dag/execute → 并行执行 → GET /dag/{id}/topology → React Flow渲染
+工作流旅程: POST /workflow/create → Saga步骤定义 → POST /workflow/run → 检查点持久化 → 失败 → POST /workflow/resume → 恢复执行
+监控旅程: WS /ws/connect → 订阅 → GET /api/orchestrator/v9.1/traces → 追踪链 → GET /latency → P50/P90/P99 → 前端监控面板
+验证: 编排→执行→监控三阶段是否数据贯通，trace_id 是否贯穿全链
+总计: 10轮 × 3子维度 × ~5-9检查点 = 165个全链路检查点
+
+每个检查点执行时必须:
+
+读取对应源码文件确认实现
+发送实际HTTP请求验证运行时行为
+对比前端 endpoints 配置与后端路由定义的一致性
+记录结果到 logs/audit_reports/ 目录

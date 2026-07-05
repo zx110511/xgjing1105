@@ -1,0 +1,40 @@
+{
+  "version": "1.0",
+  "description": "天机v9.1离线写入队列 (POST超时降级)",
+  "queue": [
+    {
+      "queued_at": "2026-06-29T08:40:00+08:00",
+      "agent": "shiguan",
+      "operation": "memory_remember",
+      "layer": "episodic",
+      "content": "天机v9.1全链改造阶段成果(2026-06-29): P0完成BGE-M3升级(indexing/embeddings.py v2.0, BGE-M3->bge-small-zh->MiniLM->TF-IDF多级回退); P1-2完成Agent自管理记忆工具MemGPT模式(memory_insert/replace/rethink); P1-3完成多Agent记忆共享层Mem0/Zep模式(memory_share/recall_shared/list_shared). MCP工具数39->45. 6个新工具验证通过. 之前10项评价5项想当然错误,真实差距仅5项.",
+      "tags": ["改造记录", "v9.1升级", "BGE-M3", "MemGPT", "Mem0", "全链改造", "阶段成果"],
+      "priority": "critical",
+      "metadata": {
+        "operation": "phase_retrospective",
+        "phase": "P0+P1-2+P1-3",
+        "agent": "miaobi+shiguan",
+        "files_modified": [
+          "indexing/embeddings.py",
+          "mcp/tianji_mcp_server_memory_ops.py",
+          "mcp/tianji_mcp_server.py",
+          "mcp/tianji_mcp_server_core.py"
+        ]
+      }
+    },
+    {
+      "queued_at": "2026-06-29T08:40:00+08:00",
+      "agent": "shiguan",
+      "operation": "memory_remember",
+      "layer": "meta",
+      "content": "天机v9.1系统策略更新: Embedding引擎从默认TF-IDF切换为auto模式BGE-M3优先+多级回退; MCP工具体系扩展MemGPT模式(memory_insert/replace/rethink)和Mem0/Zep模式(memory_share/recall_shared/list_shared); 对标2026业界Mem0/Letta/Hindsight架构; 智能调度系统vap_declare验证可用. 真实差距评估原则: 必须先读源码再下结论,避免想当然评价.",
+      "tags": ["系统策略", "Embedding升级", "MCP工具扩展", "对标业界", "审计原则"],
+      "priority": "high",
+      "metadata": {
+        "operation": "policy_update",
+        "trigger": "全链改造阶段成果",
+        "principle": "代码审计必须基于源码,不可想当然"
+      }
+    }
+  ]
+}

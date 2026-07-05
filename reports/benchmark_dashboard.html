@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>天机检索性能基准测试报告</title>
+    <style>
+        body { font-family: 'Microsoft YaHei', Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1 { color: #333; border-bottom: 2px solid #4CAF50; padding-bottom: 10px; }
+        h2 { color: #555; margin-top: 30px; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background-color: #4CAF50; color: white; }
+        tr:hover { background-color: #f5f5f5; }
+        .status-ok { color: #4CAF50; font-weight: bold; }
+        .status-warn { color: #FF9800; font-weight: bold; }
+        .metric-card { display: inline-block; width: 200px; margin: 10px; padding: 15px; background: #f9f9f9; border-radius: 8px; text-align: center; }
+        .metric-value { font-size: 24px; font-weight: bold; color: #4CAF50; }
+        .metric-label { font-size: 14px; color: #666; margin-top: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>天机检索性能基准测试报告</h1>
+        <p><strong>日期</strong>: 2026-06-02T19:20:28.044905</p>
+
+        <h2>摘要</h2>
+        <div class="metric-card">
+            <div class="metric-value">100.0%</div>
+            <div class="metric-label">R@5</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">+4.4%</div>
+            <div class="metric-label">vs OpenClaw</div>
+        </div>
+
+        <h2>详细指标</h2>
+        <table>
+            <tr><th>指标</th><th>值</th></tr>
+            <tr><td>R@5</td><td>1.0000</td></tr>
+            <tr><td>R@10</td><td>1.0000</td></tr>
+            <tr><td>MRR</td><td>1.0000</td></tr>
+            <tr><td>NDCG@5</td><td>1.0000</td></tr>
+            <tr><td>NDCG@10</td><td>1.0000</td></tr>
+        </table>
+
+        <h2>性能指标</h2>
+        <table>
+            <tr><th>指标</th><th>值</th></tr>
+            <tr><td>平均延迟</td><td>13.24ms</td></tr>
+            <tr><td>P50延迟</td><td>12.20ms</td></tr>
+            <tr><td>P99延迟</td><td>39.46ms</td></tr>
+            <tr><td>QPS</td><td>75.43</td></tr>
+        </table>
+
+        <h2>测试配置</h2>
+        <ul>
+            <li>查询数量: 500</li>
+            <li>文档库规模: 5000</li>
+        </ul>
+
+        <hr>
+        <p><em>报告生成时间: 2026-06-02T19:20:28.046923</em></p>
+    </div>
+</body>
+</html>

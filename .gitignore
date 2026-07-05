@@ -1,0 +1,227 @@
+# 天机v8.1 .gitignore
+# 创建时间: 2026-05-31
+# 创建者: @天枢(tianshu)
+
+# ============================================
+# 敏感文件 - P0强制排除
+# ============================================
+.env
+.env.*
+*.env
+*.key
+*.pem
+*.p12
+*.pfx
+secrets.yaml
+secrets.yml
+secrets.json
+credentials.json
+*.credentials
+password*
+*.password
+token*
+*.token
+api_key*
+*.api_key
+private_key*
+*.private_key
+
+# ============================================
+# Python
+# ============================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+*.manifest
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ============================================
+# 虚拟环境
+# ============================================
+venv/
+ENV/
+env/
+.venv/
+.env/
+*.venv
+
+# ============================================
+# IDE和编辑器
+# ============================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+*.sublime-workspace
+*.sublime-project
+
+# Trae IDE 本地覆盖配置 (不提交Git)
+.trae/settings.local.json
+
+# ============================================
+# 测试和覆盖率
+# ============================================
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+.benchmarks/
+tests/reports/
+
+# ============================================
+# 数据库和缓存
+# ============================================
+*.db
+*.sqlite
+*.sqlite3
+*.sql
+*.db-journal
+*.db-wal
+data/*.db
+data/*.sqlite
+data/.memory/
+data/stats_counters.json
+cache/
+.cache/
+*.cache
+
+# ============================================
+# 日志
+# ============================================
+*.log
+logs/
+.log/
+*.log.*
+
+# ============================================
+# 临时文件
+# ============================================
+*.tmp
+*.temp
+*.bak
+*.backup
+*.orig
+tmp/
+temp/
+.tmp/
+.temp/
+
+# ============================================
+# 操作系统
+# ============================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# ============================================
+# 构建产物
+# ============================================
+*.exe
+*.dll
+*.so
+*.dylib
+*.app
+*.deb
+*.rpm
+*.msi
+*.dmg
+*.pkg
+*.war
+*.ear
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+
+# ============================================
+# 文档和资源
+# ============================================
+*.pdf
+*.doc
+*.docx
+*.xls
+*.xlsx
+*.ppt
+*.pptx
+*.mp3
+*.mp4
+*.avi
+*.mov
+*.wav
+*.flv
+*.mkv
+
+# ============================================
+# 天机特定
+# ============================================
+data/icme.db
+data/evolution_bus.db
+data/service_registry.db
+data/metrics/anchors.db
+data/metrics/anchors.db-shm
+data/metrics/anchors.db-wal
+enforcement_cache/
+modules/activated_state.json
+modules/registry.json
+data/.scheduler_heartbeat
+data/.tianji_shared_status.json
+.daemon/
+server/data/.dashboard/
+_archive/ARCHIVE_MARKER
+
+# ============================================
+# 依赖和包管理
+# ============================================
+node_modules/
+package-lock.json
+yarn.lock
+Pipfile.lock
+poetry.lock
+
+# ============================================
+# 其他
+# ============================================
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.ruff_cache/
+*.pyc
+*.pyo
+*.pyd

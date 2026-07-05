@@ -1,0 +1,314 @@
+> r"""
+> 天机工作流编排引擎 (Tianji Workflow Engine) v1.0
+> ========================================================
+> LangGraph风格的图状工作流编排
+  
+> 核心特性:
+>   1. 有向图工作流: 节点+条件边
+>   2. 状态传递: 共享State在工作流中传递
+>   3. 断点续跑: Checkpoint保存中间状态
+>   4. 可观测性: 完整执行日志
+  
+> 架构位置: 天机/core/memory_workflow.py
+  
+> 灵境道谱溯源: D5-5【编排器煞】· 道五·容器体道 · 四地煞之容之术
+> """
+  
+! import time
+! import json
+! import logging
+! import threading
+! from typing import Any, Optional, Dict, List, Callable, Set, Tuple
+! from dataclasses import dataclass, field
+! from enum import Enum
+! from pathlib import Path
+! from concurrent.futures import ThreadPoolExecutor
+  
+! logger = logging.getLogger(__name__)
+  
+  
+! class NodeStatus(str, Enum):
+!     PENDING = "pending"
+!     RUNNING = "running"
+!     COMPLETED = "completed"
+!     FAILED = "failed"
+!     SKIPPED = "skipped"
+  
+  
+! class WorkflowStatus(str, Enum):
+!     DRAFT = "draft"
+!     RUNNING = "running"
+!     COMPLETED = "completed"
+!     FAILED = "failed"
+!     PAUSED = "paused"
+  
+  
+! @dataclass
+! class WorkflowState:
+!     """工作流状态"""
+!     data: Dict[str, Any] = field(default_factory=dict)
+!     history: List[Dict[str, Any]] = field(default_factory=list)
+!     checkpoint_id: str = ""
+!     current_node: str = ""
+!     errors: List[str] = field(default_factory=list)
+  
+!     def update(self, key: str, value: Any):
+!         self.data[key] = value
+!         self.history.append({
+!             "key": key, "value": value, "timestamp": time.time()
+!         })
+  
+!     def get(self, key: str, default: Any = None) -> Any:
+!         return self.data.get(key, default)
+  
+!     def to_dict(self) -> dict:
+!         return {
+!             "data": self.data,
+!             "history_count": len(self.history),
+!             "checkpoint_id": self.checkpoint_id,
+!             "current_node": self.current_node
+!         }
+  
+  
+! @dataclass
+! class WorkflowNode:
+!     """工作流节点"""
+!     name: str
+!     handler: Callable[[WorkflowState], WorkflowState]
+!     description: str = ""
+!     timeout_s: int = 300
+!     retry_count: int = 0
+!     max_retries: int = 2
+  
+  
+! @dataclass
+! class ConditionalEdge:
+!     """条件边"""
+!     from_node: str
+!     condition: Callable[[WorkflowState], str]
+!     routes: Dict[str, str]
+!     default: str
+  
+  
+! class WorkflowGraph:
+!     """工作流图"""
+  
+!     def __init__(self, name: str, max_workers: int = 4):
+!         self.name = name
+!         self.nodes: Dict[str, WorkflowNode] = {}
+!         self.edges: Dict[str, List[str]] = {}
+!         self.conditional_edges: List[ConditionalEdge] = []
+!         self.start_node: str = ""
+!         self.end_node: str = ""
+  
+!         self._executor = ThreadPoolExecutor(max_workers=max_workers)
+!         self._checkpoints: Dict[str, WorkflowState] = {}
+!         self._execution_logs: List[Dict[str, Any]] = []
+  
+!         self._lock = threading.Lock()
+  
+!     def add_node(self, name: str, handler: Callable, description: str = "", timeout_s: int = 300, max_retries: int = 2):
+!         self.nodes[name] = WorkflowNode(
+!             name=name, handler=handler, description=description,
+!             timeout_s=timeout_s, max_retries=max_retries
+!         )
+!         if not self.start_node:
+!             self.start_node = name
+!         self.end_node = name
+  
+!     def add_edge(self, from_node: str, to_node: str):
+!         if from_node not in self.edges:
+!             self.edges[from_node] = []
+!         self.edges[from_node].append(to_node)
+  
+!     def add_conditional_edges(self, from_node: str, condition: Callable, routes: Dict[str, str], default: str):
+!         self.conditional_edges.append(ConditionalEdge(
+!             from_node=from_node, condition=condition, routes=routes, default=default
+!         ))
+  
+!     def _get_next_nodes(self, current: str, state: WorkflowState) -> List[str]:
+!         """获取下一个节点"""
+!         for ce in self.conditional_edges:
+!             if ce.from_node == current:
+!                 result = ce.condition(state)
+!                 next_node = ce.routes.get(result, ce.default)
+!                 return [next_node] if next_node else []
+  
+!         return self.edges.get(current, [])
+  
+!     def _execute_node(self, node: WorkflowNode, state: WorkflowState) -> Tuple[WorkflowState, NodeStatus]:
+!         """执行节点"""
+!         retries = 0
+!         while retries <= node.max_retries:
+!             try:
+!                 start_time = time.time()
+!                 new_state = node.handler(state)
+!                 duration_ms = (time.time() - start_time) * 1000
+  
+!                 self._log_execution(node.name, NodeStatus.COMPLETED, duration_ms)
+!                 return new_state, NodeStatus.COMPLETED
+!             except Exception as e:
+!                 retries += 1
+!                 logger.error(f"节点 {node.name} 执行失败 (重试 {retries}/{node.max_retries}): {e}")
+!                 if retries > node.max_retries:
+!                     self._log_execution(node.name, NodeStatus.FAILED, 0, str(e))
+!                     state.errors.append(str(e))
+!                     return state, NodeStatus.FAILED
+!                 time.sleep(1)
+  
+!         return state, NodeStatus.FAILED
+  
+!     def _log_execution(self, node_name: str, status: NodeStatus, duration_ms: float = 0, error: str = ""):
+!         with self._lock:
+!             self._execution_logs.append({
+!                 "node": node_name,
+!                 "status": status.value,
+!                 "duration_ms": duration_ms,
+!                 "error": error,
+!                 "timestamp": time.time()
+!             })
+  
+!     def save_checkpoint(self, checkpoint_id: str, state: WorkflowState):
+!         with self._lock:
+!             state.checkpoint_id = checkpoint_id
+!             self._checkpoints[checkpoint_id] = state
+  
+!     def load_checkpoint(self, checkpoint_id: str) -> Optional[WorkflowState]:
+!         return self._checkpoints.get(checkpoint_id)
+  
+!     def execute(self, initial_state: Optional[WorkflowState] = None) -> Tuple[WorkflowState, WorkflowStatus]:
+!         """执行工作流"""
+!         state = initial_state or WorkflowState()
+  
+!         if not self.start_node:
+!             return state, WorkflowStatus.FAILED
+  
+!         current_node = self.start_node
+!         visited = set()
+!         state.current_node = current_node
+  
+!         while current_node and current_node not in visited:
+!             visited.add(current_node)
+  
+!             if current_node not in self.nodes:
+!                 state.errors.append(f"节点不存在: {current_node}")
+!                 return state, WorkflowStatus.FAILED
+  
+!             node = self.nodes[current_node]
+!             state.current_node = current_node
+  
+!             new_state, status = self._execute_node(node, state)
+  
+!             if status == NodeStatus.FAILED:
+!                 return new_state, WorkflowStatus.FAILED
+  
+!             state = new_state
+!             next_nodes = self._get_next_nodes(current_node, state)
+  
+!             if not next_nodes:
+!                 break
+!             current_node = next_nodes[0]
+  
+!         return state, WorkflowStatus.COMPLETED
+  
+!     def get_execution_logs(self, limit: int = 100) -> List[Dict[str, Any]]:
+!         return self._execution_logs[-limit:]
+  
+!     def get_stats(self) -> Dict[str, Any]:
+!         return {
+!             "name": self.name,
+!             "node_count": len(self.nodes),
+!             "edge_count": sum(len(e) for e in self.edges.values()),
+!             "conditional_edge_count": len(self.conditional_edges),
+!             "checkpoint_count": len(self._checkpoints),
+!             "execution_count": len(self._execution_logs)
+!         }
+  
+  
+! def build_memory_workflow(
+!     graph_store=None,
+!     extractor=None,
+!     procedural_store=None,
+!     state_manager=None
+! ) -> WorkflowGraph:
+!     """
+!     构建记忆处理工作流
+      
+!     工作流: 捕获 → 分类 → 抽取 → 图谱构建 → 存储 → 巩固 → 状态管理
+!     """
+!     workflow = WorkflowGraph("memory_processing_pipeline")
+  
+!     def capture_step(state: WorkflowState) -> WorkflowState:
+!         content = state.get("content", "")
+!         state.update("captured_at", time.time())
+!         state.update("content_length", len(content))
+!         state.update("captured", True)
+!         return state
+  
+!     def classify_step(state: WorkflowState) -> WorkflowState:
+!         content = state.get("content", "")
+!         classification = "general"
+!         if len(content) > 500:
+!             classification = "knowledge"
+!         elif "?" in content or "?" in content:
+!             classification = "query"
+!         state.update("classification", classification)
+!         return state
+  
+!     def extract_step(state: WorkflowState) -> WorkflowState:
+!         content = state.get("content", "")
+!         if extractor and state.get("classification") == "knowledge":
+!             try:
+!                 result = extractor.extract(content, use_llm=False)
+!                 state.update("triples_count", len(result.triples))
+!                 state.update("entities", result.entities)
+!             except Exception:
+!                 state.update("triples_count", 0)
+!         return state
+  
+!     def graph_build_step(state: WorkflowState) -> WorkflowState:
+!         if graph_store and state.get("triples_count", 0) > 0:
+!             state.update("graph_built", True)
+!         return state
+  
+!     def store_step(state: WorkflowState) -> WorkflowState:
+!         state.update("stored", True)
+!         state.update("stored_at", time.time())
+!         return state
+  
+!     def consolidate_step(state: WorkflowState) -> WorkflowState:
+!         state.update("consolidated", True)
+!         return state
+  
+!     def state_manage_step(state: WorkflowState) -> WorkflowState:
+!         if state_manager:
+!             state.update("state_managed", True)
+!         return state
+  
+!     workflow.add_node("capture", capture_step, "捕获输入")
+!     workflow.add_node("classify", classify_step, "内容分类")
+!     workflow.add_node("extract", extract_step, "知识抽取")
+!     workflow.add_node("graph_build", graph_build_step, "图谱构建")
+!     workflow.add_node("store", store_step, "记忆存储")
+!     workflow.add_node("consolidate", consolidate_step, "记忆巩固")
+!     workflow.add_node("state_manage", state_manage_step, "状态管理")
+  
+!     workflow.add_edge("capture", "classify")
+  
+!     def classification_router(state: WorkflowState) -> str:
+!         cf = state.get("classification", "general")
+!         if cf == "knowledge":
+!             return "extract"
+!         return "store"
+  
+!     workflow.add_conditional_edges(
+!         "classify", classification_router,
+!         {"extract": "extract", "store": "store"},
+!         "store"
+!     )
+!     workflow.add_edge("extract", "graph_build")
+!     workflow.add_edge("graph_build", "store")
+!     workflow.add_edge("store", "consolidate")
+!     workflow.add_edge("consolidate", "state_manage")
+  
+!     return workflow

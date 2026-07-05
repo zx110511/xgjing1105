@@ -1,0 +1,417 @@
+> r"""
+> 中文分词器 v1.1 — 天机记忆系统FTS5中文搜索核心
+> ===================================================
+  
+> M27升级: EvolutionLoop闭环 + record_action喂入 + health() + 双注入
+> 灵境道谱溯源: D8-4【语义检索煞】· 道八·认知体道 · 四地煞之识之术
+>   - FTS5中文分词+语义检索预处理+TF-IDF前置
+>   - 源文件: core/chinese_tokenizer.py → ChineseTokenizer
+  
+> 架构设计:
+> - 主分词器: jieba (精确模式 + 自定义词典)
+> - 降级分词器: 字符级Bigram (零依赖, jieba不可用时自动降级)
+> - 动态调优: 领域词典 + 热词缓存 + 用户自定义词
+  
+> 性能指标:
+> - jieba首次加载: ~0.3s (词典~30MB)
+> - 后续分词: ~50μs/字 (精确模式)
+> - Bigram降级: ~5μs/字 (零依赖)
+  
+> 使用方式:
+>     from core.chinese_tokenizer import tokenize_for_fts, tokenize_query, ChineseTokenizer
+  
+      # 写入时: 预分词后存入FTS5
+>     segmented = tokenize_for_fts("天机记忆系统v3.0发布")
+      # → "天机 记忆 系统 v3.0 发布"
+  
+      # 查询时: 预分词后构建FTS5查询
+>     query = tokenize_query("天机记忆")
+      # → '"天机" AND "记忆"'
+  
+      # EvolutionLoop实例
+>     ct = ChineseTokenizer(recorder=rec, learning_engine=le)
+>     ct.health()  # {"version":"1.1","tokenizer":"jieba",...}
+> """
+  
+> import os
+> import re
+> import threading
+> import time
+> from pathlib import Path
+> from typing import List, Optional, Set, Dict, Any
+  
+> try:
+>     from .evolution_loop import EvolutionLoop
+! except ImportError:
+!     EvolutionLoop = None
+  
+> _AI_MEMORY_ROOT = Path(__file__).resolve().parent.parent
+> _CUSTOM_DICT_PATH = _AI_MEMORY_ROOT / "data" / "custom_dict.txt"
+> _DOMAIN_DICT_PATH = _AI_MEMORY_ROOT / "data" / "domain_dict.txt"
+  
+> _jieba_available: Optional[bool] = None
+> _jieba_lock = threading.Lock()
+> _jieba_initialized = False
+  
+> _DOMAIN_WORDS = {
+>     "天机", "元初", "感枢", "运枢", "近枢", "忆枢", "知枢", "元枢",
+>     "ICME", "MCP", "FTS", "SQLite", "FastAPI", "WebSocket",
+>     "记忆引擎", "记忆系统", "记忆层", "记忆条目", "记忆架构",
+>     "质量门禁", "巩固晋升", "反思循环", "工作表征",
+>     "智能体", "编排器", "上下文", "语义搜索", "全文搜索",
+>     "分词器", "向量化", "嵌入模型", "知识图谱",
+>     "写入", "检索", "归档", "删除", "更新",
+>     "全覆盖", "功能测试", "验证",
+> }
+  
+> _HOT_WORDS_CACHE: Set[str] = set()
+> _HOT_WORDS_LOCK = threading.Lock()
+> _HOT_WORDS_MAX = 200
+> _HOT_WORDS_FILE = _AI_MEMORY_ROOT / "data" / "hot_words.txt"
+  
+  
+> def _check_jieba() -> bool:
+>     global _jieba_available
+>     if _jieba_available is not None:
+>         return _jieba_available
+>     try:
+>         import jieba
+>         _jieba_available = True
+!     except ImportError:
+!         _jieba_available = False
+>     return _jieba_available
+  
+  
+> def _init_jieba():
+>     global _jieba_initialized
+>     if _jieba_initialized:
+>         return
+>     with _jieba_lock:
+>         if _jieba_initialized:
+!             return
+>         if not _check_jieba():
+!             return
+>         import jieba
+>         jieba.setLogLevel(jieba.logging.INFO)
+>         if _CUSTOM_DICT_PATH.exists():
+>             jieba.load_userdict(str(_CUSTOM_DICT_PATH))
+>         if _DOMAIN_DICT_PATH.exists():
+>             jieba.load_userdict(str(_DOMAIN_DICT_PATH))
+>         for word in _DOMAIN_WORDS:
+>             jieba.add_word(word, freq=1000, tag="n")
+>         _load_hot_words(jieba)
+>         _jieba_initialized = True
+  
+  
+> def _load_hot_words(jieba_mod):
+>     if _HOT_WORDS_FILE.exists():
+!         try:
+!             with open(_HOT_WORDS_FILE, "r", encoding="utf-8") as f:
+!                 for line in f:
+!                     word = line.strip().split()[0] if line.strip() else ""
+!                     if word:
+!                         _HOT_WORDS_CACHE.add(word)
+!                         jieba_mod.add_word(word, freq=800, tag="n")
+!         except Exception:
+!             pass
+  
+  
+> def add_hot_word(word: str):
+!     if not word or len(word) < 2:
+!         return
+!     with _HOT_WORDS_LOCK:
+!         _HOT_WORDS_CACHE.add(word)
+!         if len(_HOT_WORDS_CACHE) > _HOT_WORDS_MAX:
+!             oldest = next(iter(_HOT_WORDS_CACHE))
+!             _HOT_WORDS_CACHE.discard(oldest)
+!     if _check_jieba():
+!         _init_jieba()
+!         import jieba
+!         jieba.add_word(word, freq=800, tag="n")
+!     try:
+!         _HOT_WORDS_FILE.parent.mkdir(parents=True, exist_ok=True)
+!         with open(_HOT_WORDS_FILE, "a", encoding="utf-8") as f:
+!             f.write(f"{word} 800 n\n")
+!     except Exception:
+!         pass
+  
+  
+> def _bigram_tokenize(text: str) -> List[str]:
+!     tokens = []
+!     cjk_buffer = []
+!     ascii_buffer = []
+!     for ch in text:
+!         if '\u4e00' <= ch <= '\u9fff':
+!             if ascii_buffer:
+!                 tokens.append("".join(ascii_buffer))
+!                 ascii_buffer = []
+!             cjk_buffer.append(ch)
+!         else:
+!             if cjk_buffer:
+!                 for i in range(len(cjk_buffer) - 1):
+!                     tokens.append(cjk_buffer[i] + cjk_buffer[i + 1])
+!                 if len(cjk_buffer) == 1:
+!                     tokens.append(cjk_buffer[0])
+!                 cjk_buffer = []
+!             if ch.isalnum():
+!                 ascii_buffer.append(ch)
+!             else:
+!                 if ascii_buffer:
+!                     tokens.append("".join(ascii_buffer))
+!                     ascii_buffer = []
+!     if cjk_buffer:
+!         for i in range(len(cjk_buffer) - 1):
+!             tokens.append(cjk_buffer[i] + cjk_buffer[i + 1])
+!         if len(cjk_buffer) == 1:
+!             tokens.append(cjk_buffer[0])
+!     if ascii_buffer:
+!         tokens.append("".join(ascii_buffer))
+!     return tokens
+  
+  
+> def _jieba_cut(text: str) -> List[str]:
+>     _init_jieba()
+>     import jieba
+>     return list(jieba.cut(text))
+  
+  
+> def tokenize_for_fts(text: str) -> str:
+>     if not text or not text.strip():
+>         return ""
+>     if _check_jieba():
+>         try:
+>             tokens = _jieba_cut(text)
+!         except Exception:
+!             tokens = _bigram_tokenize(text)
+!     else:
+!         tokens = _bigram_tokenize(text)
+>     tokens = [t.strip() for t in tokens if t.strip()]
+>     return " ".join(tokens)
+  
+  
+> def tokenize_query(query: str) -> str:
+!     if not query or not query.strip():
+!         return "*"
+!     if _check_jieba():
+!         try:
+!             tokens = _jieba_cut(query)
+!         except Exception:
+!             tokens = _bigram_tokenize(query)
+!     else:
+!         tokens = _bigram_tokenize(query)
+!     tokens = [t.strip() for t in tokens if t.strip()]
+!     if not tokens:
+!         return "*"
+!     if len(tokens) == 1:
+!         return f'"{tokens[0]}"'
+!     return " AND ".join(f'"{t}"' for t in tokens)
+  
+  
+> def tokenize_query_or(query: str) -> str:
+>     if not query or not query.strip():
+!         return "*"
+>     if _check_jieba():
+>         try:
+>             tokens = _jieba_cut(query)
+!         except Exception:
+!             tokens = _bigram_tokenize(query)
+!     else:
+!         tokens = _bigram_tokenize(query)
+>     tokens = [t.strip() for t in tokens if t.strip()]
+>     if not tokens:
+!         return "*"
+>     if len(tokens) == 1:
+>         return f'"{tokens[0]}"'
+>     return " OR ".join(f'"{t}"' for t in tokens)
+  
+  
+> def is_cjk(text: str) -> bool:
+!     return any('\u4e00' <= c <= '\u9fff' for c in text)
+  
+  
+> def get_tokenizer_status() -> dict:
+!     jieba_ok = _check_jieba()
+!     return {
+!         "tokenizer": "jieba" if jieba_ok else "bigram_fallback",
+!         "jieba_available": jieba_ok,
+!         "jieba_initialized": _jieba_initialized,
+!         "domain_words_count": len(_DOMAIN_WORDS),
+!         "hot_words_count": len(_HOT_WORDS_CACHE),
+!         "custom_dict_loaded": _CUSTOM_DICT_PATH.exists(),
+!         "domain_dict_loaded": _DOMAIN_DICT_PATH.exists(),
+!     }
+  
+  
+> class ChineseTokenizer:
+>     """
+>     中文分词器进化闭环包装器
+  
+>     封装模块级分词函数, 添加EvolutionLoop闭环 + record_action + health()
+>     """
+  
+>     def __init__(self, recorder: Optional[Any] = None,
+>                  learning_engine: Optional[Any] = None):
+!         self._recorder = recorder
+!         self._learning_engine = learning_engine
+!         self._stats: Dict[str, Any] = {
+!             "tokenize_calls": 0,
+!             "query_calls": 0,
+!             "query_or_calls": 0,
+!             "hot_word_adds": 0,
+!             "bigram_fallbacks": 0,
+!             "start_time": time.time(),
+!         }
+!         self._errors = 0
+  
+!         self._evo_loop = None
+!         if EvolutionLoop is not None:
+!             try:
+!                 self._evo_loop = EvolutionLoop(
+!                     module_name="chinese_tokenizer",
+!                     effectiveness_fn=self._calc_tokenizer_effectiveness,
+!                     learn_fn=self._learn_from_tokenizer,
+!                     evolve_fn=self._evolve_tokenizer_config,
+!                     mutable_config={
+!                         "hot_words_max": 200,
+!                         "bigram_fallback_enabled": True,
+!                     },
+!                     recorder=recorder,
+!                     learning_engine=learning_engine,
+!                 )
+!             except Exception:
+!                 pass
+  
+>     def tokenize_for_fts(self, text: str) -> str:
+!         self._stats["tokenize_calls"] += 1
+!         result = tokenize_for_fts(text)
+!         if not _check_jieba() and result:
+!             self._stats["bigram_fallbacks"] += 1
+!         if self._evo_loop is not None:
+!             try:
+!                 self._evo_loop.record_action(
+!                     action="tokenize_for_fts",
+!                     state_before={"tokenize_calls": self._stats["tokenize_calls"] - 1},
+!                     state_after={"tokenize_calls": self._stats["tokenize_calls"],
+!                                  "text_len": len(text),
+!                                  "tokens_count": len(result.split())},
+!                 )
+!             except Exception:
+!                 pass
+!         return result
+  
+>     def tokenize_query(self, query: str) -> str:
+!         self._stats["query_calls"] += 1
+!         result = tokenize_query(query)
+!         if self._evo_loop is not None:
+!             try:
+!                 self._evo_loop.record_action(
+!                     action="tokenize_query",
+!                     state_before={"query_calls": self._stats["query_calls"] - 1},
+!                     state_after={"query_calls": self._stats["query_calls"],
+!                                  "query_len": len(query)},
+!                 )
+!             except Exception:
+!                 pass
+!         return result
+  
+>     def tokenize_query_or(self, query: str) -> str:
+!         self._stats["query_or_calls"] += 1
+!         result = tokenize_query_or(query)
+!         if self._evo_loop is not None:
+!             try:
+!                 self._evo_loop.record_action(
+!                     action="tokenize_query_or",
+!                     state_before={"query_or_calls": self._stats["query_or_calls"] - 1},
+!                     state_after={"query_or_calls": self._stats["query_or_calls"],
+!                                  "query_len": len(query)},
+!                 )
+!             except Exception:
+!                 pass
+!         return result
+  
+>     def add_hot_word(self, word: str):
+!         self._stats["hot_word_adds"] += 1
+!         add_hot_word(word)
+!         if self._evo_loop is not None:
+!             try:
+!                 self._evo_loop.record_action(
+!                     action="add_hot_word",
+!                     state_before={"hot_word_adds": self._stats["hot_word_adds"] - 1},
+!                     state_after={"hot_word_adds": self._stats["hot_word_adds"],
+!                                  "word": word},
+!                 )
+!             except Exception:
+!                 pass
+  
+>     def health(self) -> Dict[str, Any]:
+!         status = get_tokenizer_status()
+!         return {
+!             "status": "ready",
+!             "version": "1.1",
+!             "tokenizer": status["tokenizer"],
+!             "jieba_available": status["jieba_available"],
+!             "jieba_initialized": status["jieba_initialized"],
+!             "domain_words": status["domain_words_count"],
+!             "hot_words": status["hot_words_count"],
+!             "tokenize_calls": self._stats["tokenize_calls"],
+!             "query_calls": self._stats["query_calls"],
+!             "hot_word_adds": self._stats["hot_word_adds"],
+!             "bigram_fallbacks": self._stats["bigram_fallbacks"],
+!             "errors": self._errors,
+!             "evo_loop_active": self._evo_loop is not None,
+!             "recorder_attached": self._recorder is not None,
+!         }
+  
+>     def get_stats(self) -> Dict[str, Any]:
+!         evo_stats = {}
+!         if self._evo_loop is not None:
+!             try:
+!                 evo_stats = self._evo_loop.get_stats()
+!             except Exception:
+!                 evo_stats = {"error": "evo_loop_stats_failed"}
+!         return {
+!             "version": "1.1",
+!             **self._stats,
+!             "health": self.health(),
+!             "evo_loop": evo_stats,
+!         }
+  
+>     def tick(self):
+!         if self._evo_loop is not None:
+!             try:
+!                 self._evo_loop.tick()
+!             except Exception:
+!                 pass
+  
+>     def _calc_tokenizer_effectiveness(self, action: str,
+>                                        state_before: Dict[str, Any],
+>                                        state_after: Dict[str, Any]) -> float:
+!         if action == "tokenize_for_fts":
+!             token_count = state_after.get("tokens_count", 0)
+!             text_len = max(state_after.get("text_len", 1), 1)
+!             return 0.3 if token_count > 0 else -0.1
+!         elif action == "tokenize_query":
+!             return 0.3
+!         elif action == "add_hot_word":
+!             return 0.2
+!         return 0.0
+  
+>     def _learn_from_tokenizer(self, causal_pairs: List[Any],
+>                                effectiveness_summary: Dict[str, Any]) -> Dict[str, Any]:
+!         return {
+!             "patterns_found": len(causal_pairs),
+!             "avg_effectiveness": effectiveness_summary.get("avg_effectiveness", 0.0),
+!             "total_tokenizations": self._stats["tokenize_calls"],
+!             "bigram_fallback_rate": (
+!                 self._stats["bigram_fallbacks"] / max(self._stats["tokenize_calls"], 1)
+!             ),
+!             "hot_words_active": self._stats["hot_word_adds"],
+!         }
+  
+>     def _evolve_tokenizer_config(self, learn_result: Dict[str, Any],
+>                                   mutable_config: Dict[str, Any]) -> Dict[str, Any]:
+!         changes = {}
+!         fallback_rate = learn_result.get("bigram_fallback_rate", 0.0)
+!         if fallback_rate > 0.5:
+!             changes["bigram_fallback_enabled"] = True
+!         return {"rules_modified": changes, "skills_created": []}

@@ -1,0 +1,376 @@
+> r"""
+> 天机Agent统一序列化标准 (Tianji Agent Serializer) v1.0
+> ========================================================
+> 灵境分布式就绪 — 模块接口可序列化标准实现
+  
+> 核心设计:
+>   1. AgentSerializable mixin — 统一 to_dict/from_dict/to_json/to_tvp
+>   2. AgentIntrospector — 自省式序列化 (无侵入，适用于旧Agent)
+>   3. AgentServiceDescriptor — 灵境服务描述标准格式
+  
+> 序列化标准 (灵境兼容):
+>   - 每个Agent必须可输出 AgentServiceDescriptor JSON
+>   - 用于服务注册发现、gRPC proto生成、健康检查
+>   - dataclass属性 → JSON序列化 / JSON反序列化 → 重建对象
+  
+> 架构位置: 天机/core/agent_serializer.py
+  
+> 灵境道谱溯源: D5-4【服务接口煞】· 道五·编排体道 · 四地煞之制之术
+> """
+  
+! import json
+! import inspect
+! import logging
+! import hashlib
+! from typing import Any, Optional, Dict, List, Type, get_type_hints
+! from dataclasses import dataclass, field, asdict, is_dataclass
+! from datetime import datetime
+! from enum import Enum
+  
+! logger = logging.getLogger(__name__)
+  
+  
+  # ═══════════════════════════════════════════════════════════════
+  # AgentServiceDescriptor — 灵境服务描述标准格式
+  # ═══════════════════════════════════════════════════════════════
+  
+! @dataclass
+! class AgentServiceDescriptor:
+!     """灵境服务描述符 — 用于服务注册发现和gRPC proto生成"""
+!     agent_id: str
+!     name: str
+!     layer: str
+!     role: str
+!     emoji: str = ""
+!     capabilities: List[str] = field(default_factory=list)
+!     tools: List[str] = field(default_factory=list)
+!     mcp_server: str = ""
+!     runtime_class: str = ""
+!     lingjing_service_id: str = ""
+!     lingjing_port: int = 0
+!     health_endpoint: str = ""
+!     collaboration_partners: List[str] = field(default_factory=list)
+  
+!     health_status: str = "unknown"
+!     stats: Dict[str, Any] = field(default_factory=dict)
+  
+!     serialized_at: str = ""
+!     schema_version: str = "1.0.0"
+  
+!     def to_dict(self) -> dict:
+!         return asdict(self)
+  
+!     def to_json(self) -> str:
+!         return json.dumps(self.to_dict(), ensure_ascii=False, indent=2)
+  
+!     @classmethod
+!     def from_dict(cls, data: dict) -> "AgentServiceDescriptor":
+!         return cls(**{k: v for k, v in data.items() if k in cls.__dataclass_fields__})
+  
+!     @classmethod
+!     def from_amim_and_instance(cls, amim_agent, instance=None) -> "AgentServiceDescriptor":
+!         """从AMIM定义+运行时实例构建服务描述符"""
+!         desc = cls(
+!             agent_id=amim_agent.agent_id,
+!             name=amim_agent.name,
+!             layer=amim_agent.layer.name if hasattr(amim_agent.layer, 'name') else str(amim_agent.layer),
+!             role=amim_agent.role,
+!             emoji=amim_agent.emoji,
+!             capabilities=amim_agent.capabilities,
+!             tools=amim_agent.tools,
+!             mcp_server=amim_agent.mcp_server,
+!             runtime_class=amim_agent.runtime_class or "",
+!             lingjing_service_id=amim_agent.lingjing_service_id or f"svc-{amim_agent.agent_id}",
+!             lingjing_port=amim_agent.lingjing_port or 0,
+!             health_endpoint=amim_agent.health_endpoint or f"/health/{amim_agent.agent_id}",
+!             collaboration_partners=amim_agent.collaboration_partners,
+!             serialized_at=datetime.now().isoformat()
+!         )
+  
+!         if instance is not None:
+!             try:
+!                 if hasattr(instance, 'health_check'):
+!                     desc.health_status = instance.health_check().get("status", "unknown")
+!                 if hasattr(instance, 'get_stats'):
+!                     desc.stats = instance.get_stats()
+!             except Exception as e:
+!                 logger.warning(f"获取实例状态失败: {e}")
+  
+!         return desc
+  
+  
+  # ═══════════════════════════════════════════════════════════════
+  # AgentIntrospector — 自省式序列化
+  # ═══════════════════════════════════════════════════════════════
+  
+! class AgentIntrospector:
+!     """
+!     Agent自省器 — 无侵入式序列化
+  
+!     通过inspect模块自省Agent类，自动提取:
+!       - 静态属性 (AGENT_ID, AGENT_NAME, LAYER, ROLE, EMOJI, CAPABILITIES, TOOLS, MCP_SERVER)
+!       - 健康检查 (health_check)
+!       - 统计信息 (get_stats)
+!       - 方法签名 (灵境gRPC proto生成用)
+  
+!     适用场景: 旧Agent无to_dict方法，但需要灵境服务描述
+!     """
+  
+!     EXPECTED_STATIC_ATTRS = [
+!         "AGENT_ID", "AGENT_NAME", "LAYER", "ROLE", "EMOJI",
+!         "CAPABILITIES", "TOOLS", "MCP_SERVER"
+!     ]
+  
+!     DEFAULT_VALUES = {
+!         "AGENT_ID": "unknown",
+!         "AGENT_NAME": "UnknownAgent",
+!         "LAYER": "L0",
+!         "ROLE": "未定义",
+!         "EMOJI": "🤖",
+!         "CAPABILITIES": [],
+!         "TOOLS": [],
+!         "MCP_SERVER": "unknown"
+!     }
+  
+!     @classmethod
+!     def inspect_agent_class(cls, agent_class: Type) -> Dict[str, Any]:
+!         """自省Agent类 — 提取所有静态属性"""
+!         result = {}
+!         for attr in cls.EXPECTED_STATIC_ATTRS:
+!             result[attr] = getattr(agent_class, attr, cls.DEFAULT_VALUES.get(attr, ""))
+!         return result
+  
+!     @classmethod
+!     def inspect_agent_instance(cls, instance) -> Dict[str, Any]:
+!         """自省Agent实例 — 提取静态属性+运行时状态"""
+!         result = cls.inspect_agent_class(type(instance))
+  
+!         if hasattr(instance, 'health_check'):
+!             try:
+!                 result["health"] = instance.health_check()
+!             except Exception as e:
+!                 result["health"] = {"status": "error", "message": str(e)}
+!         else:
+!             result["health"] = {"status": "unknown", "message": "无health_check方法"}
+  
+!         if hasattr(instance, 'get_stats'):
+!             try:
+!                 result["stats"] = instance.get_stats()
+!             except Exception as e:
+!                 result["stats"] = {"error": str(e)}
+!         else:
+!             result["stats"] = {}
+  
+!         result["has_health_check"] = hasattr(instance, 'health_check')
+!         result["has_get_stats"] = hasattr(instance, 'get_stats')
+!         result["has_to_dict"] = hasattr(instance, 'to_dict')
+!         result["public_methods"] = cls._get_public_methods(instance)
+  
+!         return result
+  
+!     @classmethod
+!     def serialize_instance(cls, instance) -> str:
+!         """将Agent实例序列化为JSON"""
+!         data = cls.inspect_agent_instance(instance)
+!         data["serialized_at"] = datetime.now().isoformat()
+!         data["schema_version"] = "1.0.0"
+!         return json.dumps(data, ensure_ascii=False, indent=2)
+  
+!     @classmethod
+!     def _get_public_methods(cls, instance) -> List[str]:
+!         """获取公开方法列表 (灵境gRPC proto生成用)"""
+!         methods = []
+!         for name, method in inspect.getmembers(instance, predicate=inspect.ismethod):
+!             if not name.startswith('_'):
+!                 try:
+!                     sig = inspect.signature(method)
+!                     params = []
+!                     for param_name, param in sig.parameters.items():
+!                         if param_name != 'self':
+!                             annotation = str(param.annotation) if param.annotation != inspect.Parameter.empty else "Any"
+!                             params.append(f"{param_name}: {annotation}")
+!                     methods.append(f"{name}({', '.join(params)})")
+!                 except Exception:
+!                     methods.append(name)
+!         return methods
+  
+  
+  # ═══════════════════════════════════════════════════════════════
+  # AgentSerializable — Mixin基类 (新Agent应继承)
+  # ═══════════════════════════════════════════════════════════════
+  
+! class AgentSerializable:
+-     """
+!     Agent序列化Mixin — 新Agent继承此基类
+  
+!     用法:
+!       class MyAgent(AgentSerializable):
+!           AGENT_ID = "my_agent"
+!           ...
+!           def health_check(self): ...
+!           def get_stats(self): ...
+!     """
+  
+!     def to_dict(self) -> dict:
+!         """序列化为dict (灵境服务描述格式)"""
+!         static = AgentIntrospector.inspect_agent_class(type(self))
+!         runtime = {
+!             "has_health_check": hasattr(self, 'health_check'),
+!             "has_get_stats": hasattr(self, 'get_stats'),
+!         }
+  
+!         if hasattr(self, 'health_check'):
+!             try:
+!                 runtime["health"] = self.health_check()
+!             except Exception as e:
+!                 runtime["health"] = {"status": "error", "message": str(e)}
+  
+!         if hasattr(self, 'get_stats'):
+!             try:
+!                 runtime["stats"] = self.get_stats()
+!             except Exception as e:
+!                 runtime["stats"] = {"error": str(e)}
+  
+!         return {**static, **runtime}
+  
+!     def to_json(self) -> str:
+!         """序列化为JSON字符串"""
+!         data = self.to_dict()
+!         data["serialized_at"] = datetime.now().isoformat()
+!         data["schema_version"] = "1.0.0"
+!         return json.dumps(data, ensure_ascii=False, indent=2)
+  
+!     def to_tvp(self) -> str:
+!         static = AgentIntrospector.inspect_agent_class(type(self))
+!         agent_id = static.get("AGENT_ID", "unknown")
+!         name = static.get("AGENT_NAME", "Unknown")
+!         emoji = static.get("EMOJI", "?")
+!         layer = static.get("LAYER", "L0")
+!         return f"[TVP] {emoji} @{name}({agent_id}) {layer}"
+  
+!     def health_check(self) -> Dict[str, Any]:
+!         return {"status": "healthy", "agent_id": getattr(self, 'AGENT_ID', 'unknown')}
+  
+!     def get_stats(self) -> Dict[str, Any]:
+!         return {"agent_id": getattr(self, 'AGENT_ID', 'unknown')}
+  
+  
+  # ═══════════════════════════════════════════════════════════════
+  # AgentSerializer — 主序列化引擎
+  # ═══════════════════════════════════════════════════════════════
+  
+! class AgentSerializer:
+!     """
+!     Agent序列化引擎 — 统一入口
+  
+!     职责:
+!       1. 为任意Agent生成AgentServiceDescriptor
+!       2. 批量序列化所有Agent
+!       3. 验证序列化-反序列化闭环
+!       4. 生成灵境服务注册清单
+!     """
+  
+!     def __init__(self, amim=None):
+!         self.amim = amim
+  
+!     def serialize_agent(self, agent_id: str, instance=None) -> Optional[AgentServiceDescriptor]:
+!         """序列化单个Agent"""
+!         if not self.amim:
+!             return None
+  
+!         amim_agent = self.amim.get_agent(agent_id)
+!         if not amim_agent:
+!             return None
+  
+!         return AgentServiceDescriptor.from_amim_and_instance(amim_agent, instance)
+  
+!     def serialize_all(self, instances: Optional[Dict[str, Any]] = None) -> List[AgentServiceDescriptor]:
+!         """批量序列化所有Agent"""
+!         descriptors = []
+!         instances = instances or {}
+  
+!         if self.amim:
+!             for agent_def in self.amim.AGENT_DEFINITIONS:
+!                 instance = instances.get(agent_def.agent_id)
+!                 desc = self.serialize_agent(agent_def.agent_id, instance)
+!                 if desc:
+!                     descriptors.append(desc)
+  
+!         return descriptors
+  
+!     def verify_roundtrip(self, descriptor: AgentServiceDescriptor) -> Dict[str, Any]:
+!         """验证序列化-反序列化闭环"""
+!         json_str = descriptor.to_json()
+!         parsed = json.loads(json_str)
+!         reconstructed = AgentServiceDescriptor.from_dict(parsed)
+  
+!         checks = {
+!             "json_valid": isinstance(json.loads(json_str), dict),
+!             "agent_id_preserved": descriptor.agent_id == reconstructed.agent_id,
+!             "name_preserved": descriptor.name == reconstructed.name,
+!             "tools_preserved": descriptor.tools == reconstructed.tools,
+!             "capabilities_preserved": descriptor.capabilities == reconstructed.capabilities,
+!             "lingjing_port_positive": descriptor.lingjing_port > 0,
+!         }
+  
+!         all_passed = all(checks.values())
+!         return {
+!             "agent_id": descriptor.agent_id,
+!             "passed": all_passed,
+!             "checks": checks
+!         }
+  
+!     def verify_all_agents(self) -> Dict[str, Any]:
+!         """验证所有Agent的序列化能力"""
+!         results = {}
+!         passed_count = 0
+!         failed_count = 0
+  
+!         amim_definitions = self.amim.AGENT_DEFINITIONS if self.amim else []
+  
+!         for agent_def in amim_definitions:
+!             agent_id = agent_def.agent_id
+!             desc = AgentServiceDescriptor.from_amim_and_instance(agent_def)
+!             verify = self.verify_roundtrip(desc)
+  
+!             results[agent_id] = verify
+!             if verify["passed"]:
+!                 passed_count += 1
+!             else:
+!                 failed_count += 1
+  
+!         return {
+!             "total": len(results),
+!             "passed": passed_count,
+!             "failed": failed_count,
+!             "rate": round(passed_count / max(len(results), 1) * 100, 1),
+!             "results": results
+!         }
+  
+!     def generate_lingjing_service_registry(self) -> Dict[str, Any]:
+!         """生成灵境服务注册清单"""
+!         descriptors = self.serialize_all()
+  
+!         services = {}
+!         for desc in descriptors:
+!             services[desc.agent_id] = {
+!                 "service_id": desc.lingjing_service_id,
+!                 "port": desc.lingjing_port,
+!                 "health_endpoint": desc.health_endpoint,
+!                 "layer": desc.layer,
+!                 "role": desc.role,
+!                 "name": desc.name,
+!                 "emoji": desc.emoji,
+!                 "tools": desc.tools,
+!                 "health_status": desc.health_status
+!             }
+  
+!         return {
+!             "_meta": {
+!                 "generated_at": datetime.now().isoformat(),
+!                 "schema_version": "1.0.0",
+!                 "service_count": len(services),
+!                 "distributed_ready": len(services) >= 20,
+!             },
+!             "services": services
+!         }

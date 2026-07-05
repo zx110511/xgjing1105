@@ -1,0 +1,757 @@
+r"""
+天机治理编排器 (Tianji Governance Orchestrator) v1.1
+=====================================================
+Phase 2 治理机制建设 — 顶层编排器
+
+M17升级: EvolutionLoop闭环 + record_action喂入 + health() + 双注入
+灵境道谱溯源: D4-1【三问门禁煞】· 道四·质量体道 · 四地煞之护之术
+  - 真实性→完整性→冲突性 三层门禁编排+全生命周期管控
+  - 源文件: core/governance_orchestrator.py → GovernanceOrchestrator
+
+职责:
+  1. 编排 ModuleRegistry + StaticAnalyzer + GovernancePipeline 全流程
+  2. 管理启动、注册、分析、审计四阶段
+  3. 提供治理状态健康检查 API
+  4. 集成到 FastAPI server 和托盘启动器
+
+基于前次SSS审计经验完善:
+  - utf-8-sig 编码统一使用
+  - 注册前预验证 (禁止重复关键字参数等效错误)
+  - 依赖图导入前缀剥离 (.前缀 -> module_id匹配)
+  - report.dependencies 必须显式赋值
+  - 状态管理强制使用枚举类型
+"""
+
+import ast
+import json
+import logging
+import sys
+import threading
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
+
+try:
+    from ..processors.evolution_loop import EvolutionLoop
+except ImportError:
+    EvolutionLoop = None
+
+APP_DIR = Path(__file__).resolve().parent.parent
+LOG_DIR = APP_DIR / "logs"
+LOG_DIR.mkdir(exist_ok=True)
+AUDIT_REPORT_DIR = LOG_DIR / "audit_reports"
+AUDIT_REPORT_DIR.mkdir(exist_ok=True)
+
+GOV_LOG = LOG_DIR / "governance.log"
+
+
+def _log(msg: str, level: str = "INFO"):
+    ts = datetime.now().strftime("%H:%M:%S")
+    line = f"[{ts}] [{level}] {msg}"
+    print(line, flush=True)
+
+
+def _log_gov(msg: str, level: str = "INFO"):
+    _log(msg, level)
+    try:
+        with open(GOV_LOG, "a", encoding="utf-8") as f:
+            ts = datetime.now().isoformat()
+            f.write(f"[{ts}] [{level}] {msg}\n")
+    except Exception:
+        pass
+
+
+class GovernanceOrchestrator:
+    r"""Phase 2 治理引导器 — 集成 ModuleRegistry + StaticAnalyzer + GovernancePipeline"""
+
+    def __init__(
+        self,
+        source_dir: str = None,
+        recorder: Optional[Any] = None,
+        learning_engine: Optional[Any] = None,
+    ):
+        if source_dir:
+            self._source_dir = Path(source_dir)
+        else:
+            self._source_dir = APP_DIR
+        self._core_dir = self._source_dir / "core"
+        self._recorder = recorder
+        self._learning_engine = learning_engine
+
+        self._governance_available = False
+        self._registry = None
+        self._analyzer = None
+        self._pipeline = None
+        self._last_analysis_report = None
+
+        self._status = {
+            "enabled": False,
+            "modules_registered": 0,
+            "modules_active": 0,
+            "modules_degraded": 0,
+            "modules_error": 0,
+            "circular_deps": 0,
+            "last_audit_time": None,
+            "last_audit_result": None,
+            "analysis_findings": 0,
+            "pipeline_records": 0,
+        }
+
+        self._stats_lock = threading.Lock()
+        self._gov_thread = None
+        self._gov_running = False
+        self._errors = 0
+
+        self._evo_loop = None
+        if EvolutionLoop is not None:
+            try:
+                self._evo_loop = EvolutionLoop(
+                    module_name="governance_orchestrator",
+                    effectiveness_fn=self._calc_orchestrator_effectiveness,
+                    learn_fn=self._learn_from_orchestrator,
+                    evolve_fn=self._evolve_orchestrator_config,
+                    mutable_config={
+                        "bootstrap_retry_max": 3,
+                        "audit_interval_seconds": 3600.0,
+                    },
+                    recorder=recorder,
+                    learning_engine=learning_engine,
+                )
+            except Exception:
+                pass
+
+    def bootstrap(self) -> bool:
+        _log_gov("治理引导器初始化开始")
+        try:
+            source_str = str(self._source_dir)
+            if source_str not in sys.path:
+                sys.path.insert(0, source_str)
+
+            from core.enforcement.governance_pipeline import (
+                GovernancePipeline,
+            )
+            from core.shared.module_registry import (
+                ModuleRegistry,
+            )
+            from core.shared.static_analyzer import (
+                StaticDependencyAnalyzer,
+            )
+
+            self._registry = ModuleRegistry()
+            self._analyzer = StaticDependencyAnalyzer()
+            self._pipeline = GovernancePipeline(self._registry)
+            self._governance_available = True
+
+            _log_gov("治理组件导入成功")
+        except Exception as e:
+            _log_gov(f"治理组件导入失败: {e}", "WARN")
+            import traceback
+
+            _log_gov(traceback.format_exc(), "ERROR")
+            return False
+
+        try:
+            self._run_registration_phase()
+            self._run_analysis_phase()
+            self._run_pipeline_phase()
+            self._generate_audit_report()
+            self._status["enabled"] = True
+            _log_gov("治理引导器初始化完成")
+            if self._evo_loop is not None:
+                try:
+                    self._evo_loop.record_action(
+                        action="bootstrap",
+                        state_before={"governance_available": False},
+                        state_after={
+                            "governance_available": True,
+                            "modules_registered": self._status["modules_registered"],
+                            "circular_deps": self._status["circular_deps"],
+                        },
+                    )
+                except Exception:
+                    pass
+            return True
+        except Exception as e:
+            _log_gov(f"治理引导器运行失败: {e}", "ERROR")
+            import traceback
+
+            _log_gov(traceback.format_exc(), "ERROR")
+            return False
+
+    def _extract_module_metadata(self, py_file: Path):
+        try:
+            content = py_file.read_text(encoding="utf-8-sig")
+            tree = ast.parse(content, filename=str(py_file))
+
+            classes = []
+            functions = []
+            docstring = ast.get_docstring(tree) or ""
+
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ClassDef):
+                    classes.append(node.name)
+                elif isinstance(node, ast.FunctionDef):
+                    functions.append(node.name)
+
+            internal_imports = []
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ImportFrom):
+                    if node.module and node.module.startswith("."):
+                        target = node.module.lstrip(".")
+                        internal_imports.append(target)
+
+            return {
+                "classes": classes,
+                "functions": functions,
+                "docstring": docstring,
+                "imports": internal_imports,
+                "class_count": len(classes),
+                "func_count": len(functions),
+            }
+        except Exception as e:
+            _log_gov(f"解析 {py_file.name} 失败: {e}", "WARN")
+            return {
+                "classes": [],
+                "functions": [],
+                "docstring": "",
+                "imports": [],
+                "class_count": 0,
+                "func_count": 0,
+            }
+
+    def _classify_module_tier(self, file_name: str, meta: dict) -> tuple:
+        from core.shared.module_registry import ModuleTier, ModuleType
+
+        engine_modules = {"engine", "llm_bridge", "hybrid_engine"}
+        config_modules = {"config", "models", "router"}
+        quality_modules = {"quality_gate", "enforcement_hook"}
+        evolution_modules = {"evolution_engine", "evolution_loop", "learning_loop"}
+        driver_modules = {"deepseek_driver", "async_bridge"}
+        scheduler_modules = {"intelligent_scheduler", "workflow_engine"}
+        gateway_modules = {"message_gateway", "namespace_manager"}
+        storage_modules = {"sqlite_store", "chinese_tokenizer"}
+        orchestration_modules = {"agent_orchestrator", "skill_registry"}
+        governance_modules = {
+            "module_registry",
+            "static_analyzer",
+            "governance_pipeline",
+            "tvp_bridge",
+        }
+
+        tier_map = {
+            **{m: ModuleTier.CORE_ENGINE for m in engine_modules},
+            **{m: ModuleTier.CORE_ENGINE for m in config_modules},
+            **{m: ModuleTier.ENFORCEMENT_COMPLIANCE for m in quality_modules},
+            **{m: ModuleTier.LEARNING_EVOLUTION for m in evolution_modules},
+            **{m: ModuleTier.LEARNING_EVOLUTION for m in driver_modules},
+            **{m: ModuleTier.SCHEDULING_ORCHESTRATION for m in scheduler_modules},
+            **{m: ModuleTier.SCHEDULING_ORCHESTRATION for m in gateway_modules},
+            **{m: ModuleTier.INFRASTRUCTURE_FOUNDATION for m in storage_modules},
+            **{m: ModuleTier.ENFORCEMENT_COMPLIANCE for m in orchestration_modules},
+            **{m: ModuleTier.CORE_ENGINE for m in governance_modules},
+        }
+
+        type_map = {
+            **{m: ModuleType.ENGINE for m in engine_modules},
+            **{m: ModuleType.ENGINE for m in config_modules},
+            **{m: ModuleType.QUALITY_GATE for m in quality_modules},
+            **{m: ModuleType.LOOP for m in evolution_modules},
+            **{m: ModuleType.HOOK for m in driver_modules},
+            **{m: ModuleType.SCHEDULER for m in scheduler_modules},
+            **{m: ModuleType.ADAPTER for m in gateway_modules},
+            **{m: ModuleType.REGISTRY for m in storage_modules},
+            **{m: ModuleType.ORCHESTRATOR for m in orchestration_modules},
+            **{m: ModuleType.REGISTRY for m in governance_modules},
+        }
+
+        tier = tier_map.get(file_name, ModuleTier.ENFORCEMENT_COMPLIANCE)
+        mod_type = type_map.get(file_name, ModuleType.SERVICE)
+        return tier, mod_type
+
+    def _classify_domain(self, file_name: str) -> str:
+        domain_map = {
+            "engine": "记忆管理",
+            "hybrid_engine": "记忆管理",
+            "llm_bridge": "模型桥接",
+            "config": "系统配置",
+            "models": "数据模型",
+            "router": "路由分发",
+            "quality_gate": "质量门禁",
+            "enforcement_hook": "合规执行",
+            "evolution_engine": "自进化",
+            "evolution_loop": "自进化",
+            "learning_loop": "闭环学习",
+            "deepseek_driver": "LLM驱动",
+            "async_bridge": "异步桥接",
+            "intelligent_scheduler": "智能调度",
+            "workflow_engine": "工作流引擎",
+            "message_gateway": "消息网关",
+            "namespace_manager": "命名空间",
+            "sqlite_store": "数据持久化",
+            "chinese_tokenizer": "中文分词",
+            "agent_orchestrator": "智能体编排",
+            "skill_registry": "技能注册",
+            "module_registry": "模块治理",
+            "static_analyzer": "静态分析",
+            "governance_pipeline": "治理流水线",
+            "tvp_bridge": "TVP桥接",
+        }
+        return domain_map.get(file_name, "通用")
+
+    def _run_registration_phase(self):
+        from core.shared.module_registry import (
+            EventDef,
+            HealthMetricDef,
+            MethodSignature,
+            ModuleDependency,
+            ModuleLifecycleState,
+            TianjiModuleDefinition,
+        )
+
+        _log_gov("=== Phase 2a: 模块注册 ===")
+        if not self._core_dir.exists():
+            _log_gov(f"核心目录不存在: {self._core_dir}", "ERROR")
+            return
+
+        py_files = sorted(self._core_dir.glob("*.py"))
+        py_files = [f for f in py_files if f.name != "__init__.py"]
+        registered = 0
+        skipped = 0
+
+        for py_file in py_files:
+            file_name = py_file.stem
+            meta = self._extract_module_metadata(py_file)
+            tier, mod_type = self._classify_module_tier(file_name, meta)
+
+            capabilities = (
+                meta["classes"][:5]
+                if meta["classes"]
+                else [f"fn_{f}" for f in meta["functions"][:5]]
+            )
+
+            api_methods = []
+            for fname in meta["functions"][:8]:
+                api_methods.append(
+                    MethodSignature(
+                        name=fname,
+                        params=[],
+                        returns="Any",
+                        description=meta["docstring"][:200]
+                        if not fname.startswith("_")
+                        else "",
+                    )
+                )
+
+            from core.shared.module_registry import DependencyType
+
+            deps = [
+                ModuleDependency(
+                    target_module=dep,
+                    dependency_type=DependencyType.REQUIRED,
+                    description=f"依赖 {dep}",
+                )
+                for dep in meta["imports"]
+            ]
+
+            try:
+                mod_def = TianjiModuleDefinition(
+                    module_id=file_name,
+                    module_name=file_name,
+                    display_name=file_name,
+                    module_version="9.1.0",
+                    tier=tier,
+                    module_type=mod_type,
+                    domain=self._classify_domain(file_name),
+                    responsibility=meta["docstring"][:300] or f"{file_name} 模块",
+                    capabilities=capabilities,
+                    anti_responsibilities=["不跨域访问", "不直接操作文件系统"],
+                    dependencies=deps,
+                    public_api=api_methods,
+                    events_published=[
+                        EventDef(
+                            name=f"on_{file_name}_ready",
+                            event_type="lifecycle",
+                            description=f"{file_name} 模块就绪",
+                        )
+                    ],
+                    health_metrics=[
+                        HealthMetricDef(
+                            metric_name="availability",
+                            unit="boolean",
+                            warn_threshold=1.0,
+                            critical_threshold=0.0,
+                        )
+                    ],
+                    lifecycle_state=ModuleLifecycleState.REGISTERED,
+                )
+
+                if self._registry.register(mod_def):
+                    registered += 1
+                    _log_gov(
+                        f"  注册: {file_name} ({tier.value}/{mod_type.value}) — {meta['class_count']}类/{meta['func_count']}函数"
+                    )
+                else:
+                    skipped += 1
+            except Exception as e:
+                _log_gov(f"  注册失败 [{file_name}]: {e}", "ERROR")
+                skipped += 1
+
+        self._status["modules_registered"] = registered
+        _log_gov(f"注册阶段完成: {registered} 成功, {skipped} 跳过")
+
+        if self._evo_loop is not None:
+            try:
+                self._evo_loop.record_action(
+                    action="register",
+                    state_before={
+                        "modules_registered": self._status["modules_registered"]
+                        - registered
+                    },
+                    state_after={"modules_registered": registered, "skipped": skipped},
+                )
+            except Exception:
+                pass
+
+    def _run_analysis_phase(self):
+        from core.shared.static_analyzer import sync_analyzer_to_registry
+
+        _log_gov("=== Phase 2b: 静态分析 ===")
+        try:
+            report = self._analyzer.analyze(str(self._core_dir))
+
+            self._status["analysis_findings"] = len(report.findings)
+            self._status["circular_deps"] = len(report.circular_dependencies)
+
+            _log_gov(
+                f"分析阶段完成: {report.total_modules}模块, "
+                f"{len(report.dependencies)}条依赖, "
+                f"{len(report.dependency_graph)}个节点, "
+                f"{len(report.findings)}个发现, "
+                f"{len(report.circular_dependencies)}个循环依赖"
+            )
+
+            sync_result = sync_analyzer_to_registry(
+                self._analyzer, self._registry, report
+            )
+            _log_gov(
+                f"  同步: 依赖={sync_result.get('dependencies_synced', 0)}, "
+                f"归档={sync_result.get('findings_archived', 0)}"
+            )
+
+            self._last_analysis_report = report
+        except Exception as e:
+            _log_gov(f"分析阶段失败: {e}", "ERROR")
+            import traceback
+
+            _log_gov(traceback.format_exc(), "ERROR")
+
+        if self._evo_loop is not None:
+            try:
+                self._evo_loop.record_action(
+                    action="analyze",
+                    state_before={
+                        "analysis_findings": self._status["analysis_findings"]
+                        - len(getattr(self._last_analysis_report, "findings", []))
+                    },
+                    state_after={
+                        "analysis_findings": self._status["analysis_findings"],
+                        "circular_deps": self._status["circular_deps"],
+                    },
+                )
+            except Exception:
+                pass
+
+    def _run_pipeline_phase(self):
+        from core.enforcement.governance_pipeline import AuditVerdict
+
+        _log_gov("=== Phase 2c: 治理流水线 ===")
+        if not self._registry:
+            _log_gov("注册中心未初始化", "WARN")
+            return
+
+        modules = self._registry.list_all()
+        total_passed = 0
+        total_failed = 0
+
+        for module_def in modules:
+            try:
+                result = self._pipeline.run_full_pipeline(module_def)
+                if hasattr(result, "overall_verdict") and result.overall_verdict:
+                    if result.overall_verdict == AuditVerdict.PASS:
+                        total_passed += 1
+                    else:
+                        total_failed += 1
+            except Exception as e:
+                _log_gov(f"  流水线 [{module_def.module_id}]: {e}", "WARN")
+                total_failed += 1
+
+        records = self._pipeline.get_all_records()
+        self._status["pipeline_records"] = len(records)
+        self._status["modules_active"] = self._registry._stats.get("total_active", 0)
+        self._status["modules_degraded"] = self._registry._stats.get(
+            "total_degraded", 0
+        )
+        self._status["modules_error"] = self._registry._stats.get("total_errors", 0)
+
+        _log_gov(
+            f"流水线阶段完成: {total_passed}通过/{total_failed}失败, "
+            f"活跃={self._status['modules_active']}, 降级={self._status['modules_degraded']}, "
+            f"错误={self._status['modules_error']}"
+        )
+
+        if self._evo_loop is not None:
+            try:
+                self._evo_loop.record_action(
+                    action="pipeline",
+                    state_before={
+                        "pipeline_records": self._status["pipeline_records"]
+                        - len(records)
+                    },
+                    state_after={
+                        "pipeline_records": self._status["pipeline_records"],
+                        "passed": total_passed,
+                        "failed": total_failed,
+                    },
+                )
+            except Exception:
+                pass
+
+    def _generate_audit_report(self):
+        _log_gov("=== Phase 2d: 审计报告 ===")
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        report_path = AUDIT_REPORT_DIR / f"governance_audit_{ts}.json"
+
+        total_audit_records = 0
+        modules_with_audits = 0
+        if self._registry:
+            for m in self._registry.list_all():
+                ar = len(m.audit_records)
+                total_audit_records += ar
+                if ar > 0:
+                    modules_with_audits += 1
+
+        report = {
+            "timestamp": datetime.now().isoformat(),
+            "version": "9.1.0",
+            "phase": "Phase2-治理机制建设",
+            "components": {
+                "module_registry": {
+                    "modules_registered": self._status["modules_registered"],
+                    "modules_active": self._status["modules_active"],
+                    "modules_degraded": self._status["modules_degraded"],
+                    "modules_error": self._status["modules_error"],
+                },
+                "static_analyzer": {
+                    "modules_analyzed": getattr(
+                        self._last_analysis_report, "total_modules", 0
+                    )
+                    if hasattr(self, "_last_analysis_report")
+                    else 0,
+                    "dependencies_found": getattr(
+                        self._last_analysis_report, "total_edges", 0
+                    )
+                    if hasattr(self, "_last_analysis_report")
+                    else 0,
+                    "findings": self._status["analysis_findings"],
+                    "circular_deps": self._status["circular_deps"],
+                },
+                "governance_pipeline": {
+                    "pipeline_records": self._status["pipeline_records"],
+                },
+            },
+            "audit_summary": {
+                "total_audit_records": total_audit_records,
+                "modules_with_audits": modules_with_audits,
+                "circular_dependencies": self._status["circular_deps"],
+            },
+            "data_foundation": {
+                "source_dir": str(self._core_dir),
+                "py_files_available": len(list(self._core_dir.glob("*.py")))
+                if self._core_dir.exists()
+                else 0,
+            },
+        }
+
+        try:
+            with open(report_path, "w", encoding="utf-8") as f:
+                json.dump(report, f, ensure_ascii=False, indent=2)
+            self._status["last_audit_time"] = datetime.now().isoformat()
+            self._status["last_audit_result"] = str(report_path)
+            _log_gov(f"审计报告已生成: {report_path}")
+        except Exception as e:
+            _log_gov(f"审计报告生成失败: {e}", "ERROR")
+
+    def get_status(self) -> dict:
+        with self._stats_lock:
+            return dict(self._status)
+
+    def health_check_all(self) -> dict:
+        result = {
+            "governance_available": self._governance_available,
+            "registry_ready": self._registry is not None,
+            "analyzer_ready": self._analyzer is not None,
+            "pipeline_ready": self._pipeline is not None,
+            **self.get_status(),
+            "circular_dependency_check": "PASS"
+            if self._status["circular_deps"] == 0
+            else f"WARN:{self._status['circular_deps']}",
+        }
+
+        if self._registry:
+            try:
+                deps_result = self._registry.validate_dependencies()
+                issues = (
+                    deps_result
+                    if isinstance(deps_result, list)
+                    else deps_result.get("issues", [])
+                )
+                result["dependency_validation"] = (
+                    "PASS" if not issues else f"WARN:{len(issues)}"
+                )
+            except Exception as e:
+                result["dependency_validation"] = f"ERROR:{e}"
+
+            try:
+                health_result = self._registry.health_check_all()
+                result["module_health"] = (
+                    f"OK:{health_result.get('healthy', 0)}/{health_result.get('total', 0)}"
+                )
+            except Exception as e:
+                result["module_health"] = f"ERROR:{e}"
+
+        return result
+
+    def export_module_manifest(self) -> dict:
+        if not self._registry:
+            return {"error": "registry not initialized"}
+        modules_data = []
+        for m in self._registry.list_all():
+            modules_data.append(
+                {
+                    "module_id": m.module_id,
+                    "module_name": m.module_name,
+                    "tier": m.tier.value if hasattr(m.tier, "value") else str(m.tier),
+                    "module_type": m.module_type.value
+                    if hasattr(m.module_type, "value")
+                    else str(m.module_type),
+                    "domain": m.domain,
+                    "lifecycle_state": m.lifecycle_state.value
+                    if hasattr(m.lifecycle_state, "value")
+                    else str(m.lifecycle_state),
+                    "version": m.module_version,
+                    "dependencies": len(m.dependencies),
+                    "capabilities": m.capabilities[:5],
+                    "audit_records": len(m.audit_records),
+                }
+            )
+        return {
+            "modules": modules_data,
+            "governance_status": self.get_status(),
+            "audit_reports": [str(p) for p in AUDIT_REPORT_DIR.glob("*.json")],
+        }
+
+    def run_reaudit(self) -> dict:
+        _log_gov("执行增量审计...")
+        if not self._governance_available:
+            return {"status": "error", "reason": "governance not available"}
+        try:
+            self._run_registration_phase()
+            self._run_analysis_phase()
+            self._run_pipeline_phase()
+            self._generate_audit_report()
+            return {"status": "completed", "governance_status": self.get_status()}
+        except Exception as e:
+            return {"status": "error", "reason": str(e)}
+
+    def health(self) -> Dict[str, Any]:
+        return {
+            "status": "ready",
+            "version": "1.1",
+            "governance_available": self._governance_available,
+            "registry_ready": self._registry is not None,
+            "analyzer_ready": self._analyzer is not None,
+            "pipeline_ready": self._pipeline is not None,
+            "modules_registered": self._status["modules_registered"],
+            "modules_active": self._status["modules_active"],
+            "circular_deps": self._status["circular_deps"],
+            "pipeline_records": self._status["pipeline_records"],
+            "errors": self._errors,
+            "evo_loop_active": self._evo_loop is not None,
+            "recorder_attached": self._recorder is not None,
+        }
+
+    def get_stats(self) -> Dict[str, Any]:
+        return {
+            "version": "1.1",
+            **self._status,
+            "health": self.health(),
+            "evo_loop": self._evo_loop.get_stats() if self._evo_loop else {},
+        }
+
+    def tick(self):
+        if self._evo_loop is not None:
+            try:
+                self._evo_loop.tick()
+            except Exception:
+                pass
+
+    def _calc_orchestrator_effectiveness(
+        self, action: str, state_before: Dict[str, Any], state_after: Dict[str, Any]
+    ) -> float:
+        if action == "bootstrap":
+            return 0.8 if state_after.get("governance_available", False) else -0.5
+        elif action == "register":
+            registered = state_after.get("modules_registered", 0)
+            skipped = state_after.get("skipped", 0)
+            total = registered + skipped
+            return 0.6 if total > 0 and registered / max(total, 1) > 0.8 else 0.2
+        elif action == "analyze":
+            return 0.4 if state_after.get("analysis_findings", 0) >= 0 else -0.1
+        elif action == "pipeline":
+            passed = state_after.get("passed", 0)
+            failed = state_after.get("failed", 0)
+            total = passed + failed
+            return 0.6 if total > 0 and passed / max(total, 1) > 0.9 else 0.3
+        return 0.0
+
+    def _learn_from_orchestrator(
+        self, causal_pairs: List[Any], effectiveness_summary: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        return {
+            "patterns_found": len(causal_pairs),
+            "avg_effectiveness": effectiveness_summary.get("avg_effectiveness", 0.0),
+            "modules_registered": self._status["modules_registered"],
+            "modules_active": self._status["modules_active"],
+            "circular_deps": self._status["circular_deps"],
+            "circular_dep_check": "PASS"
+            if self._status["circular_deps"] == 0
+            else "WARN",
+        }
+
+    def _evolve_orchestrator_config(
+        self, learn_result: Dict[str, Any], mutable_config: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        changes = {}
+        circular_deps = learn_result.get("circular_deps", 0)
+        if circular_deps > 0:
+            changes["bootstrap_retry_max"] = min(
+                5, mutable_config.get("bootstrap_retry_max", 3) + 1
+            )
+        if circular_deps == 0:
+            changes["bootstrap_retry_max"] = 3
+        return {"rules_modified": changes, "skills_created": []}
+
+
+_governor_instance: Optional[GovernanceOrchestrator] = None
+_governor_lock = threading.Lock()
+
+
+def get_governor() -> GovernanceOrchestrator:
+    global _governor_instance
+    with _governor_lock:
+        if _governor_instance is None:
+            _governor_instance = GovernanceOrchestrator()
+            _governor_instance.bootstrap()
+        return _governor_instance

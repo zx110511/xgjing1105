@@ -1,0 +1,326 @@
+> r"""
+> 四通道融合检索器 v1.0
+> =====================
+> 按优先级依次检索四通道，结果融合去重后返回:
+  
+> 通道1: FTS5 全文搜索 (快) → content_segmented 精确匹配
+> 通道2: tag_index 标签索引 (准) → 精确匹配 tags
+> 通道3: 语义向量搜索 (深) → MiniLM 跨语义匹配
+> 通道4: KG 拓扑关联 (全) → 知识图谱关联扩展
+  
+> 融合策略: RRF (Reciprocal Rank Fusion) + 通道权重
+> """
+  
+! import time
+! import threading
+! import logging
+! from typing import Any, Optional, Dict, List, Tuple
+! from dataclasses import dataclass, field
+! from enum import Enum
+! from concurrent.futures import ThreadPoolExecutor, as_completed
+  
+! logger = logging.getLogger("tianji.fusion_retriever")
+  
+  
+! class ChannelPriority(int, Enum):
+!     FTS5 = 1
+!     TAG_INDEX = 2
+!     SEMANTIC = 3
+!     KG_TOPOLOGY = 4
+  
+  
+! CHANNEL_WEIGHTS = {
+!     ChannelPriority.FTS5: 0.35,
+!     ChannelPriority.TAG_INDEX: 0.25,
+!     ChannelPriority.SEMANTIC: 0.25,
+!     ChannelPriority.KG_TOPOLOGY: 0.15,
+! }
+  
+! RRF_K = 60
+  
+  
+! @dataclass
+! class ChannelResult:
+!     channel: str
+!     entry_id: str
+!     content: str
+!     score: float
+!     layer: str = ""
+!     tags: List[str] = field(default_factory=list)
+!     metadata: Dict = field(default_factory=dict)
+  
+  
+! @dataclass
+! class FusionResult:
+!     query: str
+!     results: List[Dict]
+!     channel_stats: Dict[str, int]
+!     total_time_ms: float
+!     fusion_method: str = "rrf_weighted"
+  
+  
+! class FusionRetriever:
+!     """
+!     四通道融合检索器
+  
+!     检索优先级: FTS5(快) → tag_index(准) → 语义(深) → KG(全)
+!     融合策略: RRF加权融合
+!     """
+  
+!     def __init__(self, engine=None, sqlite_store=None, graph_store=None,
+!                  embeddings_service=None):
+!         self._engine = engine
+!         self._sqlite_store = sqlite_store
+!         self._graph_store = graph_store
+!         self._embeddings_service = embeddings_service
+!         self._lock = threading.Lock()
+!         self._stats = {
+!             "total_queries": 0,
+!             "channel_hits": {c.name: 0 for c in ChannelPriority},
+!             "channel_errors": {c.name: 0 for c in ChannelPriority},
+!             "fusion_count": 0,
+!         }
+  
+!     def set_engine(self, engine):
+!         self._engine = engine
+  
+!     def set_sqlite_store(self, store):
+!         self._sqlite_store = store
+  
+!     def set_graph_store(self, store):
+!         self._graph_store = store
+  
+!     def set_embeddings_service(self, service):
+!         self._embeddings_service = service
+  
+!     def retrieve(self, query: str, limit: int = 10,
+!                  layers: Optional[List[str]] = None,
+!                  min_score: float = 0.0) -> FusionResult:
+!         """
+!         四通道融合检索 — 核心入口
+!         """
+!         start = time.time()
+!         self._stats["total_queries"] += 1
+  
+!         all_channel_results: Dict[str, List[ChannelResult]] = {}
+  
+!         with ThreadPoolExecutor(max_workers=4) as executor:
+!             futures = {
+!                 executor.submit(self._search_fts5, query, limit, layers): ChannelPriority.FTS5,
+!                 executor.submit(self._search_tag_index, query, limit, layers): ChannelPriority.TAG_INDEX,
+!                 executor.submit(self._search_semantic, query, limit, layers): ChannelPriority.SEMANTIC,
+!                 executor.submit(self._search_kg, query, limit, layers): ChannelPriority.KG_TOPOLOGY,
+!             }
+  
+!             for future in as_completed(futures):
+!                 channel = futures[future]
+!                 try:
+!                     results = future.result()
+!                     all_channel_results[channel.name] = results
+!                     self._stats["channel_hits"][channel.name] += len(results)
+!                 except Exception as e:
+!                     logger.error(f"通道 {channel.name} 检索失败: {e}")
+!                     all_channel_results[channel.name] = []
+!                     self._stats["channel_errors"][channel.name] += 1
+  
+!         fused = self._rrf_weighted_fusion(all_channel_results, limit)
+  
+!         if min_score > 0:
+!             fused = [r for r in fused if r.get("score", 0) >= min_score]
+  
+!         elapsed = (time.time() - start) * 1000
+!         channel_stats = {name: len(results) for name, results in all_channel_results.items()}
+  
+!         self._stats["fusion_count"] += 1
+  
+!         return FusionResult(
+!             query=query,
+!             results=fused,
+!             channel_stats=channel_stats,
+!             total_time_ms=elapsed,
+!         )
+  
+!     def _search_fts5(self, query: str, limit: int,
+!                      layers: Optional[List[str]]) -> List[ChannelResult]:
+!         """
+!         通道1: FTS5 全文搜索
+!         """
+!         results = []
+  
+!         if self._sqlite_store:
+!             try:
+!                 fts_results = self._sqlite_store.search(query, limit=limit, layers=layers)
+!                 for r in fts_results[:limit]:
+!                     results.append(ChannelResult(
+!                         channel="FTS5",
+!                         entry_id=r.get("id", ""),
+!                         content=r.get("content", ""),
+!                         score=r.get("score", 0.5),
+!                         layer=r.get("layer", ""),
+!                         tags=r.get("tags", []),
+!                     ))
+!             except Exception as e:
+!                 logger.error(f"FTS5搜索失败: {e}")
+  
+!         if not results and self._engine:
+!             try:
+!                 engine_results = self._engine.recall(query=query, limit=limit,
+!                                                       min_score=0.0, layers=layers)
+!                 for r in engine_results[:limit]:
+!                     if isinstance(r, dict):
+!                         results.append(ChannelResult(
+!                             channel="FTS5",
+!                             entry_id=r.get("id", ""),
+!                             content=r.get("content", ""),
+!                             score=r.get("score", 0.5),
+!                             layer=r.get("layer", ""),
+!                             tags=r.get("tags", []),
+!                         ))
+!             except Exception:
+!                 pass
+  
+!         return results
+  
+!     def _search_tag_index(self, query: str, limit: int,
+!                           layers: Optional[List[str]]) -> List[ChannelResult]:
+!         """
+!         通道2: tag_index 标签索引
+!         """
+!         results = []
+!         query_tags = [t.strip().lower() for t in query.split() if len(t.strip()) > 1]
+  
+!         if self._sqlite_store:
+!             try:
+!                 tag_results = self._sqlite_store.search_by_tags(query_tags, limit=limit,
+!                                                                  layers=layers)
+!                 for r in tag_results[:limit]:
+!                     results.append(ChannelResult(
+!                         channel="TAG_INDEX",
+!                         entry_id=r.get("id", ""),
+!                         content=r.get("content", ""),
+!                         score=r.get("score", 0.4),
+!                         layer=r.get("layer", ""),
+!                         tags=r.get("tags", []),
+!                     ))
+!             except Exception:
+!                 pass
+  
+!         return results
+  
+!     def _search_semantic(self, query: str, limit: int,
+!                          layers: Optional[List[str]]) -> List[ChannelResult]:
+!         """
+!         通道3: 语义向量搜索
+!         """
+!         results = []
+  
+!         if self._embeddings_service:
+!             try:
+!                 sem_results = self._embeddings_service.search(query, top_k=limit)
+!                 for r in sem_results[:limit]:
+!                     if isinstance(r, dict):
+!                         results.append(ChannelResult(
+!                             channel="SEMANTIC",
+!                             entry_id=r.get("id", ""),
+!                             content=r.get("content", ""),
+!                             score=r.get("score", 0.3),
+!                             layer=r.get("layer", ""),
+!                             tags=r.get("tags", []),
+!                         ))
+!             except Exception:
+!                 pass
+  
+!         if not results and self._engine:
+!             try:
+!                 engine_results = self._engine.recall(query=query, limit=limit,
+!                                                       min_score=0.1, layers=layers)
+!                 for r in engine_results[:limit]:
+!                     if isinstance(r, dict):
+!                         score = r.get("score", 0.3)
+!                         if score > 0.3:
+!                             results.append(ChannelResult(
+!                                 channel="SEMANTIC",
+!                                 entry_id=r.get("id", ""),
+!                                 content=r.get("content", ""),
+!                                 score=score,
+!                                 layer=r.get("layer", ""),
+!                                 tags=r.get("tags", []),
+!                             ))
+!             except Exception:
+!                 pass
+  
+!         return results
+  
+!     def _search_kg(self, query: str, limit: int,
+!                    layers: Optional[List[str]]) -> List[ChannelResult]:
+!         """
+!         通道4: KG 拓扑关联
+!         """
+!         results = []
+  
+!         if self._graph_store:
+!             try:
+!                 kg_results = self._graph_store.search_entities(query, limit=limit)
+!                 for r in kg_results[:limit]:
+!                     if isinstance(r, dict):
+!                         results.append(ChannelResult(
+!                             channel="KG_TOPOLOGY",
+!                             entry_id=r.get("id", ""),
+!                             content=r.get("content", ""),
+!                             score=r.get("score", 0.2),
+!                             layer=r.get("layer", "semantic"),
+!                             tags=r.get("tags", []),
+!                         ))
+!             except Exception:
+!                 pass
+  
+!         return results
+  
+!     def _rrf_weighted_fusion(self, all_results: Dict[str, List[ChannelResult]],
+!                               limit: int) -> List[Dict]:
+!         """
+!         RRF加权融合 — 通道权重 × RRF分数
+!         """
+!         scores: Dict[str, Tuple[float, ChannelResult]] = {}
+  
+!         for channel_name, channel_results in all_results.items():
+!             try:
+!                 channel = ChannelPriority[channel_name]
+!             except (KeyError, ValueError):
+!                 continue
+  
+!             weight = CHANNEL_WEIGHTS.get(channel, 0.1)
+  
+!             for rank, result in enumerate(channel_results, start=1):
+!                 rrf_score = weight / (RRF_K + rank)
+  
+!                 if result.entry_id in scores:
+!                     old_score, old_result = scores[result.entry_id]
+!                     scores[result.entry_id] = (old_score + rrf_score, old_result)
+!                 else:
+!                     scores[result.entry_id] = (rrf_score, result)
+  
+!         sorted_results = sorted(scores.values(), key=lambda x: x[0], reverse=True)
+  
+!         fused = []
+!         for score, result in sorted_results[:limit]:
+!             fused.append({
+!                 "id": result.entry_id,
+!                 "content": result.content,
+!                 "score": round(score, 6),
+!                 "layer": result.layer,
+!                 "tags": result.tags,
+!                 "metadata": result.metadata,
+!             })
+  
+!         return fused
+  
+!     def get_stats(self) -> Dict:
+!         return {
+!             **self._stats,
+!             "engine_connected": self._engine is not None,
+!             "sqlite_connected": self._sqlite_store is not None,
+!             "graph_connected": self._graph_store is not None,
+!             "embeddings_connected": self._embeddings_service is not None,
+!             "channel_weights": {c.name: w for c, w in CHANNEL_WEIGHTS.items()},
+!         }

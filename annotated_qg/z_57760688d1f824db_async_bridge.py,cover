@@ -1,0 +1,477 @@
+> r"""
+> 天机异步桥接层 (Tianji Async Bridge) v1.0
+> ==========================================
+> 借鉴Hermes Agent的_run_async()三层策略，替换天机core中
+> 所有urllib同步HTTP调用为异步桥接模式。
+  
+> Hermes三层策略:
+>   Layer 1: 异步上下文 → 新线程+独立event loop
+>   Layer 2: 工作线程   → 线程本地持久化event loop
+>   Layer 3: 主线程     → 全局持久化event loop
+  
+> 天机增强:
+>   + 自动降级: asyncio不可用时回退urllib
+>   + 连接池:   aiohttp.TCPConnector复用连接
+>   + 重试策略: 指数退避(1s, 2s, 4s)
+>   + 天机感知: 自动注入memory_id追踪
+  
+> 架构位置: 天机/core/async_bridge.py
+> 依赖: aiohttp(可选), urllib.request(降级)
+> """
+  
+> import json
+> import time
+> import asyncio
+> import threading
+> import logging
+> from typing import Any, Optional, Dict, List, Tuple
+> from dataclasses import dataclass, field
+> from concurrent.futures import ThreadPoolExecutor, Future
+> from enum import Enum
+  
+> logger = logging.getLogger("tianji.async_bridge")
+  
+> _AIOHTTP_AVAILABLE = False
+> _aiohttp = None
+> try:
+>     import aiohttp as _aiohttp_mod
+>     _aiohttp = _aiohttp_mod
+>     _AIOHTTP_AVAILABLE = True
+! except ImportError:
+!     pass
+  
+  
+> class BridgeLayer(str, Enum):
+>     LAYER1_NEW_THREAD = "layer1_new_thread"
+>     LAYER2_WORKER_THREAD = "layer2_worker_thread"
+>     LAYER3_MAIN_THREAD = "layer3_main_thread"
+>     FALLBACK_SYNC = "fallback_sync"
+  
+  
+> @dataclass
+> class BridgeConfig:
+>     base_url: str = "http://127.0.0.1:8771"
+>     timeout_seconds: float = 10.0
+>     max_retries: int = 3
+>     retry_backoff: List[float] = field(default_factory=lambda: [1.0, 2.0, 4.0])
+>     pool_connections: int = 10
+>     pool_max_per_host: int = 5
+>     thread_pool_size: int = 4
+  
+  
+> @dataclass
+> class BridgeResult:
+>     success: bool
+>     status_code: int = 0
+>     data: Optional[Dict] = None
+>     error: str = ""
+>     layer_used: BridgeLayer = BridgeLayer.FALLBACK_SYNC
+>     latency_ms: float = 0.0
+>     memory_id: str = ""
+>     retry_count: int = 0
+  
+  
+> class _PersistentEventLoop:
+>     """持久化事件循环 — 每个线程一个，避免重复创建销毁"""
+  
+>     def __init__(self):
+>         self._loop: Optional[asyncio.AbstractEventLoop] = None
+>         self._thread: Optional[threading.Thread] = None
+>         self._lock = threading.Lock()
+>         self._ready = threading.Event()
+  
+>     def get_loop(self) -> asyncio.AbstractEventLoop:
+!         with self._lock:
+!             if self._loop is not None and self._loop.is_running():
+!                 return self._loop
+  
+!             self._ready.clear()
+!             self._thread = threading.Thread(
+!                 target=self._run_loop, daemon=True, name="tianji-async-loop"
+!             )
+!             self._thread.start()
+!             self._ready.wait(timeout=5.0)
+!             return self._loop
+  
+>     def _run_loop(self):
+!         self._loop = asyncio.new_event_loop()
+!         asyncio.set_event_loop(self._loop)
+!         self._ready.set()
+!         self._loop.run_forever()
+  
+>     def shutdown(self):
+!         if self._loop and self._loop.is_running():
+!             self._loop.call_soon_threadsafe(self._loop.stop)
+  
+  
+> _GLOBAL_LOOP = _PersistentEventLoop()
+> _THREAD_LOCAL = threading.local()
+> _THREAD_POOL = ThreadPoolExecutor(max_workers=4, thread_name_prefix="tianji-bridge")
+  
+  
+> def _get_thread_local_loop() -> Optional[asyncio.AbstractEventLoop]:
+!     loop = getattr(_THREAD_LOCAL, "event_loop", None)
+!     if loop is not None and loop.is_running():
+!         return loop
+!     try:
+!         loop = asyncio.get_running_loop()
+!         _THREAD_LOCAL.event_loop = loop
+!         return loop
+!     except RuntimeError:
+!         return None
+  
+  
+> class AsyncBridge:
+>     """
+>     异步桥接层 — 借鉴Hermes的_run_async()三层策略
+  
+>     使用方式:
+>       bridge = AsyncBridge()
+>       result = bridge.post("/api/memory/", {"content": "...", "layer": "semantic"})
+        # result.success / result.data / result.memory_id
+>     """
+  
+>     def __init__(self, config: Optional[BridgeConfig] = None):
+!         self._config = config or BridgeConfig()
+!         self._session: Any = None
+!         self._session_lock = threading.Lock()
+!         self._stats = {
+!             "total_calls": 0,
+!             "layer1_calls": 0,
+!             "layer2_calls": 0,
+!             "layer3_calls": 0,
+!             "fallback_calls": 0,
+!             "success_count": 0,
+!             "error_count": 0,
+!             "retry_count": 0,
+!             "total_latency_ms": 0.0,
+!         }
+  
+>     async def _get_session(self) -> Any:
+!         if not _AIOHTTP_AVAILABLE:
+!             raise RuntimeError("aiohttp not available")
+!         if self._session is None or self._session.closed:
+!             connector = _aiohttp.TCPConnector(
+!                 limit=self._config.pool_connections,
+!                 limit_per_host=self._config.pool_max_per_host,
+!             )
+!             self._session = _aiohttp.ClientSession(
+!                 connector=connector,
+!                 timeout=_aiohttp.ClientTimeout(total=self._config.timeout_seconds),
+!             )
+!         return self._session
+  
+>     async def _async_post(self, path: str, payload: Dict) -> BridgeResult:
+!         session = await self._get_session()
+!         url = f"{self._config.base_url}{path}"
+!         last_error = ""
+  
+!         for attempt in range(self._config.max_retries):
+!             start = time.monotonic()
+!             try:
+!                 data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+!                 async with session.post(
+!                     url, data=data,
+!                     headers={"Content-Type": "application/json; charset=utf-8"},
+!                 ) as resp:
+!                     latency = (time.monotonic() - start) * 1000
+!                     body = await resp.text()
+!                     parsed = json.loads(body) if body else {}
+!                     return BridgeResult(
+!                         success=200 <= resp.status < 300,
+!                         status_code=resp.status,
+!                         data=parsed,
+!                         latency_ms=latency,
+!                         memory_id=parsed.get("memory_id", ""),
+!                         retry_count=attempt,
+!                     )
+!             except Exception as e:
+!                 last_error = str(e)
+!                 if attempt < self._config.max_retries - 1:
+!                     backoff = self._config.retry_backoff[
+!                         min(attempt, len(self._config.retry_backoff) - 1)
+!                     ]
+!                     await asyncio.sleep(backoff)
+!                     self._stats["retry_count"] += 1
+  
+!         return BridgeResult(
+!             success=False, error=last_error, retry_count=self._config.max_retries
+!         )
+  
+>     async def _async_get(self, path: str, params: Optional[Dict] = None) -> BridgeResult:
+!         session = await self._get_session()
+!         url = f"{self._config.base_url}{path}"
+!         start = time.monotonic()
+!         try:
+!             async with session.get(url, params=params) as resp:
+!                 latency = (time.monotonic() - start) * 1000
+!                 body = await resp.text()
+!                 parsed = json.loads(body) if body else {}
+!                 return BridgeResult(
+!                     success=200 <= resp.status < 300,
+!                     status_code=resp.status,
+!                     data=parsed,
+!                     latency_ms=latency,
+!                 )
+!         except Exception as e:
+!             return BridgeResult(success=False, error=str(e))
+  
+>     def _sync_fallback_post(self, path: str, payload: Dict) -> BridgeResult:
+!         import urllib.request
+!         url = f"{self._config.base_url}{path}"
+!         start = time.monotonic()
+!         last_error = ""
+  
+!         for attempt in range(self._config.max_retries):
+!             try:
+!                 data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+!                 req = urllib.request.Request(
+!                     url, data=data,
+!                     headers={"Content-Type": "application/json; charset=utf-8"},
+!                     method="POST",
+!                 )
+!                 r = urllib.request.urlopen(req, timeout=self._config.timeout_seconds)
+!                 latency = (time.monotonic() - start) * 1000
+!                 body = r.read().decode("utf-8")
+!                 parsed = json.loads(body)
+!                 return BridgeResult(
+!                     success=True,
+!                     status_code=r.status,
+!                     data=parsed,
+!                     latency_ms=latency,
+!                     memory_id=parsed.get("memory_id", ""),
+!                     layer_used=BridgeLayer.FALLBACK_SYNC,
+!                     retry_count=attempt,
+!                 )
+!             except Exception as e:
+!                 last_error = str(e)
+!                 if attempt < self._config.max_retries - 1:
+!                     backoff = self._config.retry_backoff[
+!                         min(attempt, len(self._config.retry_backoff) - 1)
+!                     ]
+!                     time.sleep(backoff)
+!                     self._stats["retry_count"] += 1
+  
+!         return BridgeResult(
+!             success=False, error=last_error,
+!             layer_used=BridgeLayer.FALLBACK_SYNC,
+!             retry_count=self._config.max_retries,
+!         )
+  
+>     def _sync_fallback_get(self, path: str, params: Optional[Dict] = None) -> BridgeResult:
+!         import urllib.request
+!         import urllib.parse
+!         url = f"{self._config.base_url}{path}"
+!         if params:
+!             url += "?" + urllib.parse.urlencode(params)
+!         start = time.monotonic()
+!         try:
+!             req = urllib.request.Request(url)
+!             r = urllib.request.urlopen(req, timeout=self._config.timeout_seconds)
+!             latency = (time.monotonic() - start) * 1000
+!             body = r.read().decode("utf-8")
+!             parsed = json.loads(body)
+!             return BridgeResult(
+!                 success=True, status_code=r.status, data=parsed,
+!                 latency_ms=latency, layer_used=BridgeLayer.FALLBACK_SYNC,
+!             )
+!         except Exception as e:
+!             return BridgeResult(
+!                 success=False, error=str(e),
+!                 layer_used=BridgeLayer.FALLBACK_SYNC,
+!             )
+  
+>     def post(self, path: str, payload: Dict) -> BridgeResult:
+>         """
+>         三层策略POST — 借鉴Hermes _run_async()
+  
+>         Layer 1: 检测异步上下文 → 新线程+独立loop
+>         Layer 2: 工作线程       → 线程本地持久化loop
+>         Layer 3: 主线程         → 全局持久化loop
+>         Fallback: urllib同步
+>         """
+!         self._stats["total_calls"] += 1
+!         start = time.monotonic()
+  
+!         if not _AIOHTTP_AVAILABLE:
+!             self._stats["fallback_calls"] += 1
+!             result = self._sync_fallback_post(path, payload)
+!             result.latency_ms = (time.monotonic() - start) * 1000
+!             self._update_stats(result)
+!             return result
+  
+!         try:
+!             asyncio.get_running_loop()
+!             self._stats["layer1_calls"] += 1
+!             future = _THREAD_POOL.submit(self._run_in_new_loop, path, payload)
+!             result = future.result(timeout=self._config.timeout_seconds + 5)
+!             result.layer_used = BridgeLayer.LAYER1_NEW_THREAD
+!             result.latency_ms = (time.monotonic() - start) * 1000
+!             self._update_stats(result)
+!             return result
+!         except RuntimeError:
+!             pass
+  
+!         thread_loop = _get_thread_local_loop()
+!         if thread_loop is not None:
+!             self._stats["layer2_calls"] += 1
+!             future = asyncio.run_coroutine_threadsafe(
+!                 self._async_post(path, payload), thread_loop
+!             )
+!             try:
+!                 result = future.result(timeout=self._config.timeout_seconds + 5)
+!                 result.layer_used = BridgeLayer.LAYER2_WORKER_THREAD
+!                 result.latency_ms = (time.monotonic() - start) * 1000
+!                 self._update_stats(result)
+!                 return result
+!             except Exception as e:
+!                 logger.warning(f"Layer2 failed, falling back: {e}")
+  
+!         self._stats["layer3_calls"] += 1
+!         global_loop = _GLOBAL_LOOP.get_loop()
+!         if global_loop and global_loop.is_running():
+!             future = asyncio.run_coroutine_threadsafe(
+!                 self._async_post(path, payload), global_loop
+!             )
+!             try:
+!                 result = future.result(timeout=self._config.timeout_seconds + 5)
+!                 result.layer_used = BridgeLayer.LAYER3_MAIN_THREAD
+!                 result.latency_ms = (time.monotonic() - start) * 1000
+!                 self._update_stats(result)
+!                 return result
+!             except Exception as e:
+!                 logger.warning(f"Layer3 failed, falling back: {e}")
+  
+!         self._stats["fallback_calls"] += 1
+!         result = self._sync_fallback_post(path, payload)
+!         result.latency_ms = (time.monotonic() - start) * 1000
+!         self._update_stats(result)
+!         return result
+  
+>     def get(self, path: str, params: Optional[Dict] = None) -> BridgeResult:
+>         """三层策略GET"""
+!         self._stats["total_calls"] += 1
+!         start = time.monotonic()
+  
+!         if not _AIOHTTP_AVAILABLE:
+!             self._stats["fallback_calls"] += 1
+!             result = self._sync_fallback_get(path, params)
+!             result.latency_ms = (time.monotonic() - start) * 1000
+!             self._update_stats(result)
+!             return result
+  
+!         try:
+!             asyncio.get_running_loop()
+!             self._stats["layer1_calls"] += 1
+!             future = _THREAD_POOL.submit(self._run_get_in_new_loop, path, params)
+!             result = future.result(timeout=self._config.timeout_seconds + 5)
+!             result.layer_used = BridgeLayer.LAYER1_NEW_THREAD
+!             result.latency_ms = (time.monotonic() - start) * 1000
+!             self._update_stats(result)
+!             return result
+!         except RuntimeError:
+!             pass
+  
+!         self._stats["fallback_calls"] += 1
+!         result = self._sync_fallback_get(path, params)
+!         result.latency_ms = (time.monotonic() - start) * 1000
+!         self._update_stats(result)
+!         return result
+  
+>     def _run_in_new_loop(self, path: str, payload: Dict) -> BridgeResult:
+!         loop = asyncio.new_event_loop()
+!         try:
+!             return loop.run_until_complete(self._async_post(path, payload))
+!         finally:
+!             loop.close()
+  
+>     def _run_get_in_new_loop(self, path: str, params: Optional[Dict]) -> BridgeResult:
+!         loop = asyncio.new_event_loop()
+!         try:
+!             return loop.run_until_complete(self._async_get(path, params))
+!         finally:
+!             loop.close()
+  
+>     def _update_stats(self, result: BridgeResult):
+!         if result.success:
+!             self._stats["success_count"] += 1
+!         else:
+!             self._stats["error_count"] += 1
+!         self._stats["total_latency_ms"] += result.latency_ms
+  
+>     def memory_post(self, content: str, layer: str = "working",
+>                     tags: Optional[List[str]] = None,
+>                     priority: str = "medium") -> BridgeResult:
+>         """天机记忆写入的快捷方法"""
+!         return self.post("/api/memory/", {
+!             "content": content,
+!             "layer": layer,
+!             "tags": tags or [],
+!             "priority": priority,
+!         })
+  
+>     def memory_get(self, memory_id: str) -> BridgeResult:
+>         """天机记忆读取的快捷方法"""
+!         return self.get(f"/api/memory/{memory_id}")
+  
+>     def memory_search(self, query: str, layer: Optional[str] = None,
+>                       limit: int = 10) -> BridgeResult:
+>         """天机记忆搜索的快捷方法"""
+!         params = {"query": query, "limit": str(limit)}
+!         if layer:
+!             params["layer"] = layer
+!         return self.get("/api/memory/search", params)
+  
+>     def health_check(self) -> bool:
+!         result = self.get("/api/health")
+!         return result.success
+  
+>     def get_stats(self) -> Dict:
+!         avg_latency = (
+!             self._stats["total_latency_ms"] / max(1, self._stats["total_calls"])
+!         )
+!         return {
+!             **self._stats,
+!             "avg_latency_ms": round(avg_latency, 2),
+!             "aiohttp_available": _AIOHTTP_AVAILABLE,
+!             "layer_distribution": {
+!                 "layer1_new_thread": self._stats["layer1_calls"],
+!                 "layer2_worker_thread": self._stats["layer2_calls"],
+!                 "layer3_main_thread": self._stats["layer3_calls"],
+!                 "fallback_sync": self._stats["fallback_calls"],
+!             },
+!             "success_rate": (
+!                 f"{self._stats['success_count'] / max(1, self._stats['total_calls']):.1%}"
+!             ),
+!         }
+  
+>     def shutdown(self):
+!         if self._session and not self._session.closed:
+!             try:
+!                 loop = _GLOBAL_LOOP.get_loop()
+!                 if loop.is_running():
+!                     future = asyncio.run_coroutine_threadsafe(
+!                         self._session.close(), loop
+!                     )
+!                     future.result(timeout=5)
+!             except Exception:
+!                 pass
+!         _GLOBAL_LOOP.shutdown()
+!         _THREAD_POOL.shutdown(wait=False)
+  
+  
+> GLOBAL_BRIDGE: Optional[AsyncBridge] = None
+  
+  
+> def get_bridge(config: Optional[BridgeConfig] = None) -> AsyncBridge:
+>     global GLOBAL_BRIDGE
+!     if GLOBAL_BRIDGE is None:
+!         GLOBAL_BRIDGE = AsyncBridge(config)
+!     return GLOBAL_BRIDGE
+  
+  
+> def reset_bridge():
+>     global GLOBAL_BRIDGE
+!     if GLOBAL_BRIDGE is not None:
+!         GLOBAL_BRIDGE.shutdown()
+!     GLOBAL_BRIDGE = None

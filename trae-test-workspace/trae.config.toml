@@ -1,0 +1,42 @@
+﻿# Trae测试工作区配置
+
+[workspace]
+name = ""trae-test-workspace""
+version = ""1.0.0""
+description = ""Trae IDE功能测试和验证工作区""
+
+[python]
+enabled = true
+version = ""3.12""
+test_framework = ""pytest""
+coverage_tool = ""pytest-cov""
+
+[typescript]
+enabled = true
+version = ""5.0""
+test_framework = ""jest""
+coverage_tool = ""jest""
+
+[javascript]
+enabled = true
+version = ""ES2023""
+test_framework = ""jest""
+
+[rust]
+enabled = true
+version = ""1.75""
+test_framework = ""cargo test""
+
+[go]
+enabled = true
+version = ""1.21""
+test_framework = ""go test""
+
+[integration]
+mcp_enabled = true
+agent_enabled = true
+workflow_enabled = true
+
+[benchmark]
+enabled = true
+output_dir = ""benchmarks/results""

@@ -1,0 +1,170 @@
+{
+  "_meta": {
+    "version": "1.0.0",
+    "description": "天机v9.1 Trae IDE 项目级设置模板 - 团队共享配置",
+    "scope": "project",
+    "created": "2026-06-29",
+    "created_by": "@lingxi (灵犀) - 对话完整性守护者",
+    "source": "Trae IDE official docs (docs.trae.ai) + 掘金最佳实践",
+    "last_updated": "2026-06-29"
+  },
+
+  "editor": {
+    "fontSize": 14,
+    "fontFamily": "'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace",
+    "fontWeight": "400",
+    "lineHeight": 1.6,
+    "tabSize": 4,
+    "insertSpaces": true,
+    "detectIndentation": false,
+    "wordWrap": "on",
+    "wordWrapColumn": 120,
+    "minimap.enabled": true,
+    "minimap.maxColumn": 80,
+    "lineNumbers": "on",
+    "renderWhitespace": "selection",
+    "bracketPairColorization.enabled": true,
+    "guides.bracketPairs": "active",
+    "stickyScroll.enabled": true,
+    "smoothScrolling": true,
+    "cursorBlinking": "smooth",
+    "cursorSmoothCaretAnimation": "on",
+    "formatOnSave": true,
+    "formatOnPaste": false,
+    "codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    },
+    "unicodeHighlight.ambiguousCharacters": false,
+    "unicodeHighlight.invisibleCharacters": false,
+    "breadcrumbs.enabled": true,
+    "rulers": [80, 120],
+    "scrollBeyondLastLine": false
+  },
+
+  "workbench": {
+    "colorTheme": "Dark+",
+    "iconTheme": "vs-seti",
+    "activityBar.visible": true,
+    "statusBar.visible": true,
+    "sideBar.location": "left",
+    "panel.defaultLocation": "bottom",
+    "editor.enablePreview": false,
+    "editor.enablePreviewFromQuickOpen": false,
+    "startupEditor": "welcomePage",
+    "colorCustomizations": {
+      "[Dark+]": {
+        "editor.background": "#1E1E1E",
+        "sideBar.background": "#252526",
+        "activityBar.background": "#2C2C2C",
+        "statusBar.background": "#007ACC"
+      }
+    }
+  },
+
+  "terminal.integrated": {
+    "fontFamily": "'JetBrains Mono', 'Fira Code', monospace",
+    "fontSize": 13,
+    "lineHeight": 1.3,
+    "cursorStyle": "line",
+    "cursorBlinking": true,
+    "scrollback": 5000,
+    "defaultProfile.windows": "PowerShell",
+    "shell.windows": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+    "env.windows": {
+      "PYTHONIOENCODING": "utf-8-sig",
+      "PROJECT_ROOT": "${workspaceFolder}"
+    }
+  },
+
+  "files": {
+    "encoding": "utf8",
+    "autoGuessEncoding": false,
+    "autoSave": "afterDelay",
+    "autoSaveDelay": 1000,
+    "eol": "\n",
+    "trimTrailingWhitespace": true,
+    "insertFinalNewline": true,
+    "trimFinalNewlines": true,
+    "exclude": {
+      "**/.git": true,
+      "**/__pycache__": true,
+      "**/.venv": true,
+      "**/node_modules": true,
+      "**/.pytest_cache": true,
+      "**/.mypy_cache": true,
+      "**/*.pyc": true
+    },
+    "associations": {
+      "*.md": "markdown",
+      "*.json": "jsonc",
+      "*.yaml": "yaml",
+      "*.yml": "yaml"
+    }
+  },
+
+  "trae": {
+    "ai": {
+      "codeIndex.enabled": true,
+      "codeIndex.autoBuild": true,
+      "codeIndex.interval": 300,
+      "rules.autoLoad": true,
+      "rules.projectRulesFile": ".trae/rules/project_rules.md",
+      "agent.defaultModel": "claude-sonnet-4-20250514",
+      "agent.maxSteps": 200,
+      "agent.enableLakeview": true,
+      "agent.autoRunMcp": true,
+      "agent.autoRunCommand": "useWhitelist",
+      "agent.askUserQuestions": true,
+      "codeReview.mode": "reviewAllChanges",
+      "codeReview.autoJumpToNextChange": true,
+      "taskNotification.enabled": true,
+      "taskNotification.type": "banner",
+      "todoList.enabled": true,
+      "conversation.autoFoldNodes": true
+    },
+    "privacy": {
+      "mode": false
+    },
+    "mcp": {
+      "configSource": ".trae/mcp.json",
+      "autoApprove": ["memory-engine-global", "agent-framework-global"]
+    },
+    "cue": {
+      "tabCue.enabled": true,
+      "smartImport.enabled": true,
+      "smartRename.enabled": true
+    }
+  },
+
+  "extensions": {
+    "ignoreRecommendations": false,
+    "autoUpdate": true,
+    "autoCheckUpdates": true
+  },
+
+  "search": {
+    "exclude": {
+      "**/node_modules": true,
+      "**/__pycache__": true,
+      "**/.venv": true,
+      "**/Lib/site-packages": true,
+      "**/data/*.db": true
+    },
+    "followSymlinks": false,
+    "useIgnoreFiles": true,
+    "useGlobalIgnoreFiles": true
+  },
+
+  "python.defaultInterpreterPath": "D:\\元初系统\\天机v9.1\\python\\python.exe",
+  "python.pythonPath": "D:\\元初系统\\天机v9.1\\python\\python.exe",
+  "python": {
+    "defaultInterpreterPath": "D:\\元初系统\\天机v9.1\\python\\python.exe",
+    "pythonPath": "D:\\元初系统\\天机v9.1\\python\\python.exe",
+    "formatting.provider": "none",
+    "linting.enabled": true,
+    "linting.pylintEnabled": true,
+    "analysis.typeCheckingMode": "basic",
+    "analysis.autoImportCompletions": true,
+    "analysis.diagnosticMode": "workspace"
+  }
+}

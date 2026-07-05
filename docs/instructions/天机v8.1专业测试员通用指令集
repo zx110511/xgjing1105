@@ -1,0 +1,361 @@
+﻿# 🧪 天机v9.0 SSS级专业测试员通用指令集
+
+---
+
+## 📋 指令模板（每轮测试对话使用此模板，替换 `{测试目标}` 即可）
+
+```
+═══════════════════════════════════════════════════════════════
+  天机v9.0 专业测试指令 — {测试目标}
+  五级门禁流程 · 不折不扣 · 绝不跳步
+═══════════════════════════════════════════════════════════════
+
+【测试目标】{模块编号/跨模块场景} - {测试场景名}
+【测试类型】单元测试 / 集成测试 / 回归测试 / 压力测试 / 安全审计
+【依赖模块】{上游模块列表}
+【测试标准】d:\元初系统\.trae\rules\04-质量铁律.md (SG-0 ~ SG-4)
+【测试脚本】d:\元初系统\天机v9.0\scripts\test_{target}.py
+【审计输出】d:\元初系统\天机v9.0\天机v9.0科研区\成果\
+
+───────────────────────────────────────────────────────────────
+
+## SG-0: 环境准备检查
+
+□ Python版本: 3.10+
+□ 依赖就绪: 核心模块import无报错
+□ 文件系统: 测试目录可读写
+□ 内存数据库: SQLite可连接
+□ MCP服务: 如涉及MCP模块则验证连接
+
+→ 输出: 环境清单 (通过N/5项)
+
+───────────────────────────────────────────────────────────────
+
+## SG-1: Import + 路径隔离验证
+
+□ 目标模块 import 成功
+□ 依赖模块 import 成功
+□ 无循环依赖
+□ 路径隔离有效 (无全局状态污染)
+□ 类型注解基本检查
+
+→ 输出: Import清单 + 依赖图
+
+───────────────────────────────────────────────────────────────
+
+## SG-2: 功能验证 (结构化测试矩阵)
+
+### 2.1 单元测试矩阵
+| 测试维度 | 测试用例 | 预期结果 | 实际结果 | 状态 |
+|---------|---------|---------|---------|------|
+| 构造初始化 | __init__() | 无异常 | | |
+| 核心闭环1 | {写入} | 数据持久化 | | |
+| 核心闭环2 | {读取} | 返回正确 | | |
+| 核心闭环3 | {查询} | 查询命中 | | |
+| 核心闭环4 | {进化}(如适用) | 四阶段走通 | | |
+| 健康检查 | health() | 返回dict | | |
+| 统计接口 | get_stats() | 返回dict | | |
+| 边界条件 | 空/Null/极大值 | 降级不崩溃 | | |
+| 错误路径 | 异常输入 | 正确异常处理 | | |
+| 降级闭环 | 依赖不可用 | 降级运行 | | |
+
+### 2.2 测试脚本执行
+```bash
+python d:\元初系统\天机v9.0\scripts\test_{target}.py
+```
+
+→ 输出: PASS/FAIL计数 + 失败用例详情
+
+───────────────────────────────────────────────────────────────
+
+## SG-3: 集成验证 (跨模块)
+
+### 3.1 API端点验证
+□ GET /api/{module}/health → 200
+□ GET /api/{module}/status → 200
+□ 响应格式合规 (JSON)
+
+### 3.2 模块间通信
+□ 依赖模块可用
+□ 数据流正确传递
+□ 事件发布/订阅正常
+
+### 3.3 托盘+启动器集成
+□ 托盘菜单响应
+□ 启动器启动无报错
+
+→ 输出: 集成测试矩阵
+
+───────────────────────────────────────────────────────────────
+
+## SG-4: 回归验证
+
+□ 全量已有测试无退化
+□ 无新增失败用例
+□ 无新增lint/类型错误
+□ 无新增安全漏洞
+
+→ 输出: 回归报告
+
+═══════════════════════════════════════════════════════════════
+  本轮结果: [{测试目标}] 通过 ✅ / 部分失败 ⚠️ / 阻塞 ❌
+  下一步: [{下一步行动}]
+═══════════════════════════════════════════════════════════════
+```
+
+---
+
+## 🔢 测试执行队列（按测试层级排列）
+
+### 第一阶段: 单模块单元测试 (36+1项) — SG-0→SG-2
+
+| 序号 | 测试目标 | 测试脚本 | 测试用例数 | 状态 |
+|------|---------|---------|-----------|------|
+| U01 | M1-TianjiContainer | `test_m1.py` | 待开发 | ⏳ |
+| U02 | M2-ICMEStorageEngine | `test_m2_engine.py` | 已有 | ⚠️ 待审计 |
+| U03 | M3-QualityGate | `test_m3_qualitygate.py` | 已有 | ⚠️ 待审计 |
+| U04 | M4-SkillRegistry | `test_m4_skillregistry.py` | 已有 | ⚠️ 待审计 |
+| U05 | M5-SkillLifecycleTracker | `test_m5_lifecycle.py` | 已有 | ⚠️ 待审计 |
+| U06 | M6-CausalPairRecorder | `test_m6_causalpair.py` | 已有 | ⚠️ 待审计 |
+| U07 | M7-EvolutionEngine | `test_m7_evolutionengine.py` | 已有 | ⚠️ 待审计 |
+| U08 | M8-LearningEngine | `test_m8_learningloop.py` | 已有 | ⚠️ 待审计 |
+| U09 | M9-EvolutionLoop | `test_m9_evolutionloop.py` | 已有 | ⚠️ 待审计 |
+| U10 | M10-WorkflowEngine | `test_m10_workflow.py` | 已有 | ⚠️ 待审计 |
+| U11 | M11-MessageGateway | `test_m11_gateway.py` | 已有 | ⚠️ 待审计 |
+| U12 | M12-AutoSchedulerDaemon | `test_m12_daemon.py` | 已有 | ⚠️ 待审计 |
+| U13 | M13-EnforcementHook | `test_m13_enforcement.py` | 已有 | ⚠️ 待审计 |
+| U14 | M14-InterceptLayer | `test_m14_intercept.py` | 已有 | ⚠️ 待审计 |
+| U15 | M15-DeepSeekDriver | `test_m15_deepseek_driver_syntax.py` | 已有 | ⚠️ 待审计 |
+| U16 | M16-TVPBridge | `test_m16_tvp_bridge.py` | 已有 | ⚠️ 待审计 |
+| U17 | M17-GovernanceOrchestrator | `test_m17_governance_orchestrator.py` | 已有 | ⚠️ 待审计 |
+| U18 | M18-GovernancePipeline | `test_m18_governance_pipeline.py` | 已有 | ⚠️ 待审计 |
+| U19 | M19-AutoOpsEngine | `test_m19_auto_ops.py` | 已有 | ⚠️ 待审计 |
+| U20 | M20-ModuleRegistry | `test_m20_module_registry.py` | 已有 | ⚠️ 待审计 |
+| U21 | M21-StaticAnalyzer | `test_m21_static_analyzer.py` | 已有 | ⚠️ 待审计 |
+| U22 | M22-LayerRouter | `test_m22_layer_router.py` | 已有 | ⚠️ 待审计 |
+| U23 | M23-NamespaceManager | `test_m23_namespace_manager.py` | 已有 | ⚠️ 待审计 |
+| U24 | M24-HybridStorageEngine | `test_m24_hybrid_engine.py` | 已有 | ⚠️ 待审计 |
+| U25 | M25-SQLiteMemoryStore | `test_m25_sqlite_store.py` | 已有 | ⚠️ 待审计 |
+| U26 | M26-LLMBridge | `test_m26_llm_bridge.py` | 已有 | ⚠️ 待审计 |
+| U27 | M27-ChineseTokenizer | `test_m27_chinese_tokenizer.py` | 已有 | ⚠️ 待审计 |
+| U28 | M28-ConfigManager | `test_m28_config_manager.py` | 已有 | ⚠️ 待审计 |
+| U29 | M29-MCPServer | `test_m29_mcp_server.py` | 已有 | ⚠️ 待审计 |
+| U30 | M30-TianjiDaemon | `test_m30_tianji_daemon.py` | 已有 | ⚠️ 待审计 |
+| U31 | M31-EmbeddingService | `test_m31_embedding_service.py` | 已有 | ⚠️ 待审计 |
+| U32 | M32-KnowledgeGraph | `test_m32_knowledge_graph.py` | 已有 | ⚠️ 待审计 |
+| U33 | M33-DecisionEngine | `test_m33_decision_engine.py` | 已有 | ⚠️ 待审计 |
+| U34 | M34-AgentOrchestrator | `test_m34_orchestrator.py` | 已有 | ⚠️ 待审计 |
+| U35 | M35-EvolutionBus | `test_m35_evolution_bus.py` | 已有 | ⚠️ 待审计 |
+| U36 | M36-DaoRegistry | `test_m36_dao_registry.py` | 34 | ✅ |
+| UT1 | T1-ReadmeTracker | `test_t1_readme_tracker.py` | 22 | ✅ |
+
+> 进度: 2/37 ✅ 审计通过 | 35/37 ⚠️ 待审计
+
+### 第二阶段: 跨模块集成测试 — SG-3
+
+| 序号 | 测试场景 | 涉及模块 | 测试类型 | 状态 |
+|------|---------|---------|---------|------|
+| I01 | 记忆体道链 | M2→M3→M22→M24 | 数据流集成 | ⏳ |
+| I02 | 认知体道链 | M15→M8→M14→M6 | 认知闭环集成 | ⏳ |
+| I03 | 进化体道链 | M7→M8→M4→M35 | 进化闭环集成 | ⏳ |
+| I04 | 质量体道链 | M3→M13→M21 | 质量门禁集成 | ⏳ |
+| I05 | 编排体道链 | M34→M10→M11→M16 | 编排调度集成 | ⏳ |
+| I06 | 容器体道链 | M1→M20→M35→M23 | 容器生命周期集成 | ⏳ |
+| I07 | 守护体道链 | M30→M19→M18 | 自愈守护集成 | ⏳ |
+| I08 | 知识体道链 | M32→M33→M17→M31 | 知识流水线集成 | ⏳ |
+| I09 | 配置体道链 | M28→M7→M29→M26 | 配置驱动集成 | ⏳ |
+| I10 | 全道联通 | M1→M36→全部 | 端到端集成 | ⏳ |
+
+> 进度: 0/10 ⏳ 全部待开发
+
+### 第三阶段: 回归+压力测试 — SG-4
+
+| 序号 | 测试场景 | 类型 | 状态 |
+|------|---------|------|------|
+| R01 | 全量回归 | 37脚本全跑 | ⏳ |
+| R02 | 模块热加载 | 50次启动/停止 | ⏳ |
+| R03 | 并发写入 | 100并发×M2+M24+M25 | ⏳ |
+| R04 | 内存泄漏 | 24小时持续运行 | ⏳ |
+| R05 | 安全扫描 | 密钥/注入/权限 | ⏳ |
+
+> 进度: 0/5 ⏳ 全部待开发
+
+---
+
+## 🛡️ 测试硬性约束
+
+| 约束 | 说明 |
+|------|------|
+| **五级不走样** | SG-0→SG-1→SG-2→SG-3→SG-4，不可跳过任一级 |
+| **审计不可假** | 不能只看PASS计数，必须逐项验证测试用例的有效性 |
+| **覆盖率≥80%** | 关键路径100%，边界条件+异常路径全覆盖 |
+| **回归零退化** | 新代码不得导致已有测试失败 |
+| **证据链完整** | 每次测试输出必须包含: 测试矩阵 + PASS/FAIL + 失败详情 |
+| **不Mock核心** | 禁止Mock核心业务逻辑，只允许Mock外部IO |
+
+---
+
+## 📐 测试方法工具箱
+
+### 测试模式参考（来自已有最佳实践）
+
+**标准模式** (参考 `test_m36_dao_registry.py` / `test_t1_readme_tracker.py`):
+
+```python
+"""
+{模块名} 测试脚本 v9.0
+====================
+测试用例: N项
+"""
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+PASS = 0
+FAIL = 0
+
+def test(name: str, condition: bool, detail: str = ""):
+    global PASS, FAIL
+    if condition:
+        PASS += 1
+        print(f"  ✅ {name}")
+    else:
+        FAIL += 1
+        print(f"  ❌ {name}  --  {detail}")
+
+# === 测试组1: 构造 ===
+# === 测试组2: 核心闭环 ===
+# === 测试组3: 边界条件 ===
+# === 测试组4: 异常路径 ===
+# === 测试组5: health+stats ===
+
+print(f"  结果: ✅ {PASS} / ❌ {FAIL} / 总计 {PASS + FAIL}")
+sys.exit(0 if FAIL == 0 else 1)
+```
+
+### 审计检查清单 (每个已有的test脚本必须逐项审计)
+
+| 审计项 | 标准 |
+|--------|------|
+| 构造初始化 | 至少1个 __init__() 用例 |
+| 核心闭环 | 每个闭环环节至少1个用例 |
+| 边界条件 | 空/None/极大值 至少3个用例 |
+| 异常路径 | 异常输入/依赖缺失 至少2个用例 |
+| health检查 | health() 返回值验证 |
+| stats检查 | get_stats() 返回值验证 |
+| 隔离性 | 不影响其他模块 |
+
+---
+
+## ⚡ 闪电启动示例
+
+```
+═══════════════════════════════════════════════════════════════
+  天机v9.0 专业测试指令 — M36-DaoRegistry 全量审计
+  五级门禁流程 · 不折不扣 · 绝不跳步
+═══════════════════════════════════════════════════════════════
+
+【测试目标】M36 - 道谱注册中心 (DaoRegistry)
+【测试类型】单元测试 + 回归验证
+【依赖模块】M1-TianjiContainer, M20-ModuleRegistry
+【测试标准】04-质量铁律.md
+【测试脚本】d:\元初系统\天机v9.0\scripts\test_m36_dao_registry.py
+
+───────────────────────────────────────────────────────────────
+
+SG-0: 环境准备
+□ Python 3.10+ ✅
+□ 核心模块可导入 ✅
+□ SQLite可连接 ✅
+→ 环境: 5/5 ✅
+
+SG-1: Import+隔离
+□ import dao_registry ✅
+□ 无循环依赖 ✅
+□ 路径隔离 ✅
+→ Import: 3/3 ✅
+
+SG-2: 功能验证
+执行: python scripts\test_m36_dao_registry.py
+→ ✅ 34 / ❌ 0 / 总计 34
+
+SG-3: 集成 (本次跳过-纯单元测试)
+
+SG-4: 回归
+□ 无新增失败 ✅
+□ 无lint错误 ✅
+
+═══════════════════════════════════════════════════════════════
+  本轮结果: [M36-DaoRegistry] 通过 ✅
+  下一步: [M35-EvolutionBus 测试审计]
+═══════════════════════════════════════════════════════════════
+```
+
+---
+
+## 🔮 下一阶段推演路线图
+
+> 当前里程碑: 36模块全部落地 ✅ → 下一里程碑: **质量深挖 + 集成验证**
+
+### 阶段A: 测试审计深挖 (当前)
+```
+目标: 35个已有test脚本逐项审计，补齐缺失用例
+产出: 每个模块 审计报告 + 测试矩阵 + PASS/FAIL
+ICME_KEY: test_audit_{module}_v9.0
+```
+
+### 阶段B: 跨模块集成测试
+```
+目标: 9条道链 + 1条全道链的端到端集成测试
+产出: 10个集成测试脚本 + 集成矩阵报告
+ICME_KEY: integration_test_{道链}_v9.0
+```
+
+### 阶段C: 性能+压力基准
+```
+目标: 建立36模块的性能基线(内存/延迟/吞吐)
+产出: 基准报告 + 压力测试脚本
+ICME_KEY: perf_bench_v9.0
+```
+
+### 阶段D: 72天罡预研
+```
+目标: 基于M36 DaoRegistry的72天罡入口，定义天罡法模板
+产出: 天罡法定义文档 + 3个试点天罡模块
+ICME_KEY: tiangang_v9.0_pre
+```
+
+### 阶段E: 分布式扩展评估
+```
+目标: 评估M29-MCPServer + M35-EvolutionBus的分布式可行性
+产出: 分布式架构评估报告
+ICME_KEY: distributed_v9.0_eval
+```
+
+---
+
+## 📊 ICME记忆索引 — 测试实录速查
+
+| 序号 | ICME_KEY | 测试目标 | 日期 | 结果 | 用例数 |
+|------|----------|---------|------|------|--------|
+| 1 | `test_audit_m36_v9.0` | M36-DaoRegistry | 05-25 | ✅ 34/34 | 34 |
+| 2 | `test_audit_t1_v9.0` | T1-ReadmeTracker | 05-25 | ✅ 22/22 | 22 |
+
+> 检索指令: ICME查询 `ICME_KEY` 还原完整测试矩阵+审计报告
+
+---
+
+<!-- AUTO-START -->
+## 📁 文件夹索引
+
+- ./成果/
+
+## 📄 文件索引
+
+- ./天机v9.0专业测试员通用指令集
+
+## 🔖 文件摘要映射
+
+| 文件路径 | 摘要 |
+|---------|------|
+| ./天机v9.0专业测试员通用指令集 | SHA-256: `动态更新` |
+<!-- AUTO-END -->

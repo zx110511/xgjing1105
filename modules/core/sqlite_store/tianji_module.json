@@ -1,0 +1,38 @@
+﻿﻿﻿{
+    "id": "sqlite_store",
+    "display_name": "SQLite存储引擎",
+    "version": "1.0.0",
+    "description": "基于SQLite的FTS5全文搜索+WAL并发存储引擎",
+    "author": "tianji_core",
+    "category": "core",
+    "type": "engine",
+    "import_path": "core.sqlite_store.SQLiteMemoryStore",
+    "init_args": {
+        "_resolve": "sqlite_store"
+    },
+    "depends_on": [],
+    "provides": [
+        "memory_storage",
+        "full_text_search",
+        "wal_concurrent"
+    ],
+    "tags": [
+        "storage",
+        "sqlite",
+        "fts5",
+        "core"
+    ],
+    "min_platform_version": "9.1.0""config_schema": {
+        "db_path": {
+            "type": "string",
+            "description": "SQLite数据库路径",
+            "default": "data/.memory/icme.db"
+        },
+        "wal_mode": {
+            "type": "boolean",
+            "description": "启用WAL模式",
+            "default": true
+        }
+    },
+    "health_check_interval": 30.0
+}

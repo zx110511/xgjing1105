@@ -1,0 +1,149 @@
+# Trae 上下文管理 - 忽略文件配置
+# 排除不需要纳入上下文索引的文件和目录
+# 版本: 2.0.0 | 更新时间: 2026-04-30
+
+# ==================== Python 相关 ====================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.eggs/
+*.egg-info/
+
+# ==================== 虚拟环境 ====================
+.venv/
+venv/
+env/
+ENV/
+
+# ==================== Node.js 相关 ====================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ==================== 构建输出 ====================
+dist/
+build/
+*.tsbuildinfo
+out/
+
+# ==================== 数据与缓存 (大文件/二进制) ====================
+# data/ 已解封 - 天机/data/ 含领域词典等资源文件需要索引
+# data/cache/*
+# data/logs/*.log
+# *.db 已解封 - 天机记忆icme.db需要被索引
+# *.sqlite3
+# *.db-journal
+# *.db-wal
+# *.db-shm
+# data/ 已解封
+
+# ==================== AMFS 记忆系统数据 ====================
+.amfs/data/
+.amfs/index.*.bak
+# .memory/ 已解封 - 天机记忆数据需要被索引
+# .knowledge/ 已解封 - 天机知识数据需要被索引
+
+# ==================== IDE 与编辑器配置 ====================
+.vscode/settings.json
+.vscode/tasks.json
+.vscode/launch.json
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+
+# ==================== 系统文件 ====================
+.DS_Store
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# ==================== 日志文件 ====================
+*.log
+logs/
+log/
+
+# ==================== 测试与覆盖率 ====================
+coverage/
+.nyc_output/
+.jest_cache/
+.hypothesis/
+nosetests.xml
+
+# ==================== 打包与压缩文件 ====================
+*.tar.gz
+*.zip
+*.rar
+*.7z
+*.gz
+
+# ==================== 临时文件 ====================
+tmp/
+temp/
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+
+# ==================== Rust/Nexus 编译产物 ====================
+target/
+Cargo.lock
+
+# ==================== 环境变量与密钥 ====================
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+.secrets/
+
+# ==================== 文档生成产物 ====================
+docs/_build/
+site/
+*.map
+
+# ==================== AI记忆系统 (产品源码-整体排除) ====================
+AI记忆系统/
+
+# ==================== Trae Runtime 数据 (运行时数据-不索引) ====================
+# trae-memory-runtime已归档到天机基石/
+
+
+
+
+# ==================== OpenClaw (非核心代码-整体排除) ====================
+openclaw/
+
+# ==================== 脚本与批处理 (精细化: 保留核心系统脚本) ====================
+# run-collector-simple.bat
+# run-collector.bat
+# start-all.bat
+# *.bat
+# *.cmd
+# *.ps1
+# [保留] core/daemon/*.ps1 - TUMSS-Daemon 守护进程核心脚本
+
+# ==================== 第三方参考项目 (仅参考，不参与索引) ====================
+
+# ==================== 研究文档区 (研究报告，非活跃代码) ====================
+研究区/
+
+# ==================== 前端构建产物 ====================
+package-lock.json
+eslint.config.js
+*.tsbuildinfo

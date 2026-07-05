@@ -1,0 +1,35 @@
+{
+    "watch_dirs": [
+        "D:\\元初系统\\天机v9.1\\core",
+        "D:\\元初系统\\天机v9.1\\indexing",
+        "D:\\元初系统\\天机v9.1\\server",
+        "D:\\元初系统\\天机v9.1\\agents",
+        "D:\\元初系统\\天机v9.1\\mcp"
+    ],
+    "trigger_config": {
+        "enabled": true,
+        "debounce_seconds": 2.0,
+        "batch_size": 10,
+        "batch_timeout": 5.0,
+        "exclude_patterns": [
+            "*.pyc",
+            "*.pyo",
+            "__pycache__",
+            ".git",
+            "node_modules",
+            "*.tmp",
+            "*.bak",
+            ".DS_Store",
+            "Thumbs.db"
+        ],
+        "include_patterns": [
+            "*"
+        ]
+    },
+    "auto_commit": false,
+    "auto_push": false,
+    "store_to_tianji": true,
+    "notify_on_update": true,
+    "max_depth": 2,
+    "update_interval": 300.0
+}

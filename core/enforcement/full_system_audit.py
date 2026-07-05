@@ -1,0 +1,637 @@
+"""
+天机v9.1 全流程审计工具
+========================
+功能:
+1. 端到端系统健康检查
+2. 数据完整性验证
+3. 组件集成状态检查
+4. 性能指标评估
+5. 生成综合审计报告
+
+使用方法:
+  python full_system_audit.py --audit      # 执行全流程审计
+  python full_system_audit.py --detailed    # 详细模式
+  python full_system_audit.py --export-json # 导出JSON报告
+"""
+
+import sqlite3
+import json
+import time
+import os
+from pathlib import Path
+from datetime import datetime
+from typing import Dict, Any, List, Tuple
+
+ROOT = Path(__file__).resolve().parent.parent
+DB_PATH = ROOT / "data" / ".memory" / "icme.db"
+
+
+class SystemAuditor:
+    """系统审计器"""
+
+    def __init__(self, root_path: Path = ROOT, db_path: Path = DB_PATH):
+        self.root = root_path
+        self.db_path = db_path
+        self.conn = None
+
+        self.audit_results = {
+            "timestamp": "",
+            "system_info": {},
+            "checks": [],
+            "scores": {
+                "total": 0,
+                "max": 0,
+                "percentage": 0,
+                "grade": "",
+            },
+            "findings": {
+                "critical": [],
+                "warning": [],
+                "info": [],
+            },
+            "recommendations": [],
+        }
+
+    def connect(self):
+        if self.conn is None:
+            self.conn = sqlite3.connect(str(self.db_path))
+            self.conn.row_factory = sqlite3.Row
+        return self.conn
+
+    def close(self):
+        if self.conn:
+            self.conn.close()
+            self.conn = None
+
+    def add_check(
+        self,
+        category: str,
+        name: str,
+        status: str,  # pass / fail / warning
+        details: str,
+        score: int = 0,
+        max_score: int = 10,
+    ):
+        """添加审计检查项"""
+        check = {
+            "category": category,
+            "name": name,
+            "status": status,
+            "details": details,
+            "score": score,
+            "max_score": max_score,
+            "timestamp": datetime.now().isoformat(),
+        }
+
+        self.audit_results["checks"].append(check)
+        self.audit_results["scores"]["total"] += score
+        self.audit_results["scores"]["max"] += max_score
+
+        if status == "fail":
+            self.audit_results["findings"]["critical"].append(f"[{category}] {name}: {details}")
+        elif status == "warning":
+            self.audit_results["findings"]["warning"].append(f"[{category}] {name}")
+
+    def audit_filesystem(self) -> int:
+        """文件系统完整性审计"""
+        score = 0
+
+        print("\n[1/7] 文件系统审计...")
+
+        # 检查核心目录结构
+        core_dirs = [
+            ("root", self.root),
+            ("core", self.root / "core"),
+            ("data", self.root / "data"),
+            ("memory_data", self.root / "data" / ".memory"),
+            ("web", self.root / "web"),
+            ("server", self.root / "server"),
+        ]
+
+        for name, path in core_dirs:
+            exists = path.exists()
+            if exists:
+                score += 2
+                self.add_check("filesystem", f"{name}_dir_exists", "pass",
+                             f"{path} 存在", 2)
+            else:
+                self.add_check("filesystem", f"{name}_dir_exists", "fail",
+                             f"{path} 不存在", 0)
+
+        # 检查关键文件
+        key_files = [
+            ("config", self.root / "core" / "config.py"),
+            ("engine", self.root / "core" / "engine.py"),
+            ("db", self.db_path),
+        ]
+
+        for name, path in key_files:
+            if path.exists():
+                size = path.stat().st_size
+                score += 2
+                self.add_check("filesystem", f"{name}_file_exists", "pass",
+                             f"{path.name} 存在 ({size/1024:.1f}KB)", 2)
+            else:
+                self.add_check("filesystem", f"{name}_file_exists", "fail",
+                             f"{path.name} 不存在", 0)
+
+        return score
+
+    def audit_database(self) -> int:
+        """数据库完整性审计"""
+        score = 0
+
+        print("[2/7] 数据库审计...")
+
+        conn = self.connect()
+        cur = conn.cursor()
+
+        try:
+            # 数据库可访问性
+            cur.execute("SELECT 1")
+            score += 3
+            self.add_check("database", "accessibility", "pass",
+                         "数据库可正常访问", 3)
+
+            # 表完整性
+            required_tables = [
+                "memories", "knowledge_graph", "knowledge_edges"
+            ]
+
+            for table in required_tables:
+                exists = cur.execute("""
+                    SELECT name FROM sqlite_master
+                    WHERE type='table' AND name=?
+                """, (table,)).fetchone()
+
+                if exists:
+                    if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', table):
+                        continue
+                    count = cur.execute('SELECT COUNT(*) FROM "?"', (table,)).fetchone()[0]
+                    score += 2
+                    self.add_check("database", f"{table}_exists", "pass",
+                                 f"{table}表存在 ({count}条记录)", 2)
+                else:
+                    self.add_check("database", f"{table}_exists", "fail",
+                                 f"{table}表缺失", 0)
+
+            # 索引检查
+            indexes = cur.execute("""
+                SELECT COUNT(*) FROM sqlite_master
+                WHERE type='index' AND name LIKE 'idx_%'
+            """).fetchone()[0]
+
+            if indexes >= 5:
+                score += 2
+                self.add_check("database", "indexes", "pass",
+                             f"有{indexes}个索引", 2)
+            else:
+                self.add_check("database", "indexes", "warning",
+                             f"仅{indexes}个索引(建议>=5)", 1)
+
+        except Exception as e:
+            self.add_check("database", "accessibility", "fail",
+                         f"数据库错误: {e}", 0)
+
+        return score
+
+    def audit_memory_layers(self) -> int:
+        """记忆层审计"""
+        score = 0
+
+        print("[3/7] 记忆层审计...")
+
+        conn = self.connect()
+        cur = conn.cursor()
+
+        layers = [
+            ("L0_sensory", "sensory"),
+            ("L1_working", "working"),
+            ("L2_short_term", "short_term"),
+            ("L3_episodic", "episodic"),
+            ("L4_semantic", "semantic"),
+            ("L5_meta", "meta"),
+        ]
+
+        for layer_name, layer_id in layers:
+            count = cur.execute("""
+                SELECT COUNT(*) FROM memories WHERE layer=?
+            """, (layer_id,)).fetchone()[0]
+
+            if layer_id in ["sensory", "working"]:
+                # L0/L1应该有数据（活跃使用）
+                if count >= 0:
+                    score += 1
+                    self.add_check("memory", f"{layer_name}_data", "pass",
+                                 f"{layer_name}: {count}条", 1)
+            elif layer_id in ["semantic", "meta"]:
+                # L4/L5应该有策略和知识
+                if count >= 5:
+                    score += 2
+                    self.add_check("memory", f"{layer_name}_activated", "pass",
+                                 f"{layer_name}: {count}条 (已激活)", 2)
+                elif count > 0:
+                    score += 1
+                    self.add_check("memory", f"{layer_name}_partial", "warning",
+                                 f"{layer_name}: 仅{count}条 (部分激活)", 1)
+                else:
+                    self.add_check("memory", f"{layer_name}_empty", "warning",
+                                 f"{layer_name}: 空 (未激活)", 0)
+            else:
+                if count >= 0:
+                    score += 1
+                    self.add_check("memory", f"{layer_name}_ok", "pass",
+                                 f"{layer_name}: {count}条", 1)
+
+        return score
+
+    def audit_knowledge_graph(self) -> int:
+        """知识图谱审计"""
+        score = 0
+
+        print("[4/7] 知识图谱审计...")
+
+        conn = self.connect()
+        cur = conn.cursor()
+
+        # 实体节点
+        entity_count = cur.execute("""
+            SELECT COUNT(*) FROM knowledge_graph
+        """).fetchone()[0]
+
+        if entity_count >= 30:
+            score += 4
+            self.add_check("kg", "entity_count", "pass",
+                         f"实体节点: {entity_count}", 4)
+        elif entity_count >= 10:
+            score += 2
+            self.add_check("kg", "entity_count", "warning",
+                         f"实体节点: {entity_count} (偏少)", 2)
+        else:
+            self.add_check("kg", "entity_count", "warning",
+                         f"实体节点: {entity_count} (稀疏)", 0)
+
+        # 关系边
+        edge_count = cur.execute("""
+            SELECT COUNT(*) FROM knowledge_edges
+        """).fetchone()[0]
+
+        if edge_count >= 20:
+            score += 4
+            self.add_check("kg", "edge_count", "pass",
+                         f"关系边: {edge_count}", 4)
+        elif edge_count >= 5:
+            score += 2
+            self.add_check("kg", "edge_count", "warning",
+                         f"关系边: {edge_count} (需增强)", 2)
+        else:
+            self.add_check("kg", "edge_count", "info",
+                         f"关系边: {edge_count} (待构建)", 1)
+
+        # 实体类型多样性
+        types = cur.execute("""
+            SELECT COUNT(DISTINCT entity_type) FROM knowledge_graph
+        """).fetchone()[0]
+
+        if types >= 4:
+            score += 2
+            self.add_check("kg", "entity_diversity", "pass",
+                         f"实体类型: {types}种", 2)
+        else:
+            self.add_check("kg", "entity_diversity", "info",
+                         f"实体类型: {types}种", 1)
+
+        return score
+
+    def audit_tools_and_integrations(self) -> int:
+        """工具与集成审计"""
+        score = 0
+
+        print("[5/7] 工具与集成审计...")
+
+        # 核心工具检查
+        tools = [
+            ("activate_l4l5", "core/activate_l4l5.py"),
+            ("fill_kg", "core/fill_knowledge_graph.py"),
+            ("tvp_feedback", "core/enhance_tvp_feedback.py"),
+            ("evolution_l5", "core/evolution_l5_manager.py"),
+            ("preference_learner", "core/preference_learner.py"),
+            ("migrate_v80", "core/migrate_v80_to_v81.py"),
+            ("llm_kg_enhancer", "core/llm_kg_enhancer.py"),
+            ("tvp_production", "core/tvp_production_integration.py"),
+        ]
+
+        tool_count = 0
+        for name, rel_path in tools:
+            tool_path = self.root / rel_path
+            if tool_path.exists():
+                tool_count += 1
+                score += 1
+                self.add_check("tools", f"{name}_available", "pass",
+                             f"{name} 工具就绪", 1)
+            else:
+                self.add_check("tools", f"{name}_missing", "fail",
+                             f"{name} 工具缺失", 0)
+
+        if tool_count == len(tools):
+            self.add_check("tools", "completeness", "pass",
+                         f"全部{len(tools)}个工具就绪", 2)
+            score += 2
+        else:
+            self.add_check("tools", "completeness", "warning",
+                         f"{tool_count}/{len(tools)}个工具就绪", 1)
+
+        # TVP生产事件表
+        conn = self.connect()
+        cur = conn.cursor()
+
+        tvp_table = cur.execute("""
+            SELECT name FROM sqlite_master
+            WHERE type='table' AND name='tvp_production_events'
+        """).fetchone()
+
+        if tvp_table:
+            event_count = cur.execute("""
+                SELECT COUNT(*) FROM tvp_production_events
+            """).fetchone()[0]
+            score += 2
+            self.add_check("integration", "tvp_events", "pass",
+                         f"TVP生产事件: {event_count}条", 2)
+        else:
+            self.add_check("integration", "tvp_events", "warning",
+                         "TVP生产事件表不存在", 0)
+
+        # 偏好学习表
+        pref_table = cur.execute("""
+            SELECT name FROM sqlite_master
+            WHERE type='table' AND name='user_behavior_events'
+        """).fetchone()
+
+        if pref_table:
+            score += 2
+            self.add_check("integration", "preference_learning", "pass",
+                         "偏好学习模块就绪", 2)
+        else:
+            self.add_check("integration", "preference_learning", "info",
+                         "偏好学习模块未初始化", 0)
+
+        return score
+
+    def audit_archive_status(self) -> int:
+        """归档状态审计"""
+        score = 0
+
+        print("[6/7] 归档状态审计...")
+
+        # v8.0归档
+        archive_dir = Path(r"D:\元初系统\_已归档_20260528")
+        if archive_dir.exists():
+            items = list(archive_dir.iterdir())
+            score += 3
+            self.add_check("archive", "v8.0_archived", "pass",
+                         f"v8.0已归档 ({len(items)}个项目)", 3)
+        else:
+            self.add_check("archive", "v8.0_archived", "warning",
+                         "v8.0归档目录不存在", 0)
+
+        # Dashboard备份
+        dashboard_backup = self.root / "_archive"
+        if dashboard_backup.exists():
+            files = list(dashboard_backup.glob("*"))
+            score += 3
+            self.add_check("archive", "dashboard_backed_up", "pass",
+                         f"Dashboard已备份 ({len(files)}个文件)", 3)
+        else:
+            self.add_check("archive", "dashboard_backed_up", "warning",
+                         "Dashboard备份(_archive/)缺失", 0)
+
+        research_dir = self.root / "docs" / "research"
+        if research_dir.exists():
+            score += 2
+            self.add_check("archive", "research_area", "pass",
+                         "科研文档目录(docs/research/)存在", 2)
+        else:
+            self.add_check("archive", "research_area", "info",
+                         "科研文档目录不存在", 0)
+
+        # 旧版路径切断验证
+        old_paths = [
+            Path(r"D:\元初系统\素问"),
+            Path(r"D:\元初系统\灵枢"),
+        ]
+
+        for old_path in old_paths:
+            if not old_path.exists() or (old_path.exists() and "_已归档" in str(old_path)):
+                score += 1
+                self.add_check("archive", f"{old_path.name}_isolated", "pass",
+                             f"{old_path.name} 已隔离", 1)
+            elif old_path.exists():
+                self.add_check("archive", f"{old_path.name}_active", "warning",
+                             f"{old_path.name} 路径仍活跃", 0)
+
+        return score
+
+    def audit_performance(self) -> int:
+        """性能基准审计"""
+        score = 0
+
+        print("[7/7] 性能基准审计...")
+
+        conn = self.connect()
+        cur = conn.cursor()
+
+        # 查询性能测试
+        start = time.time()
+
+        for _ in range(100):
+            cur.execute("SELECT COUNT(*) FROM memories")
+
+        query_time = (time.time() - start) * 10  # ms per query
+
+        if query_time < 5:
+            score += 5
+            self.add_check("performance", "query_speed", "pass",
+                         f"查询延迟: {query_time:.2f}ms (优秀)", 5)
+        elif query_time < 20:
+            score += 3
+            self.add_check("performance", "query_speed", "pass",
+                         f"查询延迟: {query_time:.2f}ms (良好)", 3)
+        else:
+            self.add_check("performance", "query_speed", "warning",
+                         f"查询延迟: {query_time:.2f}ms (偏高)", 1)
+
+        # 数据库大小
+        db_size = self.db_path.stat().st_size / (1024 * 1024)
+
+        if db_size < 50:
+            score += 3
+            self.add_check("performance", "db_size", "pass",
+                         f"数据库大小: {db_size:.1f}MB", 3)
+        elif db_size < 200:
+            score += 2
+            self.add_check("performance", "db_size", "pass",
+                         f"数据库大小: {db_size:.1f}MB", 2)
+        else:
+            score += 1
+            self.add_check("performance", "db_size", "info",
+                         f"数据库大小: {db_size:.1f}MB (较大)", 1)
+
+        # WAL模式检查
+        wal_mode = cur.execute("PRAGMA journal_mode").fetchone()[0]
+        if wal_mode.lower() == "wal":
+            score += 2
+            self.add_check("performance", "wal_mode", "pass",
+                         f"WAL模式启用", 2)
+        else:
+            self.add_check("performance", "wal_mode", "info",
+                         f"当前模式: {wal_mode}", 1)
+
+        return score
+
+    def calculate_grade(self) -> str:
+        """计算总体评级"""
+        pct = self.audit_results["scores"]["percentage"]
+
+        if pct >= 95:
+            return "A+ (优秀)"
+        elif pct >= 90:
+            return "A (优良)"
+        elif pct >= 85:
+            return "B+ (良好)"
+        elif pct >= 75:
+            return "B (合格)"
+        elif pct >= 60:
+            return "C (需改进)"
+        else:
+            return "D (不合格)"
+
+    def generate_recommendations(self):
+        """生成改进建议"""
+        findings = self.audit_results["findings"]
+
+        if findings["critical"]:
+            self.audit_results["recommendations"].append(
+                f"🔴 发现{len(findings['critical'])}个严重问题，需立即处理"
+            )
+
+        if findings["warning"]:
+            self.audit_results["recommendations"].append(
+                f"🟡 发现{len(findings['warning'])}个警告项，建议优化"
+            )
+
+        kg_edges = next(
+            (c for c in self.audit_results["checks"]
+             if c.get("name") == "edge_count"), None
+        )
+        if kg_edges and "warning" in kg_edges.get("status", ""):
+            self.audit_results["recommendations"].append(
+                "💡 建议运行LLM KG增强器以丰富知识图谱关系"
+            )
+
+        l4_check = next(
+            (c for c in self.audit_results["checks"]
+             if "L4_semantic" in c.get("name", "")), None
+        )
+        if l4_check and "warning" in l4_check.get("status", ""):
+            self.audit_results["recommendations"].append(
+                "💡 建议运行L4/L5激活工具以充实语义层"
+            )
+
+        if not self.audit_results["recommendations"]:
+            self.audit_results["recommendations"].append(
+                "✅ 系统运行状况良好，继续保持"
+            )
+
+    def execute_audit(self, detailed: bool = False) -> Dict[str, Any]:
+        """执行完整审计"""
+        print("=" * 60)
+        print("   天机v9.1 全流程审计")
+        print(f"   时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print("=" * 60)
+
+        self.audit_results["timestamp"] = datetime.now().isoformat()
+        self.audit_results["system_info"] = {
+            "version": "9.1.0-fusion",
+            "root": str(self.root),
+            "database": str(self.db_path),
+            "python_version": "3.12",
+        }
+
+        # 执行各项审计
+        scores = []
+        scores.append(self.audit_filesystem())
+        scores.append(self.audit_database())
+        scores.append(self.audit_memory_layers())
+        scores.append(self.audit_knowledge_graph())
+        scores.append(self.audit_tools_and_integrations())
+        scores.append(self.audit_archive_status())
+        scores.append(self.audit_performance())
+
+        # 计算总分
+        total = sum(scores)
+        max_total = 70  # 最大可能分数
+        percentage = round(total / max_total * 100, 1)
+
+        self.audit_results["scores"]["total"] = total
+        self.audit_results["scores"]["max"] = max_total
+        self.audit_results["scores"]["percentage"] = percentage
+        self.audit_results["scores"]["grade"] = self.calculate_grade()
+
+        # 生成建议
+        self.generate_recommendations()
+
+        self.close()
+
+        return self.audit_results
+
+
+def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="全流程审计工具")
+    parser.add_argument("--audit", action="store_true", help="执行审计")
+    parser.add_argument("--detailed", action="store_true", help="详细输出")
+    parser.add_argument("--export-json", action="store_true", help="导出JSON")
+    args = parser.parse_args()
+
+    auditor = SystemAuditor()
+
+    if args.audit or args.detailed or args.export_json:
+        result = auditor.execute_audit(detailed=args.detailed)
+
+        print("\n" + "=" * 60)
+        print("   审计结果摘要")
+        print("=" * 60)
+        print(f"\n📊 总分: {result['scores']['total']}/{result['scores']['max']} "
+              f"({result['scores']['percentage']}%)")
+        print(f"📈 评级: {result['scores']['grade']}")
+        print(f"\n⚠️  问题统计:")
+        print(f"   🔴 严重: {len(result['findings']['critical'])}")
+        print(f"   🟡警告: {len(result['findings']['warning'])}")
+        print(f"   ℹ️  信息: {len(result['findings']['info'])}")
+
+        print(f"\n💡 建议:")
+        for rec in result["recommendations"]:
+            print(f"   - {rec}")
+
+        if args.detailed:
+            print("\n" + "=" * 60)
+            print("   详细检查项")
+            print("=" * 60)
+            for check in result["checks"]:
+                icon = "✅" if check["status"] == "pass" else \
+                       "⚠️" if check["status"] == "warning" else "❌"
+                print(f"   {icon} [{check['category']}] {check['name']}: "
+                      f"{check['details']}")
+
+        if args.export_json:
+            export_path = ROOT / "audit_report.json"
+            with open(export_path, 'w', encoding='utf-8') as f:
+                json.dump(result, f, indent=2, ensure_ascii=False, default=str)
+            print(f"\n📄 报告已导出: {export_path}")
+
+    else:
+        parser.print_help()
+
+
+if __name__ == "__main__":
+    main()

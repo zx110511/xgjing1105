@@ -1,0 +1,280 @@
+﻿# 天机v9.0 元初系统 — 灵境分布式部署
+# =============================================
+# Docker Compose: 11服务集群 + 韧性保护 + gRPC通信
+
+version: "3.9"
+
+x-tianji-common: &tianji-common
+  build:
+    context: ..
+    dockerfile: deploy/Dockerfile.lingjing
+  environment: &tianji-env
+    PYTHONUNBUFFERED: "1"
+    AI_MEMORY_ROOT: /app
+    AI_MEMORY_DATA: /app/data/.memory
+    TIANJI_LOG_LEVEL: INFO
+  restart: unless-stopped
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "10m"
+      max-file: "3"
+  healthcheck:
+    interval: 15s
+    timeout: 5s
+    retries: 3
+  networks:
+    - lingjing-net
+
+services:
+
+  # ──── 核心记忆引擎 ────
+  tianji-memory:
+    <<: *tianji-common
+    container_name: tianji-memory
+    hostname: tianji-memory
+    ports:
+      - "8771:8771"
+      - "8700:8700"
+    command: >
+      python -m server.main
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8771/api/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    volumes:
+      - tianji_memory_data:/app/data
+    depends_on:
+      - lingjing-registry
+
+  # ──── gRPC 网关 ────
+  tianji-grpc:
+    <<: *tianji-common
+    container_name: tianji-grpc
+    hostname: tianji-grpc
+    ports:
+      - "8701:8700"
+    command: >
+      python -c "
+      from core.grpc_server import TianjiGRPCServer
+      from core.service_registry import get_service_registry
+      from core.evolution_bus import get_evolution_bus
+      from core.resilience import get_resilience_manager
+      bus = get_evolution_bus()
+      reg = get_service_registry()
+      rm = get_resilience_manager()
+      srv = TianjiGRPCServer('tianji-grpc', host='0.0.0.0', port=8700, event_bus=bus, registry=reg, resilience=rm)
+      srv.start()
+      import time;
+      try:
+        while True: time.sleep(60)
+      except KeyboardInterrupt:
+        srv.stop()
+      "
+    environment:
+      <<: *tianji-env
+      TIANJI_MEMORY_URL: http://tianji-memory:8771
+      TIANJI_REGISTRY_URL: http://lingjing-registry:8771
+    depends_on:
+      - tianji-memory
+      - lingjing-registry
+
+  # ──── 服务注册中心 ────
+  lingjing-registry:
+    <<: *tianji-common
+    container_name: lingjing-registry
+    hostname: lingjing-registry
+    ports:
+      - "8772:8771"
+      - "8702:8700"
+    command: >
+      python -c "
+      from core.service_registry import ServiceRegistry
+      from core.evolution_bus import get_evolution_bus
+      from core.resilience import get_resilience_manager
+      from core.grpc_server import TianjiGRPCServer
+      import os
+      os.environ['AI_MEMORY_PORT'] = '8772'
+      bus = get_evolution_bus()
+      reg = ServiceRegistry(event_bus=bus)
+      rm = get_resilience_manager()
+      srv = TianjiGRPCServer('lingjing-registry', host='0.0.0.0', port=8700, event_bus=bus, registry=reg, resilience=rm)
+      reg.start()
+      srv.start()
+      import time
+      try:
+        while True: time.sleep(60)
+      except KeyboardInterrupt:
+        srv.stop()
+        reg.stop()
+      "
+    environment:
+      <<: *tianji-env
+      AI_MEMORY_PORT: "8772"
+    volumes:
+      - tianji_registry_data:/app/data
+
+  # ──── L0 铁卫 (质量门禁) ────
+  tiewei:
+    <<: *tianji-common
+    container_name: tiewei
+    hostname: tiewei
+    ports:
+      - "8810:8810"
+    command: >
+      python -c "
+      from core.grpc_server import TianjiGRPCServer
+      from core.evolution_bus import get_evolution_bus
+      import time
+      bus = get_evolution_bus()
+      srv = TianjiGRPCServer('tiewei', host='0.0.0.0', port=8810, event_bus=bus)
+      srv.start()
+      while True: time.sleep(60)
+      "
+    depends_on:
+      - lingjing-registry
+      - tianji-memory
+
+  # ──── L1 忆库 (记忆检索) ────
+  yiku:
+    <<: *tianji-common
+    container_name: yiku
+    hostname: yiku
+    ports:
+      - "8820:8820"
+    command: >
+      python -c "
+      from core.grpc_server import TianjiGRPCServer
+      from core.evolution_bus import get_evolution_bus
+      import time
+      bus = get_evolution_bus()
+      srv = TianjiGRPCServer('yiku', host='0.0.0.0', port=8820, event_bus=bus)
+      srv.start()
+      while True: time.sleep(60)
+      "
+    depends_on:
+      - lingjing-registry
+      - tianji-memory
+
+  # ──── L2 天枢 (总调度) ────
+  tianshu:
+    <<: *tianji-common
+    container_name: tianshu
+    hostname: tianshu
+    ports:
+      - "8800:8800"
+    command: >
+      python -c "
+      from core.grpc_server import TianjiGRPCServer
+      from core.agent_orchestrator import AgentOrchestrator
+      from core.evolution_bus import get_evolution_bus
+      from core.resilience import get_resilience_manager
+      import time
+      bus = get_evolution_bus()
+      rm = get_resilience_manager()
+      orch = AgentOrchestrator(event_bus=bus, resilience=rm)
+      srv = TianjiGRPCServer('tianshu', host='0.0.0.0', port=8800, event_bus=bus, resilience=rm)
+      srv.start()
+      while True: time.sleep(60)
+      "
+    depends_on:
+      - lingjing-registry
+      - tianji-memory
+      - yiku
+
+  # ──── L4 千里 (运维监控) ────
+  qianli:
+    <<: *tianji-common
+    container_name: qianli
+    hostname: qianli
+    ports:
+      - "8840:8840"
+    command: >
+      python -c "
+      from core.grpc_server import TianjiGRPCServer
+      from core.evolution_bus import get_evolution_bus
+      import time
+      bus = get_evolution_bus()
+      srv = TianjiGRPCServer('qianli', host='0.0.0.0', port=8840, event_bus=bus)
+      srv.start()
+      while True: time.sleep(60)
+      "
+    depends_on:
+      - lingjing-registry
+
+  # ──── 连理 (知识图谱) ────
+  lianli:
+    <<: *tianji-common
+    container_name: lianli
+    hostname: lianli
+    ports:
+      - "8807:8807"
+    command: >
+      python -c "
+      from core.grpc_server import TianjiGRPCServer
+      from core.evolution_bus import get_evolution_bus
+      import time
+      bus = get_evolution_bus()
+      srv = TianjiGRPCServer('lianli', host='0.0.0.0', port=8807, event_bus=bus)
+      srv.start()
+      while True: time.sleep(60)
+      "
+    depends_on:
+      - lingjing-registry
+      - tianji-memory
+
+  # ──── 化生 (自进化) ────
+  huasheng:
+    <<: *tianji-common
+    container_name: huasheng
+    hostname: huasheng
+    ports:
+      - "8833:8833"
+    command: >
+      python -c "
+      from core.grpc_server import TianjiGRPCServer
+      from core.evolution_bus import get_evolution_bus
+      import time
+      bus = get_evolution_bus()
+      srv = TianjiGRPCServer('huasheng', host='0.0.0.0', port=8833, event_bus=bus)
+      srv.start()
+      while True: time.sleep(60)
+      "
+    depends_on:
+      - lingjing-registry
+      - tianji-memory
+
+  # ──── 万象 (多模态) ────
+  wanxiang:
+    <<: *tianji-common
+    container_name: wanxiang
+    hostname: wanxiang
+    ports:
+      - "8824:8824"
+    command: >
+      python -c "
+      from core.grpc_server import TianjiGRPCServer
+      from core.evolution_bus import get_evolution_bus
+      import time
+      bus = get_evolution_bus()
+      srv = TianjiGRPCServer('wanxiang', host='0.0.0.0', port=8824, event_bus=bus)
+      srv.start()
+      while True: time.sleep(60)
+      "
+    depends_on:
+      - lingjing-registry
+      - tianji-memory
+
+volumes:
+  tianji_memory_data:
+    driver: local
+  tianji_registry_data:
+    driver: local
+
+networks:
+  lingjing-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16

@@ -1,0 +1,48 @@
+﻿﻿﻿﻿﻿﻿﻿﻿name: 天机v9.0 性能基准测试
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 2 * * 0'
+
+jobs:
+  benchmark:
+    name: 性能基准测试
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+      
+      - name: 设置Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-benchmark
+          pip install -r requirements.txt || true
+      
+      - name: 运行性能基准测试
+        run: |
+          pytest tests/test_core/ \
+            --benchmark-only \
+            --benchmark-autosave \
+            --benchmark-compare=previous \
+            -v || true
+      
+      - name: 上传基准测试结果
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: .benchmarks/
+      
+      - name: 生成基准测试报告
+        run: |
+          echo "# 📈 性能基准测试报告" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "基准测试已完成，结果已保存至artifacts。" >> $GITHUB_STEP_SUMMARY

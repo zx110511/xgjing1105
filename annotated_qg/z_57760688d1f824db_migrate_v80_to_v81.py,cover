@@ -1,0 +1,531 @@
+> """
+> v8.0 → v9.0 数据迁移与记忆整合
+> ====================================
+> 功能:
+> 1. 从v8.0归档数据库提取高质量记忆
+> 2. 去重处理（基于内容相似度）
+> 3. 质量评估（长度、标签、元数据完整性）
+> 4. 分层映射到v9.0 ICME架构
+> 5. 生成迁移报告
+  
+> 使用方法:
+>   python migrate_v80_to_v81.py --scan      # 扫描v8.0数据
+>   python migrate_v80_to_v81.py --migrate    # 执行迁移
+>   python migrate_v80_to_v81.py --report     # 查看报告
+> """
+  
+! import sqlite3
+! import json
+! import uuid
+! import time
+! import hashlib
+! import re
+! from pathlib import Path
+! from datetime import datetime
+! from typing import Optional, List, Dict, Any, Tuple
+! from dataclasses import dataclass, field
+  
+! _ROOT = Path(__file__).resolve().parent.parent
+! V80_DB_PATH = _ROOT.parent / "_已归档_20260528" / "天机_v8.0_ONEDIR" / "data" / ".memory" / "icme.db"
+! V81_DB_PATH = _ROOT / "data" / ".memory" / "icme.db"
+  
+! @dataclass
+! class MigrationRecord:
+!     """迁移记录"""
+!     source_id: str
+!     content: str
+!     original_layer: str
+!     target_layer: str
+!     tags: List[str]
+!     quality_score: float
+!     is_duplicate: bool = False
+!     duplicate_of: str = ""
+!     migration_status: str = "pending"  # pending / migrated / skipped
+  
+  
+! class V80ToV81Migrator:
+!     """v8.0到v9.0数据迁移器"""
+  
+!     def __init__(self):
+!         self.v80_conn = None
+!         self.v81_conn = None
+!         self.migration_records: List[MigrationRecord] = []
+!         self.stats = {
+!             "total_scanned": 0,
+!             "high_quality": 0,
+!             "duplicates_found": 0,
+!             "migrated": 0,
+!             "skipped": 0,
+!             "by_layer": {},
+!         }
+  
+!     def connect(self):
+!         """连接两个数据库"""
+!         if not V80_DB_PATH.exists():
+!             raise FileNotFoundError(f"v8.0数据库不存在: {V80_DB_PATH}")
+  
+!         self.v80_conn = sqlite3.connect(str(V80_DB_PATH))
+!         self.v80_conn.row_factory = sqlite3.Row
+  
+!         self.v81_conn = sqlite3.connect(str(V81_DB_PATH))
+!         self.v81_conn.row_factory = sqlite3.Row
+  
+!         return True
+  
+!     def close(self):
+!         if self.v80_conn:
+!             self.v80_conn.close()
+!         if self.v81_conn:
+!             self.v81_conn.close()
+  
+!     def scan_v80_data(self) -> Dict[str, Any]:
+!         """
+!         扫描v8.0数据库中的所有记忆
+  
+!         返回: 扫描结果统计
+!         """
+!         cur = self.v80_conn.cursor()
+  
+!         scan_result = {
+!             "timestamp": datetime.now().isoformat(),
+!             "database_path": str(V80_DB_PATH),
+!             "tables": [],
+!             "memory_stats": {
+!                 "total": 0,
+!                 "by_layer": {},
+!                 "avg_content_length": 0,
+!                 "with_tags": 0,
+!                 "with_metadata": 0,
+!             },
+!             "sample_records": [],
+!         }
+  
+          # 获取表列表
+!         tables = cur.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+!         for t in tables:
+!             table_name = t[0]
+!             if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', table_name):
+!                 continue
+!             count = cur.execute('SELECT COUNT(*) FROM "?"', (table_name,)).fetchone()[0]
+!             scan_result["tables"].append({"name": table_name, "count": count})
+  
+          # 分析memories表
+!         try:
+!             total = cur.execute("SELECT COUNT(*) FROM memories").fetchone()[0]
+!             scan_result["memory_stats"]["total"] = total
+  
+              # 按层分布
+!             layers = cur.execute("""
+!                 SELECT layer, COUNT(*) as cnt
+!                 FROM memories
+!                 GROUP BY layer
+!                 ORDER BY cnt DESC
+!             """).fetchall()
+  
+!             for l in layers:
+!                 layer_name = l[0] or "unknown"
+!                 scan_result["memory_stats"]["by_layer"][layer_name] = l[1]
+  
+              # 内容质量指标
+!             stats = cur.execute("""
+!                 SELECT
+!                     AVG(LENGTH(content)) as avg_len,
+!                     SUM(CASE WHEN tags IS NOT NULL AND tags != '' THEN 1 ELSE 0 END) as with_tags,
+!                     SUM(CASE WHEN metadata IS NOT NULL AND metadata != '' THEN 1 ELSE 0 END) as with_meta
+!                 FROM memories
+!             """).fetchone()
+  
+!             scan_result["memory_stats"]["avg_content_length"] = round(stats[0] or 0, 1)
+!             scan_result["memory_stats"]["with_tags"] = stats[1] or 0
+!             scan_result["memory_stats"]["with_metadata"] = stats[2] or 0
+  
+              # 获取示例记录
+!             samples = cur.execute("""
+!                 SELECT id, layer, substr(content, 1, 100) as preview,
+!                        length(content) as len, tags
+!                 FROM memories
+!                 WHERE content IS NOT NULL AND length(content) > 30
+!                 ORDER BY RANDOM()
+!                 LIMIT 10
+!             """).fetchall()
+  
+!             for s in samples:
+!                 scan_result["sample_records"].append({
+!                     "id": s["id"][:12],
+!                     "layer": s["layer"],
+!                     "preview": (s["preview"] or "")[:80],
+!                     "length": s["len"],
+!                     "has_tags": bool(s["tags"]),
+!                 })
+  
+!         except Exception as e:
+!             scan_result["error"] = str(e)
+  
+!         return scan_result
+  
+!     def calculate_quality_score(
+!         self,
+!         content: str,
+!         tags: Optional[str],
+!         metadata: Optional[str],
+!     ) -> float:
+!         """
+!         计算记忆质量分数 (0-1)
+  
+!         评分维度:
+!         - 内容长度 (>50字符得高分)
+!         - 标签完整性
+!         - 元数据丰富度
+!         - 结构化程度
+!         """
+!         score = 0.0
+  
+          # 内容长度 (40%)
+!         if content and len(content) >= 200:
+!             score += 0.4
+!         elif content and len(content) >= 100:
+!             score += 0.3
+!         elif content and len(content) >= 50:
+!             score += 0.2
+!         elif content:
+!             score += 0.1
+  
+          # 标签完整性 (25%)
+!         if tags:
+!             try:
+!                 tag_list = json.loads(tags)
+!                 if isinstance(tag_list, list) and len(tag_list) >= 3:
+!                     score += 0.25
+!                 elif isinstance(tag_list, list) and len(tag_list) >= 1:
+!                     score += 0.15
+!                 else:
+!                     score += 0.05
+!             except (json.JSONDecodeError, TypeError):
+!                 score += 0.05
+!         else:
+!             pass
+  
+!         if metadata:
+!             try:
+!                 meta_dict = json.loads(metadata)
+!                 if isinstance(meta_dict, dict) and len(meta_dict) >= 3:
+!                     score += 0.25
+!                 elif isinstance(meta_dict, dict) and len(meta_dict) >= 1:
+!                     score += 0.15
+!                 else:
+!                     score += 0.08
+!             except (json.JSONDecodeError, TypeError):
+!                 score += 0.03
+!         else:
+!             pass
+  
+          # 结构化程度 (10%)
+!         if content:
+!             has_structure = any([
+!                 '---' in content or '===' in content,  # 标题分隔符
+!                 re.search(r'#{1,6}\s', content),       # Markdown标题
+!                 re.search(r'\d+\.', content),          # 编号列表
+!                 '|' in content and content.count('|') > 2,  # 表格
+!             ])
+!             if has_structure:
+!                 score += 0.1
+  
+!         return min(score, 1.0)
+  
+!     def check_duplicate(self, content: str, threshold: float = 0.85) -> Tuple[bool, str]:
+!         """
+!         检查是否与v9.0现有数据重复
+  
+!         使用简单的内容哈希+前缀匹配
+!         返回: (is_duplicate, existing_id_or_empty)
+!         """
+!         cur = self.v81_conn.cursor()
+  
+          # 方法1: 精确哈希匹配
+!         content_hash = hashlib.md5(content.encode('utf-8')).hexdigest()[:16]
+  
+          # 方法2: 前缀匹配（取前100字符）
+!         prefix = content[:100].strip() if len(content) > 100 else content.strip()
+  
+          # 在v9.0中查找相似记录
+!         similar = cur.execute("""
+!             SELECT id, content
+!             FROM memories
+!             WHERE substr(content, 1, 100) = ?
+!             LIMIT 1
+!         """, (prefix,)).fetchone()
+  
+!         if similar:
+!             return True, similar["id"]
+  
+!         return False, ""
+  
+!     def map_layer(self, v80_layer: str) -> str:
+!         """将v8.0层映射到v9.0层"""
+!         layer_map = {
+!             "sensory": "sensory",
+!             "working": "working",
+!             "short_term": "short_term",
+!             "episodic": "episodic",
+!             "semantic": "semantic",
+!             "meta": "meta",
+!             "long_term": "semantic",  # v8.0的long_term映射到semantic
+!             "knowledge": "semantic",   # knowledge层也映射到semantic
+!             "None": "episodic",        # 无明确层的默认映射
+!             "": "episodic",
+!         }
+!         return layer_map.get(v80_layer, "episodic")
+  
+!     def prepare_migration(self) -> int:
+!         """
+!         准备迁移：扫描、去重、评分
+  
+!         返回: 可迁移的记录数
+!         """
+!         cur = self.v80_conn.cursor()
+  
+          # 获取所有v8.0记忆
+!         records = cur.execute("""
+!             SELECT id, content, layer, tags, priority,
+!                    created_at, last_accessed, access_count, metadata
+!             FROM memories
+!             WHERE content IS NOT NULL AND LENGTH(content) > 20
+!         """).fetchall()
+  
+!         self.stats["total_scanned"] = len(records)
+  
+!         for record in records:
+!             content = record["content"]
+!             quality = self.calculate_quality_score(
+!                 content, record["tags"], record["metadata"]
+!             )
+  
+              # 只保留高质量记录 (>= 0.4)
+!             if quality < 0.4:
+!                 continue
+  
+              # 检查重复
+!             is_dup, dup_id = self.check_duplicate(content)
+  
+!             target_layer = self.map_layer(record["layer"])
+  
+!             migration_rec = MigrationRecord(
+!                 source_id=record["id"],
+!                 content=content,
+!                 original_layer=record["layer"] or "",
+!                 target_layer=target_layer,
+!                 tags=json.loads(record["tags"]) if record["tags"] else [],
+!                 quality_score=quality,
+!                 is_duplicate=is_dup,
+!                 duplicate_of=dup_id,
+!             )
+  
+!             self.migration_records.append(migration_rec)
+  
+              # 更新统计
+!             if quality >= 0.7:
+!                 self.stats["high_quality"] += 1
+  
+!             if is_dup:
+!                 self.stats["duplicates_found"] += 1
+  
+!             if target_layer not in self.stats["by_layer"]:
+!                 self.stats["by_layer"][target_layer] = 0
+!             self.stats["by_layer"][target_layer] += 1
+  
+!         return len([r for r in self.migration_records if not r.is_duplicate])
+  
+!     def execute_migration(self) -> Dict[str, Any]:
+!         """
+!         执行实际迁移操作
+  
+!         将非重复的高质量记录写入v9.0数据库
+!         """
+!         cur = self.v81_conn.cursor()
+  
+!         migration_result = {
+!             "timestamp": datetime.now().isoformat(),
+!             "attempted": 0,
+!             "success": 0,
+!             "failed": 0,
+!             "skipped_duplicates": 0,
+!             "migrated_ids": [],
+!             "errors": [],
+!         }
+  
+!         now = time.time()
+  
+!         for rec in self.migration_records:
+!             if rec.is_duplicate:
+!                 rec.migration_status = "skipped"
+!                 self.stats["skipped"] += 1
+!                 migration_result["skipped_duplicates"] += 1
+!                 continue
+  
+!             migration_result["attempted"] += 1
+  
+!             try:
+!                 new_id = f"mig_{uuid.uuid4().hex[:12]}"
+  
+                  # 构建增强的标签（添加迁移来源标记）
+!                 enhanced_tags = [
+!                     *rec.tags,
+!                     f"migrated_from:v8.0",
+!                     f"original_layer:{rec.original_layer}",
+!                     f"quality:{rec.quality_score:.2f}",
+!                 ]
+  
+                  # 写入v9.0
+!                 cur.execute("""
+!                     INSERT INTO memories
+!                     (id, content, layer, tags, priority, created_at, last_accessed,
+!                      access_count, value_score, size_bytes, metadata)
+!                     VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
+!                 """, (
+!                     new_id,
+!                     rec.content,
+!                     rec.target_layer,
+!                     json.dumps(enhanced_tags, ensure_ascii=False),
+!                     "medium",
+!                     now,
+!                     now,
+!                     rec.quality_score,
+!                     len(rec.content.encode('utf-8')),
+!                     json.dumps({
+!                         "source": "v8.0_migration",
+!                         "original_id": rec.source_id,
+!                         "original_layer": rec.original_layer,
+!                         "migration_date": datetime.now().isoformat(),
+!                         "quality_score": rec.quality_score,
+!                     }, ensure_ascii=False),
+!                 ))
+  
+!                 rec.migration_status = "migrated"
+!                 self.stats["migrated"] += 1
+!                 migration_result["success"] += 1
+!                 migration_result["migrated_ids"].append(new_id)
+  
+!             except Exception as e:
+!                 rec.migration_status = "failed"
+!                 migration_result["failed"] += 1
+!                 migration_result["errors"].append({
+!                     "id": rec.source_id,
+!                     "error": str(e),
+!                 })
+  
+!         self.v81_conn.commit()
+  
+!         return migration_result
+  
+!     def generate_report(self) -> Dict[str, Any]:
+!         """生成完整迁移报告"""
+!         report = {
+!             "summary": {
+!                 **self.stats,
+!                 "timestamp": datetime.now().isoformat(),
+!                 "v80_database": str(V80_DB_PATH),
+!                 "v81_database": str(V81_DB_PATH),
+!             },
+!             "layer_distribution": {},
+!             "quality_distribution": {
+!                 "high_07_10": 0,
+!                 "medium_04_07": 0,
+!                 "low_below_04": 0,
+!             },
+!             "top_migrated_by_layer": [],
+!             "recommendations": [],
+!         }
+  
+!         for rec in self.migration_records:
+              # 层分布
+!             layer = rec.target_layer
+!             if layer not in report["layer_distribution"]:
+!                 report["layer_distribution"][layer] = {"total": 0, "migrated": 0}
+!             report["layer_distribution"][layer]["total"] += 1
+!             if rec.migration_status == "migrated":
+!                 report["layer_distribution"][layer]["migrated"] += 1
+  
+              # 质量分布
+!             if rec.quality_score >= 0.7:
+!                 report["quality_distribution"]["high_07_10"] += 1
+!             elif rec.quality_score >= 0.4:
+!                 report["quality_distribution"]["medium_04_07"] += 1
+!             else:
+!                 report["quality_distribution"]["low_below_04"] += 1
+  
+          # Top迁移目标层
+!         sorted_layers = sorted(
+!             report["layer_distribution"].items(),
+!             key=lambda x: x[1]["migrated"],
+!             reverse=True
+!         )[:5]
+  
+!         for layer, data in sorted_layers:
+!             report["top_migrated_by_layer"].append({
+!                 "layer": layer,
+!                 "migrated_count": data["migrated"],
+!                 "total_candidates": data["total"],
+!             })
+  
+          # 建议
+!         if self.stats["duplicates_found"] > 0:
+!             report["recommendations"].append(
+!                 f"发现{self.stats['duplicates_found']}条重复记录已跳过"
+!             )
+  
+!         if self.stats["high_quality"] > 0:
+!             rate = self.stats["high_quality"] / max(len(self.migration_records), 1) * 100
+!             report["recommendations"].append(
+!                 f"高质量记录占比{rate:.1f}%，建议优先利用这些知识"
+!             )
+  
+!         if self.stats["migrated"] > 0:
+!             report["recommendations"].append(
+!                 f"成功迁移{self.stats['migrated']}条记忆到v9.0，可触发L4/L5重新整理"
+!             )
+  
+!         return report
+  
+  
+! def main():
+!     import argparse
+!     parser = argparse.ArgumentParser(description="v8.0→v9.0数据迁移")
+!     parser.add_argument("--scan", action="store_true", help="扫描v8.0数据")
+!     parser.add_argument("--migrate", action="store_true", help="执行迁移")
+!     parser.add_argument("--report", action="store_true", help="生成报告")
+!     args = parser.parse_args()
+  
+!     migrator = V80ToV81Migrator()
+  
+!     try:
+!         migrator.connect()
+  
+!         if args.scan:
+!             print("\n=== 扫描v8.0归档数据 ===\n")
+!             result = migrator.scan_v80_data()
+!             print(json.dumps(result, indent=2, ensure_ascii=False, default=str))
+  
+!         if args.migrate:
+!             print("\n=== 准备迁移 ===\n")
+!             candidates = migrator.prepare_migration()
+!             print(f"可迁移候选: {candidates} 条")
+!             print(f"重复跳过: {migrator.stats['duplicates_found']} 条")
+  
+!             print("\n=== 执行迁移 ===\n")
+!             result = migrator.execute_migration()
+!             print(json.dumps(result, indent=2, ensure_ascii=False))
+  
+!         if args.report:
+!             print("\n=== 迁移报告 ===\n")
+!             report = migrator.generate_report()
+!             print(json.dumps(report, indent=2, ensure_ascii=False))
+  
+!         if not any([args.scan, args.migrate, args.report]):
+!             parser.print_help()
+  
+!     finally:
+!         migrator.close()
+  
+  
+! if __name__ == "__main__":
+!     main()

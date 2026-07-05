@@ -1,0 +1,889 @@
+﻿# 🌉 天机v9.0 SSS级 Agent-MCP集成桥接与体系升级指令集
+
+---
+
+## 📋 指令模板
+
+```
+═══════════════════════════════════════════════════════════════
+  天机v9.0 Agent-MCP体系升级指令 — {升级阶段}
+  法定升级流程 · 三步审计→四层缝合→五级验证
+═══════════════════════════════════════════════════════════════
+
+🖥️ 系统: 天机v9.0 (build 2026-05-25)
+🎯 目标: 缝合三层断裂 → 灵境兼容就绪
+🏗️ 产出: AMIM集成桥接模块 + Agent运行类升级 + MCP工具归属映射
+
+📌 执行指令 (照做不添加):
+  1) 审计阶段: [审计对象]
+  2) 实现阶段: [实现对象]
+  3) 验证阶段: [验证对象]
+═══════════════════════════════════════════════════════════════
+```
+
+---
+
+## 🔍 第一部分：三层断裂审计（现状）
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                    当前 Agent-MCP 体系裂缝                          │
+│                                                                   │
+│  [层1] .trae/agents/_AGENT_REGISTRY.json                         │
+│         20个Agent声明 (天枢/文宗/经纬/.../追光)                      │
+│         ↓ 定义了 name/layer/role/capabilities/tools               │
+│                                                                   │
+│  ⚠️ 断裂一: 声明层与运行层无桥接                                    │
+│      ┌──────────────────────────────────────┐                    │
+│      │  agent-framework-global MCP EXE      │                    │
+│      │  天机-调度.exe 作为IDE-MCP桥接         │                    │
+│      └──────────────────────────────────────┘                    │
+│         ↓ 但其中20个Agent没有对应Python类                           │
+│                                                                   │
+│  [层2] core/agent_orchestrator.py                                │
+│         19个Agent的AGENT_CAPABILITY_MATRIX (硬编码字典)             │
+│         ↓ 定义了 tools/capabilities (与层1重复)                    │
+│                                                                   │
+│  ⚠️ 断裂二: 工具绑定两处定义，无单一源头                             │
+│                                                                   │
+│  [层3] agents/ 目录                                                │
+│         仅5个运行时类: OrchestratorAgent/BuildAgent/               │
+│         TestAgent/RecoveryAgent/RuntimeRecoveryAgent              │
+│         ↓ 与层1的20个Agent 无对应关系                               │
+│                                                                   │
+│  ⚠️ 断裂三: MCP工具归属映射缺失                                     │
+│     .trae/mcp.json ─→ 6个EXE服务器                                 │
+│     mcp/tianji_mcp_server.py ─→ 24个工具                           │
+│     但 memory_remember/agent_dispatch/rule_evaluate 等             │
+│     归属于哪个Agent? 无映射表                                       │
+│                                                                   │
+│  [灵境隐患] 分布式环境下，以上断裂全部暴露为运行时崩溃                  │
+│     单体: 函数调用 → 勉强可用                                        │
+│     灵境: HTTP/gRPC → AgentToolMapping → 序列化/反序列化 → 必崩      │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🎯 第二部分：升级目标
+
+### 目标一：建立 AMIM 集成桥接模块（新模块）
+
+> **AMIM = Agent-MCP Integration Module**
+> 
+> 作用：统一管理 Agent 声明↔MCP 工具↔运行类的三层映射，成为单一事实来源（Single Source of Truth）。
+
+| 能力 | 现状 | 目标 |
+|------|------|------|
+| Agent声明 | `_AGENT_REGISTRY.json` (20个) | → AMIM 统一读取，生成运行实例 |
+| 工具绑定 | 硬编码在 `AGENT_CAPABILITY_MATRIX` | → AMIM 管理 `AgentToolMapping` 表 |
+| MCP服务器 | `.trae/mcp.json` (6个EXE) | → AMIM 读取并映射到Agent |
+| 运行类 | `agents/` (仅5个) | → AMIM 为20个Agent生成 `AgentRuntime` |
+| 灵境兼容 | 无 | → AMIM 输出可序列化的AgentService描述 |
+
+### 目标二：升级自定义Agent群（从声明→可执行）
+
+> 将 `_AGENT_REGISTRY.json` 的20个Agent从纯声明转换为可执行的 `AgentRuntime` 类。
+
+| 层级 | Agent | 现状 | 升级行动 |
+|------|-------|------|---------|
+| L0 | 铁卫 | 声明only | → `agents/tiewei.py` 实现 |
+| L1 | 忆库/洞察/律令/灵犀 | 声明only | → 各写独立Agent类 |
+| L2 | 天枢/文宗/经纬/妙笔/明镜/天算/矿师 | 声明only | → 各写独立Agent类 |
+| L3 | 百巧/史官/锦书 | 声明only | → 各写独立Agent类 |
+| L4 | 千里/工造/镇山/追光 | 声明only | → 各写独立Agent类 |
+| — | OrchestratorAgent/BuildAgent/TestAgent | 已有类 | → 纳入AMIM统一注册 |
+
+### 目标三：升级MCP系统（工具归属 + 灵境序列化）
+
+| 升级项 | 现状 | 目标 |
+|--------|------|------|
+| 工具归属映射 | 无 | → `AgentToolMapping` 表：24工具→20Agent |
+| MCP服务器路由 | 6个EXE无路由逻辑 | → AMIM接管路由：根据Agent选择MCP服务器 |
+| 灵境序列化 | 无 | → AgentService描述可JSON序列化，支持gRPC |
+| 17个新工具(灵境) | 未注册 | → 预留: agent_scale/agent_health/agent_route/... |
+
+---
+
+## 🏗️ 第三部分：升级队列
+
+### 升级队列总览
+
+```
+升级队列 (4个Serial Block，每个Block内可Parallel)
+
+Block A ─→ Block B ─→ Block C ─→ Block D
+(桥接模块)  (L0/L1)    (L2/L3/L4)  (MCP+灵境)
+ 2天         3天         5天         3天
+```
+
+---
+
+### Block A：AMIM 集成桥接模块（新模块 M37）
+
+#### A-1. 模块定位
+
+```
+模块编号: M37
+模块名称: AMIM (Agent-MCP Integration Module)
+灵境道谱: D5-3【多Agent调度煞】· 道五·编排体道的延伸
+文件位置: core/amim.py
+类名: AgentMCPIntegrationManager
+```
+
+#### A-2. 核心数据结构
+
+```python
+# core/amim.py — 单一事实来源
+
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Set
+from enum import Enum
+
+
+class AgentLayer(Enum):
+    L0 = 0    # 基础设施守护 (铁卫)
+    L1 = 1    # 数据/上下文层 (忆库/洞察/律令/灵犀)
+    L2 = 2    # 决策/创作层 (天枢/文宗/经纬/妙笔/明镜/天算/矿师)
+    L3 = 3    # 执行/工具层 (百巧/史官/锦书)
+    L4 = 4    # 运维/观测层 (千里/工造/镇山/追光)
+
+
+@dataclass
+class AgentDefinition:
+    """AMIM Agent定义 — 单一事实来源"""
+    agent_id: str
+    name: str
+    layer: AgentLayer
+    role: str
+    emoji: str
+    capabilities: List[str]
+    tools: List[str]
+    mcp_server: str                    # 归属MCP服务器
+    skill_ids: List[str] = field(default_factory=list)
+    runtime_class: Optional[str] = None  # 对应 agents/ 下的类
+
+    # 灵境扩展字段
+    lingjing_service_id: Optional[str] = None
+    lingjing_port: Optional[int] = None
+    health_endpoint: Optional[str] = None
+    grpc_proto: Optional[str] = None
+
+    def to_dict(self) -> dict:
+        return {
+            "agent_id": self.agent_id,
+            "name": self.name,
+            "layer": self.layer.name,
+            "layer_value": self.layer.value,
+            "role": self.role,
+            "emoji": self.emoji,
+            "capabilities": self.capabilities,
+            "tools": self.tools,
+            "mcp_server": self.mcp_server,
+            "skill_ids": self.skill_ids,
+            "runtime_class": self.runtime_class,
+            "lingjing_service_id": self.lingjing_service_id,
+            "lingjing_port": self.lingjing_port,
+            "health_endpoint": self.health_endpoint,
+            "grpc_proto": self.grpc_proto,
+        }
+
+    def to_tvp(self) -> str:
+        return f"[TVP] 🤖{self.emoji} @{self.name}({self.agent_id}) L{self.layer.value} → {self.mcp_server}"
+
+
+@dataclass
+class MCPToolBinding:
+    """MCP工具↔Agent绑定 — 单一事实来源"""
+    tool_name: str
+    description: str
+    owner_agent_id: str          # 主归属Agent
+    delegate_agent_ids: List[str] = field(default_factory=list)  # 可委托Agent
+    mcp_server: str = "tianji-native"  # 所在MCP服务器
+    is_lingjing_ready: bool = False    # 灵境可序列化
+    input_schema: Optional[dict] = None
+```
+
+#### A-3. AMIM 主类
+
+```python
+class AgentMCPIntegrationManager:
+    """
+    天机v9.0 M37 — Agent-MCP集成桥接模块
+
+    职责:
+      1. 统一加载20个Agent定义 (+ 5个现有Agent)
+      2. 维护 24工具↔Agent 的归属映射
+      3. 生成 _AGENT_REGISTRY.json (写入.trae)
+      4. 生成 agent_orchestrator.py 中的 AGENT_CAPABILITY_MATRIX (同步)
+      5. 为灵境生成 AgentService 描述 JSON
+      6. 验证 Agent↔MCP服务器↔工具 的一致性
+    """
+
+    VERSION = "1.0.0"
+    MODULE_ID = "M37"
+
+    AGENT_DEFINITIONS: List[AgentDefinition] = [
+        # L0 - 基础设施守护
+        AgentDefinition(
+            agent_id="tiewei", name="铁卫", layer=AgentLayer.L0,
+            role="质量守护", emoji="🛡️",
+            capabilities=["SG门禁","功能验证","安全测试","覆盖率分析"],
+            tools=["memory_recall","security-scanner","performance-profiler","execute_command"],
+            mcp_server="security-scanner",
+            skill_ids=["memory/recall:1.0","system/diagnose:1.0"],
+            lingjing_service_id="svc-quality-gate", lingjing_port=8810,
+            health_endpoint="/health/quality-gate",
+        ),
+        # L1 - 数据/上下文层
+        AgentDefinition(
+            agent_id="yiku", name="忆库", layer=AgentLayer.L1,
+            role="记忆架构师", emoji="💾",
+            capabilities=["ICME六层管理","语义检索","容量监控","巩固晋升"],
+            tools=["memory_remember","memory_recall","memory_stats","memory_capacity","build_working_representation","memory_consolidate","search_memories","get_memory","list_memories","run_reflective_cycle","get_session_digest","explain_memory_lineage"],
+            mcp_server="memory-engine-global",
+            skill_ids=["memory/remember:1.0","memory/recall:1.0","memory/auto-capture:1.0"],
+            lingjing_service_id="svc-memory-core", lingjing_port=8820,
+            health_endpoint="/health/memory",
+        ),
+        AgentDefinition(
+            agent_id="dongcha", name="洞察", layer=AgentLayer.L1,
+            role="上下文分析师", emoji="🔎",
+            capabilities=["意图识别","实体抽取","情感分析","关键词提取"],
+            tools=["context_extract","memory_recall","tianji_classify","tianji_summarize_conversation","tianji_intercept"],
+            mcp_server="agent-framework-global",
+            skill_ids=["context/extract:1.0"],
+            lingjing_service_id="svc-context-analyzer", lingjing_port=8821,
+            health_endpoint="/health/context",
+        ),
+        AgentDefinition(
+            agent_id="luling", name="律令", layer=AgentLayer.L1,
+            role="规则守护者", emoji="⚖️",
+            capabilities=["规则匹配","合规检查","冲突检测","门禁执行"],
+            tools=["rule_evaluate","security-scanner","memory_recall"],
+            mcp_server="agent-framework-global",
+            skill_ids=[],
+            lingjing_service_id="svc-rule-engine", lingjing_port=8822,
+            health_endpoint="/health/rules",
+        ),
+        AgentDefinition(
+            agent_id="lingxi", name="灵犀", layer=AgentLayer.L1,
+            role="会话监控", emoji="🦋",
+            capabilities=["对话完整性","意图连续性","上下文恢复","异常检测"],
+            tools=["context_extract","memory_recall","tianji_intercept"],
+            mcp_server="agent-framework-global",
+            skill_ids=["context/extract:1.0","agent/dispatch:1.0","agent/transparent-dispatch:1.0"],
+            lingjing_service_id="svc-session-guardian", lingjing_port=8823,
+            health_endpoint="/health/session",
+        ),
+        # L2 - 决策/创作层
+        AgentDefinition(
+            agent_id="tianshu", name="天枢", layer=AgentLayer.L2,
+            role="总指挥", emoji="🎯",
+            capabilities=["编排","决策","调度","分发","全局管理"],
+            tools=["agent_dispatch","system_status","context_extract","rule_evaluate","memory_remember","memory_recall","execute_command"],
+            mcp_server="agent-framework-global",
+            skill_ids=["agent/dispatch:1.0","agent/transparent-dispatch:1.0","context/extract:1.0"],
+            lingjing_service_id="svc-orchestrator", lingjing_port=8800,
+            health_endpoint="/health/orchestrator",
+        ),
+        AgentDefinition(
+            agent_id="wenzong", name="文宗", layer=AgentLayer.L2,
+            role="主编", emoji="📝",
+            capabilities=["项目管理","内容审核","进度追踪","团队协调"],
+            tools=["agent_dispatch","system_status","memory_recall","execute_command"],
+            mcp_server="agent-framework-global",
+            skill_ids=[],
+            lingjing_service_id="svc-editor-chief", lingjing_port=8801,
+            health_endpoint="/health/editor",
+        ),
+        AgentDefinition(
+            agent_id="jingwei", name="经纬", layer=AgentLayer.L2,
+            role="架构师", emoji="📐",
+            capabilities=["架构设计","技术选型","路径规划","重构策略"],
+            tools=["agent_dispatch","rule_evaluate","memory_recall","execute_command"],
+            mcp_server="agent-framework-global",
+            skill_ids=[],
+            lingjing_service_id="svc-architect", lingjing_port=8802,
+            health_endpoint="/health/architect",
+        ),
+        AgentDefinition(
+            agent_id="miaobi", name="妙笔", layer=AgentLayer.L2,
+            role="创作者", emoji="✍️",
+            capabilities=["创作","写作","创意生成","角色塑造","世界观构建"],
+            tools=["memory_recall","memory_remember","tianji_semantic_search","tianji_extract_knowledge"],
+            mcp_server="tianji-native",
+            skill_ids=["novel/chapter-create:1.0","novel/worldbuilding-expand:1.0"],
+            lingjing_service_id="svc-creator", lingjing_port=8803,
+            health_endpoint="/health/creator",
+        ),
+        AgentDefinition(
+            agent_id="mingjing", name="明镜", layer=AgentLayer.L2,
+            role="审校者", emoji="🔍",
+            capabilities=["审校","质量评估","一致性检查","风格验证"],
+            tools=["memory_recall","rule_evaluate","security-scanner"],
+            mcp_server="agent-framework-global",
+            skill_ids=["novel/consistency-check:1.0","novel/setting-consistency-deep:1.0"],
+            lingjing_service_id="svc-reviewer", lingjing_port=8804,
+            health_endpoint="/health/reviewer",
+        ),
+        AgentDefinition(
+            agent_id="tiansuan", name="天算", layer=AgentLayer.L2,
+            role="数据分析师", emoji="📊",
+            capabilities=["统计分析","可视化","模式识别","报告撰写"],
+            tools=["memory_recall","memory_stats","tianji_summarize","tianji_semantic_search"],
+            mcp_server="tianji-native",
+            skill_ids=[],
+            lingjing_service_id="svc-analyst", lingjing_port=8805,
+            health_endpoint="/health/analyst",
+        ),
+        AgentDefinition(
+            agent_id="kuangshi", name="矿师", layer=AgentLayer.L2,
+            role="语料处理", emoji="⛏️",
+            capabilities=["语料导入","数据清洗","分类标注","批量处理"],
+            tools=["memory_remember","execute_command","memory_recall","tianji_auto_tag","tianji_classify"],
+            mcp_server="tianji-native",
+            skill_ids=["corpus/batch-import:1.0","corpus/extract:1.0","corpus/quality-score:1.0"],
+            lingjing_service_id="svc-corpus-miner", lingjing_port=8806,
+            health_endpoint="/health/corpus",
+        ),
+        # L3 - 执行/工具层
+        AgentDefinition(
+            agent_id="baiqiao", name="百巧", layer=AgentLayer.L3,
+            role="技能代理", emoji="⚡",
+            capabilities=["技能调用","工作流编排","参数验证","结果格式化"],
+            tools=["execute_command","agent_dispatch"],
+            mcp_server="command-executor",
+            skill_ids=["agent/dispatch:1.0","novel/format-export:1.0","novel/version-track:1.0"],
+            lingjing_service_id="svc-skill-invoker", lingjing_port=8830,
+            health_endpoint="/health/skills",
+        ),
+        AgentDefinition(
+            agent_id="shiguan", name="史官", layer=AgentLayer.L3,
+            role="版本追踪", emoji="📜",
+            capabilities=["版本管理","历史归档","变更分析","回滚支持"],
+            tools=["memory_recall","memory_remember","tianji_export"],
+            mcp_server="tianji-native",
+            skill_ids=["novel/version-track:1.0"],
+            lingjing_service_id="svc-history-tracker", lingjing_port=8831,
+            health_endpoint="/health/history",
+        ),
+        AgentDefinition(
+            agent_id="jinshu", name="锦书", layer=AgentLayer.L3,
+            role="成品导出", emoji="📖",
+            capabilities=["格式导出","成品美化","模板应用","输出验证"],
+            tools=["execute_command","memory_recall","tianji_export"],
+            mcp_server="command-executor",
+            skill_ids=["novel/format-export:1.0"],
+            lingjing_service_id="svc-exporter", lingjing_port=8832,
+            health_endpoint="/health/export",
+        ),
+        # L4 - 运维/观测层
+        AgentDefinition(
+            agent_id="qianli", name="千里", layer=AgentLayer.L4,
+            role="系统监控", emoji="👁️",
+            capabilities=["实时监控","性能采集","智能告警","趋势分析"],
+            tools=["system_status","ops-engine","performance-profiler","memory_recall","tianji_health"],
+            mcp_server="performance-profiler",
+            skill_ids=["system/diagnose:1.0"],
+            lingjing_service_id="svc-monitor", lingjing_port=8840,
+            health_endpoint="/health/monitor",
+        ),
+        AgentDefinition(
+            agent_id="gongzao", name="工造", layer=AgentLayer.L4,
+            role="DevOps", emoji="🚀",
+            capabilities=["CI/CD","环境管理","服务部署","资源调度"],
+            tools=["execute_command","ops-engine","agent_dispatch"],
+            mcp_server="ops-engine",
+            skill_ids=[],
+            lingjing_service_id="svc-devops", lingjing_port=8841,
+            health_endpoint="/health/devops",
+        ),
+        AgentDefinition(
+            agent_id="zhenshan", name="镇山", layer=AgentLayer.L4,
+            role="安全审计", emoji="🔒",
+            capabilities=["漏洞扫描","合规检查","密钥管理","数据保护"],
+            tools=["security-scanner","execute_command","memory_recall"],
+            mcp_server="security-scanner",
+            skill_ids=[],
+            lingjing_service_id="svc-security", lingjing_port=8842,
+            health_endpoint="/health/security",
+        ),
+        AgentDefinition(
+            agent_id="zhuiguang", name="追光", layer=AgentLayer.L4,
+            role="性能优化", emoji="⚡",
+            capabilities=["性能剖析","瓶颈分析","基准测试","资源优化"],
+            tools=["performance-profiler","execute_command","memory_recall"],
+            mcp_server="performance-profiler",
+            skill_ids=[],
+            lingjing_service_id="svc-performance", lingjing_port=8843,
+            health_endpoint="/health/performance",
+        ),
+    ]
+
+    def __init__(self):
+        self._agent_map: Dict[str, AgentDefinition] = {}
+        self._tool_map: Dict[str, MCPToolBinding] = {}
+        self._mcp_server_map: Dict[str, List[str]] = {}
+        self._build_maps()
+
+    def _build_maps(self):
+        for agent in self.AGENT_DEFINITIONS:
+            self._agent_map[agent.agent_id] = agent
+            if agent.mcp_server not in self._mcp_server_map:
+                self._mcp_server_map[agent.mcp_server] = []
+            self._mcp_server_map[agent.mcp_server].append(agent.agent_id)
+
+    def get_agent(self, agent_id: str) -> Optional[AgentDefinition]:
+        return self._agent_map.get(agent_id)
+
+    def get_agents_by_layer(self, layer: AgentLayer) -> List[AgentDefinition]:
+        return [a for a in self.AGENT_DEFINITIONS if a.layer == layer]
+
+    def get_agents_by_mcp_server(self, server: str) -> List[AgentDefinition]:
+        return [self._agent_map[aid] for aid in self._mcp_server_map.get(server, [])]
+
+    def get_agents_for_tool(self, tool_name: str) -> List[AgentDefinition]:
+        return [a for a in self.AGENT_DEFINITIONS if tool_name in a.tools]
+
+    def generate_registry_json(self) -> dict:
+        """生成 _AGENT_REGISTRY.json 内容"""
+        agents = {}
+        for agent in self.AGENT_DEFINITIONS:
+            agents[agent.agent_id] = {
+                "name": agent.name,
+                "layer": f"L{agent.layer.value}",
+                "role": agent.role,
+                "emoji": agent.emoji,
+                "capabilities": agent.capabilities,
+                "tools": agent.tools,
+                "mcp_server": agent.mcp_server,
+            }
+        return {
+            "_meta": {
+                "source": "core/amim.py",
+                "version": self.VERSION,
+                "module": self.MODULE_ID,
+                "agent_count": len(self.AGENT_DEFINITIONS),
+            },
+            "agents": agents,
+        }
+
+    def generate_capability_matrix(self) -> str:
+        """生成 agent_orchestrator.py 中的 AGENT_CAPABILITY_MATRIX 代码"""
+        lines = ["AGENT_CAPABILITY_MATRIX: Dict[str, Dict] = {"]
+        for agent in self.AGENT_DEFINITIONS:
+            lines.append(f'    "{agent.agent_id}": {{'
+                         f'"name":"{agent.name}","layer":"L{agent.layer.value}",'
+                         f'"role":"{agent.role}","emoji":"{agent.emoji}",')
+            capabilities = json.dumps(agent.capabilities, ensure_ascii=False)
+            tools = json.dumps(agent.tools, ensure_ascii=False)
+            lines.append(f'        "capabilities":{capabilities},')
+            lines.append(f'        "tools":{tools}}},')
+        lines.append("}")
+        return "\n".join(lines)
+
+    def generate_lingjing_services(self) -> dict:
+        """生成灵境架构的 AgentService 描述 JSON"""
+        services = {}
+        for agent in self.AGENT_DEFINITIONS:
+            if agent.lingjing_service_id:
+                services[agent.lingjing_service_id] = {
+                    "agent_id": agent.agent_id,
+                    "agent_name": agent.name,
+                    "agent_emoji": agent.emoji,
+                    "layer": f"L{agent.layer.value}",
+                    "port": agent.lingjing_port,
+                    "health_endpoint": agent.health_endpoint,
+                    "tools": agent.tools,
+                    "mcp_server": agent.mcp_server,
+                    "grpc_proto": agent.grpc_proto,
+                    "capabilities": agent.capabilities,
+                }
+        return {
+            "_meta": {
+                "source": "core/amim.py → generate_lingjing_services()",
+                "version": self.VERSION,
+                "migration_target": "灵境架构 Phase 1+",
+            },
+            "services": services,
+        }
+
+    def validate(self) -> List[str]:
+        """验证 Agent↔MCP↔工具 一致性"""
+        issues = []
+        known_tools = {
+            "memory_remember","memory_recall","memory_forget","memory_stats",
+            "memory_capacity","memory_consolidate","search_memories","get_memory",
+            "list_memories","build_working_representation","run_reflective_cycle",
+            "get_session_digest","explain_memory_lineage","tianji_health",
+            "tianji_help","tianji_classify","tianji_auto_tag","tianji_summarize",
+            "tianji_extract_knowledge","tianji_expand_query","tianji_semantic_search",
+            "tianji_intercept","tianji_export","tianji_summarize_conversation",
+            "agent_dispatch","system_status","context_extract","rule_evaluate",
+            "execute_command","security-scanner","performance-profiler","ops-engine",
+        }
+        known_mcp = {"tianji-native","agent-framework-global","command-executor",
+                     "memory-engine-global","ops-engine","performance-profiler","security-scanner"}
+
+        for agent in self.AGENT_DEFINITIONS:
+            if agent.mcp_server not in known_mcp:
+                issues.append(f"[{agent.agent_id}] 未知MCP服务器: {agent.mcp_server}")
+            for tool in agent.tools:
+                if tool not in known_tools:
+                    issues.append(f"[{agent.agent_id}] 未知工具: {tool}")
+
+        mcp_coverage = set()
+        for agent in self.AGENT_DEFINITIONS:
+            mcp_coverage.add(agent.mcp_server)
+        for s in known_mcp:
+            if s not in mcp_coverage:
+                issues.append(f"MCP服务器 {s} 无Agent绑定")
+
+        return issues
+```
+
+---
+
+### Block B：Agent运行类升级（L0 + L1）
+
+#### B-1. 升级模式：声明→运行类
+
+```
+每个Agent遵循统一模式:
+
+agents/{agent_id}.py
+    class {AgentName}Agent:
+        def __init__(self, amim: AgentMCPIntegrationManager):
+            self.defn = amim.get_agent("{agent_id}")     # 从AMIM获取定义
+
+        def handle(self, task: AgentTask) -> StageResult:
+            # 统一入口：TVP声明 + 工具调用 + 结果封装
+            ...
+
+        def health(self) -> bool:
+            ...
+```
+
+#### B-2. L0 升级：铁卫 Agent 实现
+
+```python
+# agents/tiewei.py
+
+class TieweiAgent:
+    """铁卫 — L0质量守护Agent"""
+    AGENT_ID = "tiewei"
+
+    def __init__(self, amim):
+        self.amim = amim
+        self.defn = amim.get_agent(self.AGENT_ID)
+
+    def handle(self, task):
+        print(f"[TVP] 🛡️ 铁卫(L0) 启动质量门禁: {task.goal}")
+        # 执行SG门禁链
+        for stage in ["SG0_ENV_READY","SG1_IMPORT_VERIFY","SG2_FUNCTIONAL","SG3_MCP","SG4_REGRESSION"]:
+            if not self._run_gate(stage):
+                return StageResult(status="failed", summary=f"门禁{stage}未通过")
+        return StageResult(status="completed", summary="全门禁通过")
+
+    def _run_gate(self, stage: str) -> bool:
+        ...
+```
+
+#### B-3. L1 升级队列（4个Agent）
+
+| Agent | 文件 | 核心方法 | MCP工具绑定 |
+|-------|------|---------|------------|
+| 忆库 | `agents/yiku.py` | `remember()` / `recall()` / `consolidate()` | memory_* (12工具) |
+| 洞察 | `agents/dongcha.py` | `analyze_intent()` / `extract_entities()` | context_extract / tianji_classify |
+| 律令 | `agents/luling.py` | `evaluate_rules()` / `check_compliance()` | rule_evaluate / security-scanner |
+| 灵犀 | `agents/lingxi.py` | `monitor_context()` / `detect_drift()` | context_extract / tianji_intercept |
+
+---
+
+### Block C：Agent运行类升级（L2 + L3 + L4）
+
+#### C-1. L2 升级队列（7个Agent）
+
+| Agent | 文件 | 核心方法 |
+|-------|------|---------|
+| 天枢 | `agents/tianshu.py` | `orchestrate()` / `dispatch_agent()` / `evaluate_decision()` |
+| 文宗 | `agents/wenzong.py` | `manage_project()` / `review_content()` / `track_progress()` |
+| 经纬 | `agents/jingwei.py` | `design_architecture()` / `select_tech()` / `plan_path()` |
+| 妙笔 | `agents/miaobi.py` | `create_content()` / `build_world()` / `generate_creative()` |
+| 明镜 | `agents/mingjing.py` | `review_quality()` / `check_consistency()` / `validate_style()` |
+| 天算 | `agents/tiansuan.py` | `analyze_stats()` / `visualize_data()` / `recognize_patterns()` |
+| 矿师 | `agents/kuangshi.py` | `import_corpus()` / `clean_data()` / `batch_label()` |
+
+#### C-2. L3 升级队列（3个Agent）
+
+| Agent | 文件 | 核心方法 |
+|-------|------|---------|
+| 百巧 | `agents/baiqiao.py` | `invoke_skill()` / `orchestrate_workflow()` / `validate_params()` |
+| 史官 | `agents/shiguan.py` | `track_version()` / `archive_history()` / `analyze_change()` |
+| 锦书 | `agents/jinshu.py` | `export_format()` / `beautify_output()` / `apply_template()` |
+
+#### C-3. L4 升级队列（4个Agent）
+
+| Agent | 文件 | 核心方法 |
+|-------|------|---------|
+| 千里 | `agents/qianli.py` | `monitor_realtime()` / `collect_performance()` / `alert_smart()` |
+| 工造 | `agents/gongzao.py` | `run_cicd()` / `manage_env()` / `deploy_service()` |
+| 镇山 | `agents/zhenshan.py` | `scan_vulnerability()` / `check_compliance()` / `manage_keys()` |
+| 追光 | `agents/zhuiguang.py` | `profile_performance()` / `analyze_bottleneck()` / `benchmark()` |
+
+---
+
+### Block D：MCP系统升级 + 灵境兼容
+
+#### D-1. MCP工具归属映射表
+
+```python
+# 24个当前工具 + 17个灵境预留工具的完整映射
+
+TOOL_AGENT_MAPPING = {
+    # ──── 记忆核心 (归属: 忆库) ────
+    "memory_remember":              {"owner": "yiku", "delegates": ["tianshu","miaobi","kuangshi","shiguan"]},
+    "memory_recall":                {"owner": "yiku", "delegates": ["*"]},  # 全员可用
+    "memory_forget":                {"owner": "yiku", "delegates": []},
+    "memory_stats":                 {"owner": "yiku", "delegates": ["tiansuan","qianli"]},
+    "memory_capacity":              {"owner": "yiku", "delegates": ["qianli"]},
+    "memory_consolidate":           {"owner": "yiku", "delegates": []},
+    "search_memories":              {"owner": "yiku", "delegates": ["dongcha","tiansuan"]},
+    "get_memory":                   {"owner": "yiku", "delegates": ["*"]},
+    "list_memories":                {"owner": "yiku", "delegates": ["*"]},
+    "build_working_representation": {"owner": "yiku", "delegates": []},
+    "run_reflective_cycle":         {"owner": "yiku", "delegates": []},
+    "get_session_digest":           {"owner": "yiku", "delegates": ["dongcha","lingxi"]},
+    "explain_memory_lineage":       {"owner": "yiku", "delegates": []},
+
+    # ──── 天机工具 (归属: 天枢作为协调者) ────
+    "tianji_health":                {"owner": "qianli", "delegates": ["tianshu","gongzao"]},
+    "tianji_help":                  {"owner": "tianshu", "delegates": ["*"]},
+    "tianji_classify":              {"owner": "dongcha", "delegates": ["kuangshi"]},
+    "tianji_auto_tag":              {"owner": "kuangshi", "delegates": ["dongcha"]},
+    "tianji_summarize":             {"owner": "tiansuan", "delegates": ["dongcha"]},
+    "tianji_extract_knowledge":     {"owner": "dongcha", "delegates": ["miaobi","tiansuan"]},
+    "tianji_expand_query":          {"owner": "dongcha", "delegates": ["miaobi"]},
+    "tianji_semantic_search":       {"owner": "dongcha", "delegates": ["miaobi","tiansuan"]},
+    "tianji_intercept":             {"owner": "lingxi", "delegates": ["dongcha"]},
+    "tianji_export":                {"owner": "jinshu", "delegates": ["shiguan"]},
+    "tianji_summarize_conversation": {"owner": "dongcha", "delegates": ["lingxi"]},
+
+    # ──── 框架工具 (归属: 天枢) ────
+    "agent_dispatch":               {"owner": "tianshu", "delegates": ["wenzong","jingwei","baiqiao","gongzao"]},
+    "system_status":                {"owner": "qianli", "delegates": ["tianshu","wenzong","gongzao","lingxi"]},
+    "context_extract":              {"owner": "dongcha", "delegates": ["lingxi","tianshu"]},
+    "rule_evaluate":                {"owner": "luling", "delegates": ["tianshu","jingwei","mingjing"]},
+
+    # ──── 命令执行 (归属: 百巧) ────
+    "execute_command":              {"owner": "baiqiao", "delegates": ["tianshu","wenzong","jingwei","gongzao","zhenshan","zhuiguang"]},
+
+    # ──── MCP服务器级工具 ────
+    "security-scanner":             {"owner": "zhenshan", "delegates": ["tiewei","luling","mingjing"]},
+    "performance-profiler":         {"owner": "zhuiguang", "delegates": ["qianli","tiewei"]},
+    "ops-engine":                   {"owner": "gongzao", "delegates": ["qianli"]},
+}
+
+# ──── 灵境预留工具 (Phase 1-8 逐步启用) ────
+LINGJING_FUTURE_TOOLS = {
+    "agent_scale":                  {"owner": "tianshu",  "phase": 1},
+    "agent_health":                 {"owner": "qianli",   "phase": 1},
+    "agent_route":                  {"owner": "tianshu",  "phase": 2},
+    "agent_register":               {"owner": "tianshu",  "phase": 1},
+    "agent_deregister":             {"owner": "tianshu",  "phase": 3},
+    "agent_heartbeat":              {"owner": "qianli",   "phase": 1},
+    "service_discover":             {"owner": "tianshu",  "phase": 2},
+    "service_config_push":          {"owner": "gongzao",  "phase": 3},
+    "service_config_pull":          {"owner": "gongzao",  "phase": 2},
+    "distributed_lock":             {"owner": "tianshu",  "phase": 2},
+    "distributed_cache":            {"owner": "yiku",     "phase": 3},
+    "message_publish":              {"owner": "tianshu",  "phase": 2},
+    "message_subscribe":            {"owner": "tianshu",  "phase": 2},
+    "stream_process":               {"owner": "dongcha",  "phase": 4},
+    "stream_aggregate":             {"owner": "tiansuan", "phase": 4},
+    "circuit_breaker":              {"owner": "tiewei",   "phase": 3},
+    "rate_limiter":                 {"owner": "tiewei",   "phase": 2},
+}
+```
+
+#### D-2. MCP 服务器桥接升级
+
+```python
+# core/amim.py 中加入 MCP 服务器路由
+
+class MCPServerRouter:
+    """
+    M35-EvolutionBus + M29-MCPServer 的桥接路由
+
+    天机v9.0模式: 直接方法调用
+    灵境模式: 通过EvolutionBus发布事件 → MCP Server序列化/反序列化
+    """
+
+    def __init__(self, amim: AgentMCPIntegrationManager, mode: str = "tianji"):
+        self.amim = amim
+        self.mode = mode  # "tianji" | "lingjing"
+
+    def route_tool_call(self, agent_id: str, tool_name: str, arguments: dict) -> dict:
+        """根据Agent ID和工具名，路由到正确的MCP服务器"""
+        agent = self.amim.get_agent(agent_id)
+        if not agent:
+            return {"error": f"未知Agent: {agent_id}"}
+
+        if tool_name not in agent.tools:
+            return {"error": f"Agent {agent.name} 无权调用工具 {tool_name}"}
+
+        if self.mode == "tianji":
+            return self._route_local(agent, tool_name, arguments)
+        else:
+            return self._route_lingjing(agent, tool_name, arguments)
+
+    def _route_local(self, agent, tool_name, arguments):
+        """天机v9.0模式: 本地方法调用"""
+        # 直接调用 mcp/tianji_mcp_server.py 的 handler
+        ...
+
+    def _route_lingjing(self, agent, tool_name, arguments):
+        """灵境模式: 通过EvolutionBus → MCP Server EXE"""
+        event = {
+            "type": "MCP_TOOL_CALL",
+            "source_agent": agent.agent_id,
+            "target_mcp": agent.mcp_server,
+            "tool": tool_name,
+            "arguments": arguments,
+        }
+        # 发布到EvolutionBus → 目标MCP Server EXE消费
+        ...
+```
+
+---
+
+## 📊 第四部分：实施优先级与排期
+
+```
+                                             灵境兼容就绪
+                                                  │
+  ┌──────────────┐   ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
+  │  Block A     │──→│  Block B     │──→│  Block C     │──→│  Block D     │
+  │  AMIM模块    │   │  L0+L1升级   │   │  L2+L3+L4    │   │  MCP+灵境    │
+  │  M37         │   │  铁卫+4Agent  │   │  7+3+4Agent  │   │  归属映射    │
+  │  2天         │   │  3天         │   │  5天         │   │  3天         │
+  └──────────────┘   └──────────────┘   └──────────────┘   └──────────────┘
+      优先级P0           优先级P1           优先级P2           优先级P1
+      必须最先           依赖Block A        依赖Block B        可与Block C并行
+
+  总计: 约13天 (Block A+C 路径最长: 2+5+3=10天, Block B串行)
+  关键路径: A → B → C → D = 13天
+```
+
+| Block | 内容 | 耗时 | 依赖 | 产出 |
+|-------|------|------|------|------|
+| **A** | AMIM集成桥接模块 (M37) | 2天 | 无 | `core/amim.py` + Agent定义同步 |
+| **B** | L0铁卫 + L1四Agent运行类 | 3天 | Block A | `agents/tiewei.py` + L1×4 |
+| **C** | L2七Agent + L3三Agent + L4四Agent | 5天 | Block B | 14个Agent运行类 |
+| **D** | MCP工具归属映射 + 灵境序列化 | 3天 | Block A,B | 完整TOOL_AGENT_MAPPING + 灵境JSON |
+
+---
+
+## ✅ 第五部分：验收标准
+
+### V-A：AMIM 模块验收
+
+```
+□ _AGENT_REGISTRY.json 由 AMIM.generate_registry_json() 生成，非手写
+□ core/agent_orchestrator.py 的 AGENT_CAPABILITY_MATRIX 由 AMIM 同步生成
+□ AMIM.validate() 返回空列表（无断链/幽灵工具）
+□ 19个Agent定义包含 lingjing_service_id + lingjing_port + health_endpoint
+□ 24个工具全部有归属映射 (TOOL_AGENT_MAPPING)
+□ 6个MCP服务器全部有Agent绑定 (mcp_server_map)
+```
+
+### V-B：Agent运行类验收
+
+```
+□ 每个Agent运行类包含:
+    □ agents/{agent_id}.py 文件存在
+    □ 类名符合 {AgentName}Agent 规范
+    □ __init__ 接受 amim 参数，从AMIM获取定义
+    □ handle(task) 方法实现 TVP声明 + 工具调用 + StageResult
+    □ health() 方法返回 bool
+□ 20个Agent全部通过 agents/all_agents_import_test.py
+```
+
+### V-C：MCP系统验收
+
+```
+□ TOOL_AGENT_MAPPING 覆盖全部24个现有工具
+□ 每个工具的主归属Agent (owner) 明确
+□ 每个工具的委托Agent (delegates) 合理
+□ 灵境预留17个工具已登记
+□ MCPServerRouter.route_tool_call() 可解析所有工具路由
+□ 灵境AgentService JSON 可被 Phase 1 直接消费
+```
+
+### V-D：一致性验收
+
+```
+□ 运行 import core.amim; m = AgentMCPIntegrationManager(); m.validate() → []
+□ 运行 python -m agents.all_agents_import_test → 20/20 PASS
+□ 运行 python scripts/verify_amim_consistency.py → 全部一致
+□ _AGENT_REGISTRY.json 与 AMIM.AGENT_DEFINITIONS 完全一致
+□ AGENT_CAPABILITY_MATRIX 与 AMIM.AGENT_DEFINITIONS 完全一致
+□ TOOL_AGENT_MAPPING 中的工具列表与 mcp/tianji_mcp_server.py 的 ALL_TOOLS 一致
+```
+
+---
+
+## 📜 第六部分：灵境道谱溯源
+
+| 道 | 煞 | 模块 | AMIM中的体现 |
+|----|-----|------|-------------|
+| 道五·编排体 | D5-1 多Agent调度煞 | M34 | AMIM统一注册20个Agent |
+| 道五·编排体 | D5-3 Agent调度煞 | M34 | AgentScheduler 通过AMIM路由 |
+| 道五·编排体 | D5-4 TVP协议煞 | M16 | AMIM.to_tvp() TVP透明声明 |
+| 道六·容器体 | D6-4 命名空间煞 | M23 | Agent命名空间隔离 |
+| 道八·通信体 | D8-2 MCP工具煞 | M29 | TOOL_AGENT_MAPPING |
+| 道八·通信体 | D8-3 事件总线煞 | M35 | MCPServerRouter灵境模式 |
+| 道九·进化体 | D9-2 Δ阈值配置煞 | — | Agent权重动态调谐 |
+| 道九·进化体 | D9-4 桥接通道煞 | M26 | AMIM为桥接层 |
+
+---
+
+## 📄 文件清单
+
+```
+产出文件:
+  d:\元初系统\天机v9.0\core\amim.py                    ← M37 AMIM集成桥接模块
+  d:\元初系统\天机v9.0\agents\tiewei.py                ← L0铁卫Agent
+  d:\元初系统\天机v9.0\agents\yiku.py                  ← L1忆库Agent
+  d:\元初系统\天机v9.0\agents\dongcha.py               ← L1洞察Agent
+  d:\元初系统\天机v9.0\agents\luling.py                ← L1律令Agent
+  d:\元初系统\天机v9.0\agents\lingxi.py                ← L1灵犀Agent
+  d:\元初系统\天机v9.0\agents\tianshu.py               ← L2天枢Agent
+  d:\元初系统\天机v9.0\agents\wenzong.py               ← L2文宗Agent
+  d:\元初系统\天机v9.0\agents\jingwei.py               ← L2经纬Agent
+  d:\元初系统\天机v9.0\agents\miaobi.py                ← L2妙笔Agent
+  d:\元初系统\天机v9.0\agents\mingjing.py              ← L2明镜Agent
+  d:\元初系统\天机v9.0\agents\tiansuan.py              ← L2天算Agent
+  d:\元初系统\天机v9.0\agents\kuangshi.py              ← L2矿师Agent
+  d:\元初系统\天机v9.0\agents\baiqiao.py               ← L3百巧Agent
+  d:\元初系统\天机v9.0\agents\shiguan.py               ← L3史官Agent
+  d:\元初系统\天机v9.0\agents\jinshu.py                ← L3锦书Agent
+  d:\元初系统\天机v9.0\agents\qianli.py                ← L4千里Agent
+  d:\元初系统\天机v9.0\agents\gongzao.py               ← L4工造Agent
+  d:\元初系统\天机v9.0\agents\zhenshan.py              ← L4镇山Agent
+  d:\元初系统\天机v9.0\agents\zhuiguang.py             ← L4追光Agent
+  d:\元初系统\天机v9.0\agents\all_agents_import_test.py ← 20Agent导入测试
+  d:\元初系统\天机v9.0\scripts\verify_amim_consistency.py ← AMIM一致性验证
+
+受影响的现有文件:
+  d:\元初系统\天机v9.0\.trae\agents\_AGENT_REGISTRY.json  ← 由AMIM生成
+  d:\元初系统\天机v9.0\core\agent_orchestrator.py         ← AGENT_CAPABILITY_MATRIX 由AMIM同步
+  d:\元初系统\天机v9.0\mcp\tianji_mcp_server.py           ← 引用 TOOL_AGENT_MAPPING
+```
+
+---
+
+> 📌 **指令性质**: 此指令集为 **SSS级体系升级指令**，解决三层断裂的结构性缺陷，同时为灵境架构提供Agent-MCP序列化兼容层。Block A (AMIM) 为阻断性依赖，必须最先执行。
+>
+> 🔗 **配套指令集**: [天机v9.0落地开发通用指令] [天机v9.0专业化集成与托盘定制指令集] [天机v9.0专业测试员通用指令集]

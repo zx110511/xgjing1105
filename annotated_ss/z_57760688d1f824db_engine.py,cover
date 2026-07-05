@@ -1,0 +1,1804 @@
+> r"""
+> 天机记忆系统 (TIANJI) - ICME独立核心引擎 v5.3
+> ============================================
+> 《天机·星枢运转》— 智能驱动，AI自主运行
+  
+> 平台级六层记忆引擎，完全独立于Trae IDE进程运行。
+> 三枢体系: 灵枢主枢纽 · 素问主运行 · 天机主智能
+  
+> v5.0 更新:
+> - 容量累积量阈值 (accumulation_threshold_bytes) 替代旧比例阈值
+> - QualityGate 高质量写入门禁集成
+> - promotion_score 多维评分公式 (含上游深度+关联度)
+> - hard_cap 软上限: 达到后强制晋升而非拒绝写入
+> - 总容量与操作解耦: 只与记忆累积变化量相关
+> - _accumulated_bytes 逐层追踪累积变化量
+  
+> 特性:
+> - 六层记忆架构 (L0-L5) + Archive
+> - 累积量驱动的自动晋升/归档
+> - 基于文件系统的持久化 (JSON)
+> - 标签索引 + 多维度检索
+> - REST API就绪 (无状态友好)
+> """
+  
+> import time
+> import json
+> import uuid
+> import hashlib
+> import threading
+> from pathlib import Path
+> from datetime import datetime
+> from dataclasses import dataclass, field
+> from typing import Any, Optional, List, Dict, Set, Tuple
+> from collections import OrderedDict, defaultdict
+  
+> from .config import ICMEConfig, DEFAULT_CONFIG
+> from .learning_bridge import ClosedLoopLearningBridge
+  
+> try:
+>     from .processors.consolidation_processor import (
+>         ConsolidationProcessor,
+>         OrchestrationStrategy,
+>     )
+!     from .processors.conflict_resolver import (
+!         ConflictResolver,
+!         ConflictType,
+!         ResolutionStrategy,
+!         ResolutionVerdict,
+!     )
+!     from .processors.preference_drift_detector import (
+!         PreferenceDriftDetector,
+!         DriftType,
+!     )
+!     _PROCESSORS_AVAILABLE = True
+> except ImportError:
+>     _PROCESSORS_AVAILABLE = False
+  
+  
+> @dataclass
+> class MemoryEntry:
+>     id: str
+>     content: str
+>     layer: str
+>     tags: list[str] = field(default_factory=list)
+>     priority: str = "medium"
+>     created_at: float = field(default_factory=time.time)
+>     last_accessed: float = field(default_factory=time.time)
+>     access_count: int = 0
+>     effectiveness_score: float = 0.5
+>     related_ids: list[str] = field(default_factory=list)
+>     metadata: dict[str, Any] = field(default_factory=dict)
+>     changelog: list[dict] = field(default_factory=list)
+  
+>     @property
+>     def size_bytes(self) -> int:
+!         return len(self.content.encode('utf-8')) + len(json.dumps(self.tags)) + len(json.dumps(self.metadata))
+  
+>     def priority_weight(self) -> float:
+!         weights = {"critical": 5.0, "high": 4.0, "medium": 2.0, "low": 1.0}
+!         return weights.get(self.priority, 1.0)
+  
+>     def value_score(self) -> float:
+!         recency_factor = max(0.1, 1.0 - (time.time() - self.last_accessed) / (30 * 24 * 3600))
+!         return (
+!             self.priority_weight() * 0.4
+!             + self.effectiveness_score * 0.3
+!             + recency_factor * 0.2
+!             + min(1.0, self.access_count / 20) * 0.1
+!         )
+  
+>     def update_content(self, new_content: str):
+!         if self.content != new_content:
+!             self.changelog.append({
+!                 "timestamp": time.time(),
+!                 "delta_content": new_content,
+!                 "previous_content": self.content[:200] if len(self.content) > 200 else self.content
+!             })
+!             self.content = new_content
+!             self.last_accessed = time.time()
+  
+>     def to_dict(self) -> dict:
+!         return {
+!             "id": self.id,
+!             "content": self.content,
+!             "layer": self.layer,
+!             "tags": self.tags,
+!             "priority": self.priority,
+!             "value_score": round(self.value_score(), 4),
+!             "access_count": self.access_count,
+!             "created_at": self.created_at,
+!             "last_accessed": self.last_accessed,
+!             "size_bytes": self.size_bytes,
+!             "metadata": self.metadata,
+!             "related_ids": self.related_ids,
+!         }
+  
+  
+> class ICMEEngine:
+>     def __init__(
+>         self,
+>         config: Optional[ICMEConfig] = None,
+>         dependencies: Optional[Dict[str, Any]] = None
+>     ):
+!         self.config = config or DEFAULT_CONFIG
+!         self._dependencies = dependencies or {}
+  
+!         self._layers: dict[str, OrderedDict[str, MemoryEntry]] = {
+!             layer.name: OrderedDict() for layer in self.config.layers
+!         }
+!         self._archive: OrderedDict[str, MemoryEntry] = OrderedDict()
+!         self._archive_max_size = 5 * 1024 * 1024 * 1024
+!         self._tag_index: dict[str, set[str]] = defaultdict(set)
+!         self._layer_sizes: dict[str, int] = {layer.name: 0 for layer in self.config.layers}
+!         self._accumulated_bytes: dict[str, int] = {layer.name: 0 for layer in self.config.layers}
+!         self._accumulated_entries: dict[str, int] = {layer.name: 0 for layer in self.config.layers}
+!         self._last_consolidation_time: dict[str, float] = {layer.name: 0.0 for layer in self.config.layers}
+!         self._consolidation_event_log: list[dict] = []
+!         self._consolidation_event_log_max = 500
+!         self._stats = {
+!             "total_entries": 0, "total_accesses": 0,
+!             "total_consolidations": 0, "total_archivals": 0,
+!             "total_restorations": 0, "start_time": time.time(),
+!             "total_rejected": 0, "total_downgraded": 0,
+!             "total_conflicts": 0, "total_consolidations_triggered": 0,
+!             "total_hard_cap_enforcements": 0,
+!             "total_recall_calls": 0, "total_recall_hits": 0,
+!             "total_recall_latency_ms": 0,
+!         }
+!         self._rate_tracker: dict[str, list[tuple[float, int]]] = {
+!             layer.name: [] for layer in self.config.layers
+!         }
+!         self._rate_window_seconds = getattr(self.config, 'rate_tracking_window_seconds', 300)
+!         self._data_path = self.config.data_path
+!         self._lock = threading.RLock()
+  
+!         self._quality_gate = self._dependencies.get('quality_gate')
+!         self._llm_bridge = self._dependencies.get('llm_bridge')
+!         self._consolidation_processor = self._dependencies.get('consolidation_processor')
+!         self._conflict_resolver = self._dependencies.get('conflict_resolver')
+!         self._preference_drift_detector = self._dependencies.get('preference_drift_detector')
+!         self._learning_bridge = self._dependencies.get('learning_bridge')
+!         self._asset_registry = self._dependencies.get('asset_registry')
+!         if self._learning_bridge is None:
+!             self._learning_bridge = ClosedLoopLearningBridge(engine=self)
+  
+!         self._sqlite_store = self._dependencies.get('sqlite_store')
+!         self._async_executor = self._dependencies.get('async_executor')
+  
+!         if _PROCESSORS_AVAILABLE and self._consolidation_processor is None:
+!             self._consolidation_processor = ConsolidationProcessor(engine=self)
+!         if _PROCESSORS_AVAILABLE and self._conflict_resolver is None:
+!             self._conflict_resolver = ConflictResolver()
+!         if _PROCESSORS_AVAILABLE and self._preference_drift_detector is None:
+!             self._preference_drift_detector = PreferenceDriftDetector()
+  
+!         if self._sqlite_store is None:
+!             try:
+!                 from .sqlite_store import SQLiteMemoryStore
+!                 self._sqlite_store = SQLiteMemoryStore(self._data_path / "icme.db")
+!             except Exception:
+!                 pass
+  
+!         self._evo_loop = self._dependencies.get('evolution_loop')
+!         if self._evo_loop is None:
+!             try:
+!                 from .evolution_loop import EvolutionLoop
+!                 self._evo_loop = EvolutionLoop(
+!                     module_name="engine",
+!                     effectiveness_fn=self._calc_engine_effectiveness,
+!                     learn_fn=self._learn_from_engine_ops,
+!                     evolve_fn=self._evolve_engine_config,
+!                     mutable_config={
+!                         "consolidation_threshold": 0.8,
+!                         "archive_age_days": 30,
+!                         "hard_cap_ratio": 0.95,
+!                         "promotion_min_score": 0.6,
+!                     },
+!                     health_metrics_fn=self._get_engine_health,
+!                 )
+!             except ImportError:
+!                 pass
+!         self._ensure_dirs()
+!         self._load_memory_data()
+!         self._start_consolidation_daemon()
+  
+>     def set_quality_gate(self, gate):
+!         self._quality_gate = gate
+  
+>     def set_llm_bridge(self, bridge):
+!         self._llm_bridge = bridge
+  
+>     def _calc_engine_effectiveness(self, action: str, state_before: Dict, state_after: Dict) -> float:
+!         if action == "memory_write":
+!             if state_after.get("result") == "rejected":
+!                 return -0.3
+!             if state_after.get("result") == "downgraded":
+!                 return -0.1
+!             if state_after.get("result") == "stored":
+!                 return 0.3
+!         if action == "consolidation":
+!             if state_after.get("entries_consolidated", 0) > 0:
+!                 return 0.4
+!             return -0.1
+!         if action == "capacity_enforcement":
+!             return -0.5
+!         return 0.0
+  
+>     def _learn_from_engine_ops(self, causal_pairs, effectiveness_summary) -> Dict:
+!         cap_enforcements = sum(1 for p in causal_pairs if p.action == "capacity_enforcement")
+!         rejections = sum(1 for p in causal_pairs if p.action == "memory_write" and p.effectiveness < 0)
+!         hot_layers = []
+!         for layer_name, size in self._layer_sizes.items():
+!             cap = next((l.max_size for l in self.config.layers if l.name == layer_name), 1)
+!             if cap > 0 and size / cap > 0.7:
+!                 hot_layers.append(layer_name)
+!         return {
+!             "capacity_enforcements": cap_enforcements,
+!             "write_rejections": rejections,
+!             "hot_layers": hot_layers,
+!             "avg_effectiveness": effectiveness_summary.get("avg", 0.0),
+!         }
+  
+>     def _evolve_engine_config(self, learn_result, mutable_config) -> Dict:
+!         changes = []
+!         hot_layers = learn_result.get("hot_layers", [])
+!         if len(hot_layers) >= 2:
+!             old_threshold = mutable_config.get("consolidation_threshold", 0.8)
+!             new_threshold = max(old_threshold - 0.05, 0.5)
+!             changes.append({"rule": "consolidation_threshold", "old_value": old_threshold, "new_value": new_threshold})
+!         if learn_result.get("write_rejections", 0) > 10:
+!             old_promo = mutable_config.get("promotion_min_score", 0.6)
+!             new_promo = max(old_promo - 0.05, 0.3)
+!             changes.append({"rule": "promotion_min_score", "old_value": old_promo, "new_value": new_promo})
+!         return {"changes": changes}
+  
+>     def _get_engine_health(self) -> Dict[str, float]:
+!         total_cap = sum(l.max_size for l in self.config.layers) or 1
+!         total_used = sum(self._layer_sizes.values())
+!         return {
+!             "capacity_usage": total_used / total_cap,
+!             "error_rate": self._stats.get("total_rejected", 0) / max(self._stats.get("total_entries", 1), 1),
+!         }
+  
+>     @property
+>     def evolution_loop(self):
+!         return self._evo_loop
+  
+>     def _ensure_dirs(self):
+!         self._data_path.mkdir(parents=True, exist_ok=True)
+!         for layer in self.config.layers:
+!             (self._data_path / layer.name).mkdir(exist_ok=True)
+  
+>     def _load_memory_data(self):
+!         for layer_name in self._layers.keys():
+!             layer_dir = self._data_path / layer_name
+!             if not layer_dir.exists():
+!                 continue
+!             for entry_file in layer_dir.glob("*.json"):
+!                 try:
+!                     data = json.loads(entry_file.read_text(encoding="utf-8-sig"))
+!                     entry = MemoryEntry(
+!                         id=data["id"], content=data["content"], layer=data["layer"],
+!                         tags=data.get("tags", []), priority=data.get("priority", "medium"),
+!                         created_at=data.get("created_at", time.time()),
+!                         last_accessed=data.get("last_accessed", time.time()),
+!                         access_count=data.get("access_count", 0),
+!                         effectiveness_score=data.get("effectiveness_score", 0.5),
+!                         related_ids=data.get("related_ids", []),
+!                         metadata=data.get("metadata", {}),
+!                         changelog=data.get("changelog", []),
+!                     )
+!                     self._layers[layer_name][entry.id] = entry
+!                     self._update_layer_size(layer_name, entry.size_bytes, track_accumulation=False)
+!                     self._index_tags(entry.id, entry.tags)
+!                     self._stats["total_entries"] += 1
+!                 except Exception:
+!                     pass
+  
+>     def _save_entry(self, entry: MemoryEntry):
+!         layer_dir = self._data_path / entry.layer
+!         layer_dir.mkdir(exist_ok=True)
+!         entry_data = {
+!             "id": entry.id, "content": entry.content, "layer": entry.layer,
+!             "tags": entry.tags, "priority": entry.priority,
+!             "created_at": entry.created_at, "last_accessed": entry.last_accessed,
+!             "access_count": entry.access_count,
+!             "effectiveness_score": entry.effectiveness_score,
+!             "related_ids": entry.related_ids, "metadata": entry.metadata,
+!             "changelog": entry.changelog,
+!         }
+!         (layer_dir / f"{entry.id}.json").write_text(
+!             json.dumps(entry_data, ensure_ascii=False, indent=2), encoding="utf-8"
+!         )
+  
+>     def _delete_entry_file(self, entry_id: str, layer_name: str):
+!         entry_file = self._data_path / layer_name / f"{entry_id}.json"
+!         if entry_file.exists():
+!             entry_file.unlink()
+  
+>     def _get_layer_size(self, layer_name: str) -> int:
+!         return self._layer_sizes.get(layer_name, 0)
+  
+>     def _update_layer_size(self, layer_name: str, delta: int, track_accumulation: bool = True):
+!         if layer_name in self._layer_sizes:
+!             self._layer_sizes[layer_name] += delta
+!         if track_accumulation:
+!             if layer_name in self._accumulated_bytes:
+!                 self._accumulated_bytes[layer_name] += max(0, delta)
+!             if layer_name in self._accumulated_entries:
+!                 self._accumulated_entries[layer_name] += 1 if delta > 0 else 0
+!             if layer_name in self._rate_tracker and delta > 0:
+!                 self._rate_tracker[layer_name].append((time.time(), delta))
+!                 self._rate_tracker[layer_name] = [
+!                     (ts, sz) for ts, sz in self._rate_tracker[layer_name]
+!                     if time.time() - ts <= self._rate_window_seconds
+!                 ]
+  
+>     def _get_layer_usage(self, layer_name: str) -> float:
+!         layer_config = self.config.get_layer(layer_name)
+!         if not layer_config:
+!             return 0.0
+!         return self._get_layer_size(layer_name) / layer_config.max_size_bytes
+  
+>     def _get_margin_ratio(self, layer_name: str) -> float:
+!         layer_config = self.config.get_layer(layer_name)
+!         if not layer_config or layer_config.max_size_bytes <= 0:
+!             return 1.0
+!         used_bytes = self._get_layer_size(layer_name)
+!         byte_margin = max(0.0, 1.0 - used_bytes / layer_config.max_size_bytes)
+!         entry_count = len(self._layers.get(layer_name, {}))
+!         if layer_config.max_entries > 0:
+!             entry_margin = max(0.0, 1.0 - entry_count / layer_config.max_entries)
+!         else:
+!             entry_margin = 1.0
+!         return min(byte_margin, entry_margin)
+  
+>     def _get_margin_level(self, layer_name: str) -> str:
+!         layer_config = self.config.get_layer(layer_name)
+!         if not layer_config:
+!             return "red"
+!         safety = getattr(layer_config, 'margin_management', None)
+!         if safety is not None:
+!             return safety.get_level(self._get_margin_ratio(layer_name))
+!         margin = self._get_margin_ratio(layer_name)
+!         if margin >= 0.50:
+!             return "green"
+!         if margin >= 0.25:
+!             return "yellow"
+!         if margin >= 0.10:
+!             return "orange"
+!         return "red"
+  
+>     def _calc_current_rate(self, layer_name: str) -> float:
+!         records = self._rate_tracker.get(layer_name, [])
+!         if not records:
+!             return 0.0
+!         now = time.time()
+!         window_records = [(ts, sz) for ts, sz in records if now - ts <= self._rate_window_seconds]
+!         if not window_records:
+!             return 0.0
+!         total_bytes = sum(sz for _, sz in window_records)
+!         time_span = now - window_records[0][0]
+!         if time_span <= 0:
+!             return 0.0
+!         return total_bytes / time_span
+  
+>     def _get_accumulation_ratio(self, layer_name: str) -> float:
+!         layer_config = self.config.get_layer(layer_name)
+!         if not layer_config or layer_config.accumulation_threshold_bytes <= 0:
+!             return 0.0
+!         return self._accumulated_bytes.get(layer_name, 0) / layer_config.accumulation_threshold_bytes
+  
+>     def _get_accumulation_entry_ratio(self, layer_name: str) -> float:
+!         layer_config = self.config.get_layer(layer_name)
+!         if not layer_config or layer_config.accumulation_threshold_entries <= 0:
+!             return 0.0
+!         return self._accumulated_entries.get(layer_name, 0) / layer_config.accumulation_threshold_entries
+  
+>     def _check_orchestration_trigger(self, layer_name: str) -> tuple[bool, str]:
+!         layer_config = self.config.get_layer(layer_name)
+!         if not layer_config:
+!             return False, "no_config"
+  
+!         accumulated_bytes = self._accumulated_bytes.get(layer_name, 0)
+!         accumulated_entries = self._accumulated_entries.get(layer_name, 0)
+!         threshold_bytes = getattr(layer_config, 'accumulation_threshold_bytes', 0)
+!         threshold_entries = getattr(layer_config, 'accumulation_threshold_entries', 0)
+  
+!         if threshold_bytes > 0 and accumulated_bytes >= threshold_bytes:
+!             return True, f"delta_bytes_trigger({accumulated_bytes}/{threshold_bytes})"
+  
+!         if threshold_entries > 0 and accumulated_entries >= threshold_entries:
+!             return True, f"delta_entries_trigger({accumulated_entries}/{threshold_entries})"
+  
+!         current_rate = self._calc_current_rate(layer_name)
+!         rate_threshold = getattr(layer_config, 'rate_threshold_bytes_per_sec', 0)
+!         if rate_threshold > 0 and current_rate >= rate_threshold:
+!             return True, f"burst_rate_trigger({current_rate:.0f}/{rate_threshold:.0f} B/s)"
+  
+!         margin_ratio = self._get_margin_ratio(layer_name)
+!         safety = getattr(layer_config, 'margin_management', None)
+!         if safety is not None and margin_ratio < safety.safety_floor:
+!             return True, f"safety_floor_breach(margin={margin_ratio:.2f}<{safety.safety_floor})"
+!         if safety is not None and margin_ratio < safety.target_margin:
+!             return True, f"below_target_margin(margin={margin_ratio:.2f}<{safety.target_margin})"
+  
+!         if margin_ratio < 0.05:
+!             return True, f"safety_floor_breach(margin={margin_ratio:.2f})"
+!         if margin_ratio < 0.15:
+!             return True, f"below_target_margin(margin={margin_ratio:.2f})"
+  
+!         return False, f"below_threshold(bytes={accumulated_bytes}/{threshold_bytes}, entries={accumulated_entries}/{threshold_entries}, margin={margin_ratio:.2f})"
+  
+>     def _should_consolidate(self, layer_name: str) -> tuple[bool, str]:
+!         return self._check_orchestration_trigger(layer_name)
+  
+>     def _can_consolidate_now(self, layer_name: str) -> tuple[bool, str]:
+!         layer_config = self.config.get_layer(layer_name)
+!         if not layer_config:
+!             return False, "no_config"
+!         elapsed = time.time() - self._last_consolidation_time.get(layer_name, 0.0)
+!         if elapsed < layer_config.min_consolidation_interval_seconds:
+!             return False, f"anti_thrash(wait {layer_config.min_consolidation_interval_seconds - elapsed:.1f}s)"
+!         return True, "ready"
+  
+>     def _reset_accumulation(self, layer_name: str):
+!         if layer_name in self._accumulated_bytes:
+!             self._accumulated_bytes[layer_name] = 0
+!         if layer_name in self._accumulated_entries:
+!             self._accumulated_entries[layer_name] = 0
+!         if layer_name in self._last_consolidation_time:
+!             self._last_consolidation_time[layer_name] = time.time()
+  
+>     def _log_consolidation_event(self, event: dict):
+!         event["timestamp"] = time.time()
+!         self._consolidation_event_log.append(event)
+!         if len(self._consolidation_event_log) > self._consolidation_event_log_max:
+!             self._consolidation_event_log = self._consolidation_event_log[-self._consolidation_event_log_max:]
+  
+>     def _index_tags(self, entry_id: str, tags: List[str]):
+!         for tag in tags:
+!             self._tag_index[tag].add(entry_id)
+  
+>     def _unindex_tags(self, entry_id: str, tags: List[str]):
+!         for tag in tags:
+!             if tag in self._tag_index:
+!                 self._tag_index[tag].discard(entry_id)
+  
+>     def _apply_llm_enrichment(
+>         self, content: str, layer: str, tags: List[str], priority: str, metadata: Optional[dict]
+>     ) -> tuple[str, List[str], str, Optional[dict], bool]:
+>         """应用LLM增强处理"""
+!         actual_layer = layer
+!         llm_enriched = False
+  
+!         if self._llm_bridge and self._llm_bridge.is_ready:
+!             enrichment = self._llm_bridge.enrich_remember(content, layer, tags, priority)
+!             if enrichment.get("llm_enriched"):
+!                 llm_enriched = True
+!                 if not layer or layer == "working":
+!                     actual_layer = enrichment["layer"]
+!                 tags = enrichment["tags"] if not tags else tags
+!                 priority = enrichment["priority"] if priority == "medium" else priority
+!                 if enrichment.get("summary"):
+!                     metadata = metadata or {}
+!                     metadata["llm_summary"] = enrichment["summary"]
+!                 if enrichment.get("knowledge_triples"):
+!                     metadata = metadata or {}
+!                     metadata["knowledge_triples"] = enrichment["knowledge_triples"]
+  
+!         return actual_layer, tags, priority, metadata, llm_enriched
+  
+>     def _enrich_with_llm(
+>         self, content: str, layer: str, tags: List[str], priority: str, metadata: Optional[dict]
+>     ) -> tuple[str, List[str], str, Optional[dict], bool]:
+>         """LLM增强桥接 — 智能分层+自动标签+价值评估+知识提取+摘要"""
+!         if not self._llm_bridge or not self._llm_bridge.is_ready:
+!             return layer, tags, priority, metadata, False
+  
+!         actual_layer = layer
+!         llm_enriched = False
+  
+!         try:
+!             enrichment = self._llm_bridge.enrich_remember(content, layer, tags, priority)
+!             if enrichment.get("llm_enriched"):
+!                 llm_enriched = True
+!                 if not layer or layer == "working":
+!                     actual_layer = enrichment.get("layer", layer)
+!                 auto_tags = enrichment.get("tags", [])
+!                 if auto_tags and not tags:
+!                     tags = auto_tags
+!                 elif auto_tags and tags:
+!                     tags = list(set(tags + auto_tags))
+!                 auto_priority = enrichment.get("priority", "medium")
+!                 if priority == "medium" and auto_priority != "medium":
+!                     priority = auto_priority
+!                 if enrichment.get("summary"):
+!                     metadata = metadata or {}
+!                     metadata["llm_summary"] = enrichment["summary"]
+!                 if enrichment.get("knowledge_triples"):
+!                     metadata = metadata or {}
+!                     metadata["knowledge_triples"] = enrichment["knowledge_triples"]
+!                 value_score = enrichment.get("value_score", 0.5)
+!                 if value_score != 0.5:
+!                     metadata = metadata or {}
+!                     metadata["llm_value_score"] = value_score
+!         except Exception:
+!             pass
+  
+!         return actual_layer, tags, priority, metadata, llm_enriched
+  
+>     def _register_asset_atom(
+>         self, result: dict, content: str, layer: str,
+>         tags: List[str], priority: str, metadata: Optional[dict]
+>     ) -> Optional[str]:
+>         """D02: remember()成功后自动注册AssetAtom"""
+!         try:
+!             from .asset_atom import AssetAtom, AssetRegistry, Provenance, ContentType
+!         except ImportError:
+!             return None
+  
+!         registry = self._asset_registry
+!         if not isinstance(registry, AssetRegistry):
+!             return None
+  
+!         memory_id = result.get("id", "")
+!         if not memory_id:
+!             return None
+  
+!         content_hash = AssetRegistry.compute_content_hash(content)
+  
+!         content_type = ContentType.UNKNOWN
+!         src = (metadata or {}).get("source", "")
+!         if "trae_capture" in src or "conversation" in src:
+!             content_type = ContentType.CONVERSATION
+!         elif "file" in src or "snapshot" in src:
+!             content_type = ContentType.FILE
+!         elif "decision" in src or layer == "episodic":
+!             content_type = ContentType.DECISION
+!         elif layer == "semantic":
+!             content_type = ContentType.KNOWLEDGE
+!         elif layer == "meta":
+!             content_type = ContentType.RULE
+  
+!         atom = AssetAtom(
+!             memory_id=memory_id,
+!             layer=layer,
+!             content_type=content_type,
+!             content_hash=content_hash,
+!             provenance=Provenance(
+!                 created_by="engine",
+!                 created_at=time.time(),
+!                 reason=f"Auto-registered from remember()",
+!                 session_id=(metadata or {}).get("session_id", ""),
+!             ),
+!         )
+!         asset_id = registry.register(atom)
+!         result["asset_id"] = asset_id
+!         return asset_id
+  
+>     def _apply_quality_gate(
+>         self, content: str, layer: str, tags: List[str], priority: str, metadata: Optional[dict]
+>     ) -> tuple[Optional[Any], str, Optional[dict]]:
+>         """应用质量门禁检查"""
+!         gate_result = None
+!         actual_layer = layer
+  
+!         if self._quality_gate:
+!             existing = self.get_all_entries(limit=100)
+!             gate_result = self._quality_gate.check(content, layer, tags, priority, existing)
+!             actual_layer = gate_result.target_layer
+  
+!             if gate_result.verdict == "reject":
+!                 self._stats["total_rejected"] += 1
+!             elif gate_result.verdict == "downgrade":
+!                 self._stats["total_downgraded"] += 1
+!             elif gate_result.verdict == "conflict":
+!                 self._stats["total_conflicts"] += 1
+!                 if gate_result.conflicts_with:
+!                     metadata = metadata or {}
+!                     metadata["conflicts_with"] = gate_result.conflicts_with
+  
+!         return gate_result, actual_layer, metadata
+  
+>     def _create_memory_entry(
+>         self, content: str, layer: str, tags: List[str], priority: str, metadata: Optional[dict], gate_result: Optional[Any]
+>     ) -> MemoryEntry:
+>         """创建记忆条目"""
+!         entry_id = hashlib.sha256(
+!             f"{content}{time.time()}{uuid.uuid4()}".encode()
+!         ).hexdigest()[:16]
+  
+!         entry = MemoryEntry(
+!             id=entry_id, content=content, layer=layer,
+!             tags=tags, priority=priority, metadata=metadata or {},
+!         )
+  
+!         if gate_result and hasattr(gate_result, 'conflicts_with') and gate_result.conflicts_with:
+!             entry.related_ids = list(set(entry.related_ids + gate_result.conflicts_with))
+  
+!         return entry
+  
+>     def _store_memory_entry(self, entry: MemoryEntry) -> None:
+>         """存储记忆条目到内存和磁盘"""
+!         self._layers[entry.layer][entry.id] = entry
+!         self._update_layer_size(entry.layer, entry.size_bytes)
+!         self._index_tags(entry.id, entry.tags)
+!         self._stats["total_entries"] += 1
+!         self._save_entry(entry)
+!         self._auto_consolidate(entry.layer)
+!         self._check_hard_cap(entry.layer)
+  
+>     def _build_remember_result(
+>         self, entry: MemoryEntry, requested_layer: str, llm_enriched: bool, gate_result: Optional[Any]
+>     ) -> dict:
+>         """构建remember操作的结果字典"""
+!         result = {
+!             "id": entry.id,
+!             "status": gate_result.verdict if gate_result else "stored",
+!             "actual_layer": entry.layer,
+!             "requested_layer": requested_layer,
+!             "size_bytes": entry.size_bytes,
+!             "llm_enriched": llm_enriched,
+!         }
+  
+!         if gate_result:
+!             result["gate_verdict"] = gate_result.verdict
+!             result["gate_reason"] = gate_result.reason
+!             result["quality_dimensions"] = gate_result.quality_dimensions
+  
+!         return result
+  
+>     def remember(
+>         self, content: str, layer: str = "working",
+>         tags: Optional[List[str]] = None, priority: str = "medium",
+>         metadata: Optional[dict] = None,
+>         use_llm: bool = True,
+>     ) -> dict:
+>         """写入记忆 - 主入口函数（重构后）"""
+!         tags = tags or []
+  
+!         if use_llm and self._llm_bridge and hasattr(self, '_enrich_with_llm'):
+!             actual_layer, tags, priority, metadata, llm_enriched = self._enrich_with_llm(
+!                 content, layer, tags, priority, metadata
+!             )
+!         else:
+!             actual_layer = layer
+!             llm_enriched = False
+  
+!         gate_result, actual_layer, metadata = self._apply_quality_gate(
+!             content, layer, tags, priority, metadata
+!         )
+  
+!         if gate_result and gate_result.verdict == "reject":
+!             return {
+!                 "id": None,
+!                 "status": "rejected",
+!                 "reason": gate_result.reason,
+!                 "gate_verdict": gate_result.verdict,
+!                 "quality_dimensions": gate_result.quality_dimensions,
+!             }
+  
+!         with self._lock:
+!             entry = self._create_memory_entry(content, actual_layer, tags, priority, metadata, gate_result)
+!             self._store_memory_entry(entry)
+!             result = self._build_remember_result(entry, layer, llm_enriched, gate_result)
+!             if self._learning_bridge:
+!                 try:
+!                     self._learning_bridge.on_remember(result, content, actual_layer)
+!                 except Exception:
+!                     pass
+!             if self._asset_registry and result.get("id"):
+!                 try:
+!                     self._register_asset_atom(result, content, actual_layer, tags, priority, metadata)
+!                 except Exception:
+!                     pass
+!             return result
+  
+>     def remember_batch(
+>         self, entries: List[dict], use_llm: bool = False,
+>     ) -> List[dict]:
+>         """
+>         批量写入记忆 — 质量门禁前置 + WAL延迟写盘 + 固结硬上限批量后置
+  
+>         参数:
+>           entries: [{"content": str, "layer": str, "tags": list, "priority": str, "metadata": dict}, ...]
+  
+>         返回: [{"id": str, "status": str, ...}, ...]
+>         """
+!         if not entries:
+!             return []
+!         results = []
+!         gate_results = []
+!         pending_wal: list[MemoryEntry] = []
+!         affected_layers: set[str] = set()
+!         with self._lock:
+!             for e in entries:
+!                 content = e.get("content", "")
+!                 layer = e.get("layer", "working")
+!                 tags = e.get("tags", [])
+!                 priority = e.get("priority", "medium")
+!                 metadata = e.get("metadata", {})
+!                 actual_layer = layer
+!                 gate_result = None
+!                 if self._quality_gate:
+!                     existing = list(self._layers.get(layer, {}).values())[:50]
+!                     gate_result = self._quality_gate.check(content, layer, tags, priority, existing)
+!                     actual_layer = gate_result.target_layer
+!                     if gate_result.verdict == "reject":
+!                         self._stats["total_rejected"] += 1
+!                         gate_results.append((None, gate_result, content, actual_layer, tags, priority, metadata, layer))
+!                         continue
+!                     if gate_result.verdict == "downgrade":
+!                         self._stats["total_downgraded"] += 1
+!                     if gate_result.verdict == "conflict":
+!                         self._stats["total_conflicts"] += 1
+!                 gate_results.append((gate_result, content, actual_layer, tags, priority, metadata, layer))
+!             for item in gate_results:
+!                 gate_result, content, actual_layer, tags, priority, metadata, requested_layer = item
+!                 entry_id = hashlib.sha256(
+!                     f"{content}{time.time()}{uuid.uuid4()}".encode()
+!                 ).hexdigest()[:16]
+!                 entry = MemoryEntry(
+!                     id=entry_id, content=content, layer=actual_layer,
+!                     tags=tags, priority=priority, metadata=metadata or {},
+!                 )
+!                 if gate_result and gate_result.conflicts_with:
+!                     entry.related_ids = list(set(entry.related_ids + gate_result.conflicts_with))
+!                 self._layers[actual_layer][entry_id] = entry
+!                 self._update_layer_size(actual_layer, entry.size_bytes)
+!                 self._index_tags(entry_id, entry.tags)
+!                 self._stats["total_entries"] += 1
+!                 pending_wal.append(entry)
+!                 affected_layers.add(actual_layer)
+!                 results.append({
+!                     "id": entry_id,
+!                     "status": gate_result.verdict if gate_result else "stored",
+!                     "actual_layer": actual_layer,
+!                     "requested_layer": requested_layer,
+!                     "size_bytes": entry.size_bytes,
+!                 })
+!             for entry in pending_wal:
+!                 self._save_entry(entry)
+!             for layer_name in affected_layers:
+!                 self._auto_consolidate(layer_name)
+!                 self._check_hard_cap(layer_name)
+!         return results
+  
+>     def fast_inject(
+>         self, entries: List[dict],
+>     ) -> List[dict]:
+>         """
+>         极速批量注入 — 跳过质量门禁/文件I/O/固结/硬上限/累积追踪。
+  
+>         仅用于基准测试/合成数据集场景。每条目约100μs，1000条目<0.1s。
+  
+>         参数:
+>           entries: [{"content": str, "layer": str, "tags": list, "priority": str}, ...]
+  
+>         返回: [{"id": str, "actual_layer": str, "size_bytes": int}, ...]
+>         """
+!         if not entries:
+!             return []
+!         results = []
+!         with self._lock:
+!             for e in entries:
+!                 content = e.get("content", "")
+!                 layer = e.get("layer", "semantic")
+!                 tags = e.get("tags", [])
+!                 priority = e.get("priority", "high")
+!                 entry_id = hashlib.sha256(
+!                     f"{content}{time.time()}{uuid.uuid4()}".encode()
+!                 ).hexdigest()[:16]
+!                 entry = MemoryEntry(
+!                     id=entry_id, content=content, layer=layer,
+!                     tags=tags, priority=priority, metadata={},
+!                 )
+!                 self._layers[layer][entry_id] = entry
+!                 for tag in tags:
+!                     self._tag_index[tag].add(entry_id)
+!                 size = self._layer_sizes.get(layer, 0)
+!                 self._layer_sizes[layer] = size + entry.size_bytes
+!                 self._stats["total_entries"] += 1
+!                 results.append({
+!                     "id": entry_id,
+!                     "actual_layer": layer,
+!                     "size_bytes": entry.size_bytes,
+!                 })
+!         return results
+  
+>     def purge_layer(self, layer_name: str) -> int:
+>         """
+>         清空指定记忆层的所有条目，恢复容量计数器。
+  
+>         参数:
+>           layer_name: 要清空的层级名称
+  
+>         返回: 删除的条目数
+>         """
+!         with self._lock:
+!             count = len(self._layers.get(layer_name, {}))
+!             if count == 0:
+!                 return 0
+!             for entry_id in list(self._layers[layer_name].keys()):
+!                 entry = self._layers[layer_name][entry_id]
+!                 for tag in entry.tags:
+!                     if tag in self._tag_index:
+!                         self._tag_index[tag].discard(entry_id)
+!                 self._delete_entry_file(entry_id, layer_name)
+!             self._layers[layer_name] = {}
+!             self._layer_sizes[layer_name] = 0
+!             if layer_name in self._accumulated_bytes:
+!                 self._accumulated_bytes[layer_name] = 0
+!             if layer_name in self._accumulated_entries:
+!                 self._accumulated_entries[layer_name] = 0
+!             return count
+  
+>     def remember_async(self, content: str, layer: str = "working",
+>                        tags: Optional[List[str]] = None, priority: str = "medium",
+>                        metadata: Optional[dict] = None) -> Any:
+>         """异步写入 — 非阻塞写入，立即返回future"""
+!         self.ensure_async_executor()
+!         return self._async_executor.submit(
+!             self.remember, content, layer, tags, priority, metadata, False
+!         )
+  
+>     def ensure_async_executor(self):
+>         """确保异步执行器就绪"""
+!         if self._async_executor is None:
+!             import concurrent.futures
+!             self._async_executor = concurrent.futures.ThreadPoolExecutor(max_workers=4, thread_name_prefix="tianji-write")
+  
+>     def _filter_and_score_entries(
+>         self, query: Optional[str], tags: Optional[List[str]],
+>         priority: Optional[List[str]], layers: List[str],
+>         min_score: float, include_archived: bool
+>     ) -> List[Tuple[float, MemoryEntry]]:
+>         """评分并过滤条目"""
+!         results: List[Tuple[float, MemoryEntry]] = []
+  
+!         for layer_name in layers:
+!             if layer_name not in self._layers:
+!                 continue
+!             for entry in self._layers[layer_name].values():
+!                 score = self._score_entry(entry, query, tags, priority)
+!                 if score >= min_score:
+!                     results.append((score, entry))
+  
+!         if include_archived:
+!             for entry in self._archive.values():
+!                 score = self._score_entry(entry, query, tags, priority)
+!                 if score >= min_score:
+!                     results.append((score * 0.5, entry))
+  
+!         return results
+  
+>     def _apply_llm_enrichment(
+>         self, query: str, entries: List[MemoryEntry], limit: int, use_llm: bool
+>     ) -> List[MemoryEntry]:
+>         """应用LLM增强"""
+!         if use_llm and query and self._llm_bridge and self._llm_bridge.is_ready:
+!             return self._llm_bridge.enrich_recall(query, entries, limit)
+!         return entries[:limit]
+  
+>     def _update_access_statistics(self, entries: List[MemoryEntry]) -> None:
+>         """更新访问统计"""
+!         current_time = time.time()
+!         for entry in entries:
+!             entry.last_accessed = current_time
+!             entry.access_count += 1
+!         self._stats["total_accesses"] += len(entries)
+  
+>     def remember_guarded(
+>         self, content: str, layer: str = "working",
+>         tags: Optional[List[str]] = None, priority: str = "medium",
+>         metadata: Optional[dict] = None,
+>     ) -> dict:
+!         return self.remember(content, layer, tags, priority, metadata)
+  
+>     def recall(
+>         self, query: Optional[str] = None, layers: Optional[List[str]] = None,
+>         tags: Optional[List[str]] = None, priority: Optional[List[str]] = None,
+>         limit: int = 20, min_score: float = 0.1,
+>         include_related: bool = True, include_archived: bool = False,
+>         use_llm: bool = False,
+>     ) -> List[MemoryEntry]:
+>         """检索记忆条目"""
+!         with self._lock:
+!             layers = layers or [l.name for l in self.config.layers]
+  
+!             scored_entries = self._filter_and_score_entries(
+!                 query, tags, priority, layers, min_score, include_archived
+!             )
+  
+!             scored_entries.sort(key=lambda x: x[0], reverse=True)
+!             entries = [e for _, e in scored_entries[:limit * 2]]
+  
+!             entries = self._apply_llm_enrichment(query, entries, limit, use_llm)
+  
+!             self._update_access_statistics(entries)
+  
+!             return entries
+  
+>     def _validate_consolidation_params(
+>         self, from_layer: str, to_layer: str, entry_id: str
+>     ) -> Optional[MemoryEntry]:
+>         """验证巩固参数并返回条目"""
+!         if from_layer not in self._layers or to_layer not in self._layers:
+!             return None
+!         if entry_id not in self._layers[from_layer]:
+!             return None
+!         return self._layers[from_layer].pop(entry_id)
+  
+>     def _create_consolidated_entry(
+>         self, entry: MemoryEntry, from_layer: str, to_layer: str
+>     ) -> MemoryEntry:
+>         """创建巩固后的新条目"""
+!         return MemoryEntry(
+!             id=entry.id,
+!             content=f"[{from_layer}->{to_layer}] {entry.content}",
+!             layer=to_layer,
+!             tags=entry.tags + [f"from-{from_layer}"],
+!             priority=entry.priority,
+!             effectiveness_score=entry.effectiveness_score,
+!             related_ids=entry.related_ids,
+!             metadata={
+!                 **entry.metadata,
+!                 "consolidated_at": time.time(),
+!                 "source_layer": from_layer
+!             },
+!         )
+  
+>     def forget(self, entry_id: str) -> bool:
+!         with self._lock:
+!             for layer_name, layer_data in self._layers.items():
+!                 if entry_id in layer_data:
+!                     entry = layer_data.pop(entry_id)
+!                     self._update_layer_size(layer_name, -entry.size_bytes)
+!                     self._unindex_tags(entry_id, entry.tags)
+!                     self._stats["total_entries"] -= 1
+!                     self._stats["total_archivals"] += 1
+!                     self._delete_entry_file(entry_id, layer_name)
+!                     self._archive[entry.id] = MemoryEntry(
+!                         id=entry.id, content=entry.content, layer="archive",
+!                         tags=entry.tags + ["archived"], priority="low",
+!                         created_at=entry.created_at, last_accessed=time.time(),
+!                         access_count=entry.access_count,
+!                         effectiveness_score=entry.effectiveness_score,
+!                         related_ids=entry.related_ids,
+!                         metadata={**entry.metadata, "archived_at": time.time()},
+!                     )
+!                     return True
+!             return False
+  
+>     def consolidate(self, from_layer: str, to_layer: str, entry_id: str) -> Optional[str]:
+>         """巩固条目到更高层"""
+!         with self._lock:
+!             entry = self._validate_consolidation_params(from_layer, to_layer, entry_id)
+!             if entry is None:
+!                 return None
+  
+!             self._update_layer_size(from_layer, -entry.size_bytes)
+!             self._unindex_tags(entry_id, entry.tags)
+  
+!             new_entry = self._create_consolidated_entry(entry, from_layer, to_layer)
+  
+!             self._layers[to_layer][entry.id] = new_entry
+!             self._update_layer_size(to_layer, new_entry.size_bytes)
+!             self._index_tags(entry.id, new_entry.tags)
+!             self._stats["total_consolidations"] += 1
+  
+!             return entry.id
+  
+>     def consolidate_batch(
+>         self, from_layer: str, to_layer: Optional[str] = None,
+>         threshold: float = 0.6, max_entries: int = 50,
+>         use_quality_promotion: bool = True,
+>     ) -> Dict:
+!         with self._lock:
+!             if from_layer not in self._layers:
+!                 return {"status": "error", "error": f"layer {from_layer} not found", "consolidated": 0}
+!             target_layer = to_layer
+!             if not target_layer:
+!                 layer_order = ["sensory", "working", "short_term", "episodic", "semantic", "meta"]
+!                 try:
+!                     idx = layer_order.index(from_layer)
+!                     if idx < len(layer_order) - 1:
+!                         target_layer = layer_order[idx + 1]
+!                 except ValueError:
+!                     return {"status": "error", "error": f"invalid layer: {from_layer}", "consolidated": 0}
+!             if target_layer not in self._layers:
+!                 self._layers[target_layer] = {}
+!             candidates = []
+!             for entry_id, entry in list(self._layers[from_layer].items()):
+!                 if use_quality_promotion:
+!                     score = self.promotion_score(entry)
+!                     if score >= threshold:
+!                         candidates.append((score, entry_id, entry))
+!                 else:
+!                     candidates.append((0.5, entry_id, entry))
+!             candidates.sort(key=lambda x: x[0], reverse=True)
+!             candidates = candidates[:max_entries]
+!             results = []
+!             for score, entry_id, entry in candidates:
+!                 self._layers[from_layer].pop(entry_id)
+!                 self._update_layer_size(from_layer, -entry.size_bytes)
+!                 self._unindex_tags(entry_id, entry.tags)
+!                 new_entry = MemoryEntry(
+!                     id=entry.id,
+!                     content=f"[{from_layer}->{target_layer}] {entry.content[:1000]}",
+!                     layer=target_layer,
+!                     tags=entry.tags + [f"from-{from_layer}", "batch-consolidated"],
+!                     priority=entry.priority,
+!                     effectiveness_score=entry.effectiveness_score,
+!                     related_ids=entry.related_ids,
+!                     metadata={
+!                         **entry.metadata,
+!                         "consolidated_at": time.time(),
+!                         "source_layer": from_layer,
+!                         "promotion_score": round(score, 4),
+!                     },
+!                 )
+!                 self._layers[target_layer][entry.id] = new_entry
+!                 self._update_layer_size(target_layer, new_entry.size_bytes)
+!                 self._index_tags(entry.id, new_entry.tags)
+!                 self._stats["total_consolidations"] += 1
+!                 results.append({
+!                     "id": entry.id,
+!                     "promotion_score": round(score, 4),
+!                     "from": from_layer,
+!                     "to": target_layer,
+!                     "size_bytes": new_entry.size_bytes,
+!                 })
+!             if from_layer in self._layers:
+!                 self._auto_consolidate(from_layer)
+!             return {
+!                 "status": "completed",
+!                 "from_layer": from_layer,
+!                 "to_layer": target_layer,
+!                 "consolidated": len(results),
+!                 "threshold": threshold,
+!                 "candidates_available": len(self._layers.get(from_layer, {})),
+!                 "results": results,
+!             }
+  
+>     def smart_promote(self, layer: str, threshold: float = 0.6,
+>                       limit: int = 10) -> List[Dict]:
+!         return self.consolidate_batch(
+!             from_layer=layer, to_layer=None,
+!             threshold=threshold, max_entries=limit,
+!             use_quality_promotion=True,
+!         )["results"]
+  
+>     def consolidate_all_layers(self, threshold: float = 0.6,
+>                                max_per_layer: int = 30) -> Dict:
+!         results = {}
+!         total = 0
+!         layers_to_scan = ["sensory", "working", "short_term", "episodic", "semantic"]
+!         for layer in layers_to_scan:
+!             if layer in self._layers and len(self._layers[layer]) > 0:
+!                 r = self.consolidate_batch(
+!                     from_layer=layer, threshold=threshold,
+!                     max_entries=max_per_layer, use_quality_promotion=True,
+!                 )
+!                 results[layer] = r
+!                 total += r["consolidated"]
+!         return {"status": "completed", "total_consolidated": total, "layer_results": results}
+  
+>     def force_evict_overcapacity(self, layer: str, target_ratio: float = 0.8,
+>                                  max_evict: int = 200) -> Dict:
+!         with self._lock:
+!             if layer not in self._layers:
+!                 return {"status": "error", "error": f"layer {layer} not found", "evicted": 0}
+!             entries = list(self._layers[layer].items())
+!             current_count = len(entries)
+!             layer_config = self.config.get_layer(layer)
+!             max_entries = getattr(layer_config, 'max_entries', 2000) if layer_config else 2000
+!             target_count = int(max_entries * target_ratio)
+  
+!             if current_count <= max_entries:
+!                 return {"status": "ok", "message": f"within capacity ({current_count}/{max_entries})", "evicted": 0}
+  
+!             evict_count = min(max_evict, current_count - target_count)
+!             if evict_count <= 0:
+!                 evict_count = min(max_evict, current_count - int(max_entries * 0.7))
+  
+!             sorted_entries = sorted(entries, key=lambda x: (
+!                 x[1].effectiveness_score or 0,
+!                 x[1].access_count or 0,
+!                 x[1].created_at or 0,
+!             ))
+  
+!             evicted = []
+!             for i in range(min(evict_count, len(sorted_entries))):
+!                 entry_id, entry = sorted_entries[i]
+!                 self._layers[layer].pop(entry_id)
+!                 self._update_layer_size(layer, -entry.size_bytes)
+!                 self._unindex_tags(entry_id, entry.tags)
+!                 self._stats["total_entries"] -= 1
+!                 self._stats["total_archivals"] += 1
+!                 self._archive[entry.id] = MemoryEntry(
+!                     id=entry.id, content=entry.content[:500], layer="archive",
+!                     tags=entry.tags + ["force-evicted", f"from-{layer}"], priority="low",
+!                     created_at=entry.created_at, last_accessed=time.time(),
+!                     access_count=entry.access_count,
+!                     effectiveness_score=entry.effectiveness_score,
+!                     related_ids=entry.related_ids,
+!                     metadata={**entry.metadata, "evicted_at": time.time(), "reason": "overcapacity"},
+!                 )
+!                 evicted.append({
+!                     "id": entry_id, "layer": layer,
+!                     "effectiveness_score": entry.effectiveness_score,
+!                     "size_bytes": entry.size_bytes,
+!                 })
+  
+!             remaining = len(self._layers.get(layer, {}))
+!             return {
+!                 "status": "completed", "layer": layer,
+!                 "before": current_count, "after": remaining,
+!                 "max_entries": max_entries, "evicted": len(evicted),
+!                 "target_ratio": target_ratio, "reason": "overcapacity_force_evict",
+!             }
+  
+>     def check_l0_ttl(self, ttl_days: int = 7, archive_days: int = 30,
+>                      max_l0_size_mb: float = 10.0) -> Dict:
+!         result = {
+!             "scanned": 0,
+!             "consolidated_to_l1": 0,
+!             "archived": 0,
+!             "force_consolidated": 0,
+!             "errors": [],
+!         }
+  
+!         now = time.time()
+!         ttl_seconds = ttl_days * 86400
+!         archive_seconds = archive_days * 86400
+  
+!         with self._lock:
+!             if "sensory" not in self._layers:
+!                 return result
+  
+!             l0_entries = list(self._layers["sensory"].items())
+!             result["scanned"] = len(l0_entries)
+  
+!             total_size = sum(e.size_bytes for _, e in l0_entries)
+!             if total_size > max_l0_size_mb * 1024 * 1024:
+!                 sorted_entries = sorted(l0_entries, key=lambda x: x[1].created_at or 0)
+!                 force_count = 0
+!                 for entry_id, entry in sorted_entries:
+!                     if total_size <= max_l0_size_mb * 1024 * 1024 * 0.8:
+!                         break
+!                     try:
+!                         cid = self.consolidate("sensory", "working", entry_id)
+!                         if cid:
+!                             force_count += 1
+!                             total_size -= entry.size_bytes
+!                     except Exception as e:
+!                         result["errors"].append(str(e))
+!                 result["force_consolidated"] = force_count
+  
+!             l0_entries = list(self._layers["sensory"].items())
+  
+!             for entry_id, entry in l0_entries:
+!                 age = now - (entry.created_at or now)
+  
+!                 if age > archive_seconds:
+!                     try:
+!                         if entry_id in self._layers.get("sensory", {}):
+!                             self._layers["sensory"].pop(entry_id, None)
+!                             self._update_layer_size("sensory", -entry.size_bytes)
+!                             self._unindex_tags(entry_id, entry.tags)
+!                             self._archive[entry.id] = MemoryEntry(
+!                                 id=entry.id,
+!                                 content=entry.content[:500],
+!                                 layer="archive",
+!                                 tags=entry.tags + ["ttl-archived"],
+!                                 priority="low",
+!                                 created_at=entry.created_at,
+!                                 last_accessed=time.time(),
+!                                 access_count=entry.access_count,
+!                                 effectiveness_score=entry.effectiveness_score,
+!                                 related_ids=entry.related_ids,
+!                                 metadata={**entry.metadata, "archived_at": now, "reason": "l0_ttl_expired"},
+!                             )
+!                             result["archived"] += 1
+!                     except Exception as e:
+!                         result["errors"].append(str(e))
+  
+!                 elif age > ttl_seconds:
+!                     try:
+!                         cid = self.consolidate("sensory", "working", entry_id)
+!                         if cid:
+!                             result["consolidated_to_l1"] += 1
+!                     except Exception as e:
+!                         result["errors"].append(str(e))
+  
+!         return result
+  
+>     def get_consolidation_candidates(self, layer: str = "",
+>                                      threshold: float = 0.5) -> List[Dict]:
+!         layers = [layer] if layer else [name for name in self._layers
+!                                          if name not in ("meta",)]
+!         candidates = []
+!         for layer_name in layers:
+!             if layer_name not in self._layers:
+!                 continue
+!             for entry_id, entry in self._layers[layer_name].items():
+!                 score = self.promotion_score(entry)
+!                 if score >= threshold:
+!                     candidates.append({
+!                         "entry_id": entry_id,
+!                         "layer": layer_name,
+!                         "score": round(score, 4),
+!                         "tags": entry.tags[:5],
+!                         "size_bytes": entry.size_bytes,
+!                     })
+!         candidates.sort(key=lambda x: x["score"], reverse=True)
+!         return candidates
+  
+>     def _calculate_recency_factor(self, entry: MemoryEntry) -> float:
+>         """计算新近度因子"""
+!         time_diff = time.time() - entry.last_accessed
+!         return max(0.1, 1.0 - time_diff / (30 * 24 * 3600))
+  
+>     def _calculate_weighted_promotion_sum(
+>         self, entry: MemoryEntry, recency_factor: float,
+>         upstream_depth: float, connectedness: float,
+>         quality_score: float, delta_frequency: float,
+>         consolidation_benefit: float, margin_pressure: float
+>     ) -> float:
+>         """计算加权晋升分数"""
+!         w = self.config.promotion_weights
+  
+!         return (
+!             entry.priority_weight() * w.priority_weight
+!             + entry.effectiveness_score * w.effectiveness
+!             + recency_factor * w.recency
+!             + min(1.0, entry.access_count / 20) * w.access_count
+!             + upstream_depth * w.upstream_depth
+!             + connectedness * w.connectedness
+!             + quality_score * getattr(w, 'quality_score', 0.10)
+!             + delta_frequency * getattr(w, 'delta_frequency', 0.05)
+!             + consolidation_benefit * getattr(w, 'consolidation_benefit', 0.05)
+!             + margin_pressure * getattr(w, 'margin_pressure', 0.05)
+!         )
+  
+>     def promotion_score(self, entry: MemoryEntry, engine=None) -> float:
+>         """计算条目晋升分数"""
+!         recency_factor = self._calculate_recency_factor(entry)
+!         upstream_depth = self._calc_upstream_depth(entry)
+!         connectedness = self._calc_connectedness(entry)
+!         quality_score = self._calc_quality_score(entry)
+!         delta_frequency = self._calc_delta_frequency(entry)
+!         consolidation_benefit = self._calc_consolidation_benefit(entry)
+!         margin_pressure = self._calc_margin_pressure(entry.layer)
+  
+!         return self._calculate_weighted_promotion_sum(
+!             entry, recency_factor, upstream_depth, connectedness,
+!             quality_score, delta_frequency, consolidation_benefit, margin_pressure
+!         )
+  
+>     def _calc_upstream_depth(self, entry: MemoryEntry) -> float:
+!         if not entry.related_ids:
+!             return 0.3
+!         total_depth = 0
+!         count = 0
+!         for rid in entry.related_ids[:10]:
+!             for layer_name, layer_data in self._layers.items():
+!                 if rid in layer_data:
+!                     ref = layer_data[rid]
+!                     layer_idx = self.config.get_layer_index(ref.layer)
+!                     total_depth += (layer_idx + 1) / 6.0
+!                     count += 1
+!                     break
+!         if count == 0:
+!             return 0.3
+!         return min(1.0, total_depth / count)
+  
+>     def _calc_connectedness(self, entry: MemoryEntry) -> float:
+!         if not entry.related_ids:
+!             return 0.2
+!         related_count = len(entry.related_ids)
+!         score = min(1.0, related_count / 10.0)
+!         total_links = 0
+!         for rid in entry.related_ids[:5]:
+!             for layer_name, layer_data in self._layers.items():
+!                 if rid in layer_data:
+!                     ref = layer_data[rid]
+!                     total_links += len(ref.related_ids)
+!                     break
+!         avg_links = total_links / max(1, min(5, len(entry.related_ids)))
+!         score = (score + min(1.0, avg_links / 20.0)) / 2.0
+!         return max(0.2, score)
+  
+>     def _calc_quality_score(self, entry: MemoryEntry) -> float:
+!         dims = []
+!         if entry.metadata.get("conflict_resolution") in ("confirm", "merged"):
+!             dims.append(0.8)
+!         elif entry.metadata.get("conflict_resolution") == "denied":
+!             dims.append(0.2)
+!         else:
+!             dims.append(0.5)
+!         if entry.tags and len(entry.tags) >= 2:
+!             dims.append(min(1.0, len(entry.tags) / 5.0))
+!         else:
+!             dims.append(0.3)
+!         if entry.metadata.get("upstream_id") or entry.related_ids:
+!             dims.append(0.7)
+!         else:
+!             dims.append(0.3)
+!         return sum(dims) / len(dims) if dims else 0.5
+  
+>     def _calc_delta_frequency(self, entry: MemoryEntry) -> float:
+!         accumulated = self._accumulated_entries.get(entry.layer, 0)
+!         layer_config = self.config.get_layer(entry.layer)
+!         if not layer_config or layer_config.accumulation_threshold_entries <= 0:
+!             return 0.5
+!         ratio = accumulated / layer_config.accumulation_threshold_entries
+!         return min(1.0, ratio)
+  
+>     def _calc_consolidation_benefit(self, entry: MemoryEntry) -> float:
+!         margin_ratio = self._get_margin_ratio(entry.layer)
+!         if margin_ratio < 0.15:
+!             return 0.9
+!         elif margin_ratio < 0.30:
+!             return 0.7
+!         elif margin_ratio < 0.50:
+!             return 0.4
+!         return 0.1
+  
+>     def _calc_margin_pressure(self, layer_name: str) -> float:
+!         margin_ratio = self._get_margin_ratio(layer_name)
+!         layer_config = self.config.get_layer(layer_name)
+!         if not layer_config:
+!             return 0.5
+!         safety = getattr(layer_config, 'margin_management', None)
+!         if safety is None:
+!             return 0.5
+!         safety_floor = getattr(safety, 'safety_floor', 0.05)
+!         target_margin = getattr(safety, 'target_margin', 0.15)
+!         if margin_ratio < safety_floor:
+!             return 1.0
+!         if margin_ratio < target_margin:
+!             return 0.5 + 0.5 * (target_margin - margin_ratio) / max(target_margin - safety_floor, 0.01)
+!         return max(0.0, 0.5 * (1.0 - margin_ratio))
+  
+>     def stats(self) -> dict:
+!         with self._lock:
+!             layer_counts = {}
+!             for name, layer_data in self._layers.items():
+!                 layer_counts[name] = len(layer_data)
+!             total_calls = self._stats["total_recall_calls"]
+!             hit_rate = round(
+!                 self._stats["total_recall_hits"] / max(total_calls, 1) * 100, 1
+!             ) if total_calls > 0 else 0.0
+!             avg_latency_ms = round(
+!                 self._stats["total_recall_latency_ms"] / max(total_calls, 1), 1
+!             ) if total_calls > 0 else 0.0
+!             return {
+!                 "total_entries": self._stats["total_entries"],
+!                 "total_accesses": self._stats["total_accesses"],
+!                 "uptime_seconds": round(time.time() - self._stats["start_time"], 1),
+!                 "layers": layer_counts,
+!                 "archive_entries": len(self._archive),
+!                 "consolidations": self._stats["total_consolidations"],
+!                 "archivals": self._stats["total_archivals"],
+!                 "rejected": self._stats["total_rejected"],
+!                 "downgraded": self._stats["total_downgraded"],
+!                 "hit_rate": hit_rate,
+!                 "avg_recall_latency_ms": avg_latency_ms,
+!                 "conflicts": self._stats["total_conflicts"],
+!                 "consolidations_triggered": self._stats["total_consolidations_triggered"],
+!                 "hard_cap_enforcements": self._stats["total_hard_cap_enforcements"],
+!                 "consolidation_events_logged": len(self._consolidation_event_log),
+!                 "data_path": str(self._data_path),
+!             }
+  
+>     def get_layer_capacity_info(self) -> Dict[str, Dict]:
+!         with self._lock:
+!             info = {}
+!             for layer in self.config.layers:
+!                 size = self._get_layer_size(layer.name)
+!                 usage = size / layer.max_size_bytes if layer.max_size_bytes > 0 else 0
+!                 accumulated = self._accumulated_bytes.get(layer.name, 0)
+!                 acc_entries = self._accumulated_entries.get(layer.name, 0)
+!                 acc_ratio = self._get_accumulation_ratio(layer.name)
+!                 entry_ratio = self._get_accumulation_entry_ratio(layer.name)
+!                 last_cons = self._last_consolidation_time.get(layer.name, 0.0)
+!                 info[layer.name] = {
+!                     "size_bytes": size,
+!                     "max_size_bytes": layer.max_size_bytes,
+!                     "hard_cap_bytes": layer.hard_cap_bytes,
+!                     "entry_count": len(self._layers[layer.name]),
+!                     "max_entries": layer.max_entries,
+!                     "usage_ratio": round(usage, 4),
+!                     "capacity_threshold": layer.capacity_threshold,
+!                     "accumulation_threshold_bytes": layer.accumulation_threshold_bytes,
+!                     "accumulation_threshold_entries": layer.accumulation_threshold_entries,
+!                     "accumulated_bytes": accumulated,
+!                     "accumulated_entries": acc_entries,
+!                     "accumulation_ratio": round(acc_ratio, 4),
+!                     "accumulation_entry_ratio": round(entry_ratio, 4),
+!                     "needs_consolidation": acc_ratio >= 1.0 or entry_ratio >= 1.0,
+!                     "at_hard_cap": size >= layer.hard_cap_bytes,
+!                     "seconds_since_last_consolidation": round(time.time() - last_cons, 1),
+!                 }
+!             return info
+  
+>     def get_accumulation_stats(self) -> Dict[str, Dict]:
+!         with self._lock:
+!             stats = {}
+!             for layer in self.config.layers:
+!                 stats[layer.name] = {
+!                     "accumulated_bytes": self._accumulated_bytes.get(layer.name, 0),
+!                     "threshold_bytes": layer.accumulation_threshold_bytes,
+!                     "ratio": round(self._get_accumulation_ratio(layer.name), 4),
+!                     "needs_check": self._get_accumulation_ratio(layer.name) >= 1.0,
+!                 }
+!             return stats
+  
+>     def get_all_entries(self, layer: Optional[str] = None, limit: int = 100) -> List[MemoryEntry]:
+!         with self._lock:
+!             entries = []
+!             if layer:
+!                 if layer in self._layers:
+!                     entries = list(self._layers[layer].values())
+!             else:
+!                 for layer_data in self._layers.values():
+!                     entries.extend(layer_data.values())
+!             entries.sort(key=lambda e: e.value_score(), reverse=True)
+!             return entries[:limit]
+  
+>     def _score_entry(
+>         self, entry: MemoryEntry, query: Optional[str],
+>         tags: Optional[List[str]], priority: Optional[List[str]]
+>     ) -> float:
+!         score = entry.value_score()
+!         if tags:
+!             matched = sum(1 for t in tags if t in entry.tags)
+!             if matched == 0:
+!                 return 0.0
+!             score *= (1.0 + 0.3 * matched / len(tags))
+!         if priority:
+!             if entry.priority not in priority:
+!                 return 0.0
+!             score *= 1.5
+!         if query:
+!             query_lower = query.lower()
+!             content_lower = entry.content.lower()
+!             if query_lower in content_lower:
+!                 score *= 3.0
+!             else:
+!                 query_words = set(query_lower.split())
+!                 content_words = set(content_lower.split())
+!                 overlap = query_words & content_words
+!                 if overlap:
+!                     score *= (1.0 + 0.5 * len(overlap) / len(query_words))
+!                 else:
+!                     score *= 0.3
+!         return score
+  
+>     def _auto_consolidate(self, from_layer: str):
+!         self._sync_evo_config()
+!         layer_config = self.config.get_layer(from_layer)
+!         if not layer_config:
+!             return
+!         next_layer = self.config.get_next_layer(from_layer)
+  
+!         should, reason = self._should_consolidate(from_layer)
+!         if not should:
+!             return
+  
+!         margin_level = self._get_margin_level(from_layer)
+!         if margin_level == "green":
+!             ratio = getattr(layer_config, 'consolidation_ratio', 0.15)
+!         elif margin_level == "yellow":
+!             ratio = getattr(layer_config, 'deep_consolidation_ratio', 0.25)
+!         elif margin_level == "orange":
+!             ratio = getattr(layer_config, 'deep_consolidation_ratio', 0.25)
+!         else:
+!             ratio = getattr(layer_config, 'emergency_consolidation_ratio', 0.50)
+  
+!         if not next_layer:
+!             if margin_level == "red":
+!                 entries = sorted(
+!                     self._layers[from_layer].values(),
+!                     key=lambda e: self.promotion_score(e), reverse=True,
+!                 )
+!                 archive_count = max(3, int(len(entries) * ratio))
+!                 for entry in entries[:archive_count]:
+!                     self.forget(entry.id)
+!                 self._log_consolidation_event({
+!                     "event": "archive_no_next_layer",
+!                     "from_layer": from_layer,
+!                     "trigger_reason": reason,
+!                     "margin_level": margin_level,
+!                     "archived_count": archive_count,
+!                 })
+!             else:
+!                 self._log_consolidation_event({
+!                     "event": "consolidation_skipped_no_next",
+!                     "from_layer": from_layer,
+!                     "trigger_reason": reason,
+!                     "margin_level": margin_level,
+!                 })
+!             self._reset_accumulation(from_layer)
+!             return
+  
+!         entries = sorted(
+!             self._layers[from_layer].values(),
+!             key=lambda e: self.promotion_score(e), reverse=True
+!         )
+!         consolidate_count = max(3, int(len(entries) * ratio))
+!         promoted = 0
+!         for entry in entries[:consolidate_count]:
+!             if self.consolidate(from_layer, next_layer.name, entry.id):
+!                 promoted += 1
+  
+!         self._stats["total_consolidations_triggered"] += 1
+!         self._log_consolidation_event({
+!             "event": "consolidation_executed",
+!             "from_layer": from_layer,
+!             "to_layer": next_layer.name,
+!             "trigger_reason": reason,
+!             "margin_level": margin_level,
+!             "consolidation_ratio": ratio,
+!             "promoted_count": promoted,
+!             "total_in_layer": len(entries),
+!             "accumulated_bytes_before": self._accumulated_bytes.get(from_layer, 0),
+!             "accumulated_entries_before": self._accumulated_entries.get(from_layer, 0),
+!         })
+!         if self._learning_bridge:
+!             try:
+!                 self._learning_bridge.on_consolidation({
+!                     "event": "consolidation_executed",
+!                     "from_layer": from_layer,
+!                     "to_layer": next_layer.name,
+!                     "trigger_reason": reason,
+!                     "promoted_count": promoted,
+!                 })
+!             except Exception:
+!                 pass
+!         self._reset_accumulation(from_layer)
+  
+!         self._trigger_evolution_cycle(from_layer)
+!         new_margin = self._get_margin_ratio(from_layer)
+!         safety = getattr(layer_config, 'margin_management', None)
+!         target = safety.target_margin if safety else 0.15
+!         if new_margin < target:
+!             self._progressive_orchestration(from_layer, depth=1)
+  
+>     def _check_hard_cap(self, layer_name: str):
+!         layer_config = self.config.get_layer(layer_name)
+!         if not layer_config:
+!             return
+!         size = self._get_layer_size(layer_name)
+!         if size < layer_config.hard_cap_bytes:
+!             return
+!         next_layer = self.config.get_next_layer(layer_name)
+!         if not next_layer:
+!             remaining = size - layer_config.max_size_bytes
+!             if remaining > 0:
+!                 self._log_consolidation_event({
+!                     "event": "hard_cap_no_next_layer",
+!                     "layer": layer_name,
+!                     "overflow_bytes": remaining,
+!                     "total_size": size,
+!                     "hard_cap": layer_config.hard_cap_bytes,
+!                 })
+!             return
+  
+!         entries = sorted(
+!             self._layers[layer_name].values(),
+!             key=lambda e: self.promotion_score(e), reverse=True
+!         )
+!         overflow = max(0, size - layer_config.max_size_bytes)
+!         freed = 0
+!         promoted = 0
+!         for entry in entries:
+!             if freed >= overflow and size - freed <= layer_config.max_size_bytes * 0.9:
+!                 break
+!             entry_size = entry.size_bytes
+!             if self.consolidate(layer_name, next_layer.name, entry.id):
+!                 freed += entry_size
+!                 promoted += 1
+  
+!         self._stats["total_hard_cap_enforcements"] += 1
+!         self._log_consolidation_event({
+!             "event": "hard_cap_enforced",
+!             "layer": layer_name,
+!             "to_layer": next_layer.name,
+!             "overflow_bytes": overflow,
+!             "freed_bytes": freed,
+!             "promoted_count": promoted,
+!             "remaining_size": self._get_layer_size(layer_name),
+!         })
+!         self._reset_accumulation(layer_name)
+  
+!         if self._evo_loop:
+!             self._evo_loop.record_action(
+!                 action="capacity_enforcement",
+!                 state_before={"layer": layer_name, "overflow_bytes": overflow},
+!                 state_after={"promoted": promoted, "freed_bytes": freed},
+!             )
+  
+>     def force_consolidate_layer(self, layer_name: str) -> int:
+!         with self._lock:
+!             layer_config = self.config.get_layer(layer_name)
+!             if not layer_config:
+!                 return 0
+!             next_layer = self.config.get_next_layer(layer_name)
+!             if not next_layer:
+!                 return 0
+!             entries = sorted(
+!                 self._layers[layer_name].values(),
+!                 key=lambda e: self.promotion_score(e), reverse=True
+!             )
+!             count = max(5, int(len(entries) * 0.2))
+!             promoted = 0
+!             for entry in entries[:count]:
+!                 if self.consolidate(layer_name, next_layer.name, entry.id):
+!                     promoted += 1
+!             self._log_consolidation_event({
+!                 "event": "force_consolidation",
+!                 "from_layer": layer_name,
+!                 "to_layer": next_layer.name,
+!                 "promoted_count": promoted,
+!                 "total_in_layer": len(entries),
+!             })
+!             self._reset_accumulation(layer_name)
+!             return promoted
+  
+>     def verify_consistency(self) -> dict:
+!         errors = []
+!         warnings = []
+!         with self._lock:
+!             for layer_name, layer_data in self._layers.items():
+!                 computed_size = sum(e.size_bytes for e in layer_data.values())
+!                 tracked_size = self._layer_sizes.get(layer_name, 0)
+!                 if abs(computed_size - tracked_size) > 1024:
+!                     errors.append(
+!                         f"{layer_name}: computed={computed_size} tracked={tracked_size} diff={abs(computed_size-tracked_size)}"
+!                     )
+!                 actual_count = len(layer_data)
+!                 tracked_count = self._accumulated_entries.get(layer_name, 0)
+!             total_from_layers = sum(len(v) for v in self._layers.values())
+!             total_tracked = self._stats["total_entries"]
+!             if total_from_layers != total_tracked:
+!                 errors.append(f"total_entries mismatch: layers={total_from_layers} stats={total_tracked}")
+!             for layer_name in self._layers:
+!                 should, reason = self._should_consolidate(layer_name)
+!                 can, wait_reason = self._can_consolidate_now(layer_name)
+!                 if should and not can:
+!                     warnings.append(f"{layer_name}: needs_consolidation but blocked ({wait_reason})")
+!                 if should:
+!                     warnings.append(f"{layer_name}: consolidation_needed ({reason})")
+!             tag_index_size = sum(len(v) for v in self._tag_index.values())
+!             if tag_index_size < total_from_layers:
+!                 warnings.append(f"tag_index may be incomplete: {tag_index_size} < {total_from_layers}")
+!         return {
+!             "consistent": len(errors) == 0,
+!             "errors": errors,
+!             "warnings": warnings,
+!             "checked_at": time.time(),
+!         }
+  
+>     def get_consolidation_event_log(self, limit: int = 50) -> list[dict]:
+!         with self._lock:
+!             return self._consolidation_event_log[-limit:]
+  
+>     def replay_memory(self, memory_id: str, up_to_timestamp: Optional[float] = None) -> Optional[dict]:
+!         if self._sqlite_store:
+!             try:
+!                 return self._sqlite_store.replay_events(memory_id, up_to_timestamp)
+!             except Exception:
+!                 pass
+!         return None
+  
+>     def _sync_evo_config(self):
+!         if not self._evo_loop:
+!             return
+!         mc = self._evo_loop.mutable_config
+!         if "consolidation_threshold" in mc:
+!             pass
+  
+>     def _emit_event(self, event_type: str, memory_id: str, layer: str, payload: dict):
+!         if self._sqlite_store:
+!             try:
+!                 self._sqlite_store.append_event(event_type, memory_id, layer, payload)
+!             except Exception:
+!                 pass
+  
+>     def _trigger_evolution_cycle(self, layer_name: str = ""):
+>         """在固结完成后触发一轮进化循环"""
+!         if not self._evo_loop:
+!             return
+!         try:
+!             health = self._get_engine_health()
+!             urgency = self._evo_loop.urgency_accumulator.current_urgency()
+!             if urgency >= 5.0 or health.get("capacity_usage", 0) > 0.7:
+!                 self._evo_loop.trigger(reason=f"post_consolidation({layer_name})")
+!         except Exception:
+!             pass
+  
+>     def _progressive_orchestration(self, layer_name: str, depth: int = 1):
+!         if depth > 3:
+!             return
+!         layer_config = self.config.get_layer(layer_name)
+!         if not layer_config:
+!             return
+!         next_layer = self.config.get_next_layer(layer_name)
+!         if not next_layer:
+!             return
+!         margin_after = self._get_margin_ratio(layer_name)
+!         safety = getattr(layer_config, 'margin_management', None)
+!         target = safety.target_margin if safety else 0.15
+!         if margin_after >= target:
+!             return
+!         if depth == 1:
+!             ratio = getattr(layer_config, 'deep_consolidation_ratio', 0.25)
+!         elif depth == 2:
+!             ratio = getattr(layer_config, 'emergency_consolidation_ratio', 0.50)
+!         else:
+!             ratio = 0.80
+!         entries = sorted(
+!             self._layers[layer_name].values(),
+!             key=lambda e: self.promotion_score(e), reverse=True,
+!         )
+!         extra_count = max(3, int(len(entries) * ratio))
+!         extra_promoted = 0
+!         for entry in entries[:extra_count]:
+!             if self.consolidate(layer_name, next_layer.name, entry.id):
+!                 extra_promoted += 1
+!         self._log_consolidation_event({
+!             "event": "progressive_orchestration",
+!             "from_layer": layer_name,
+!             "to_layer": next_layer.name,
+!             "depth": depth,
+!             "ratio": ratio,
+!             "extra_promoted": extra_promoted,
+!             "margin_before": margin_after,
+!         })
+!         new_margin = self._get_margin_ratio(layer_name)
+!         if new_margin < target:
+!             self._progressive_orchestration(layer_name, depth=depth + 1)
+  
+>     def _start_consolidation_daemon(self):
+!         import threading as _th
+!         import logging as _logging
+!         _logger = _logging.getLogger(__name__)
+!         self._consolidation_running = True
+!         interval = getattr(self.config, 'consolidation_interval_minutes', 5) * 60
+  
+!         def _daemon_loop():
+!             while self._consolidation_running:
+!                 try:
+!                     time.sleep(interval)
+!                     if not self._consolidation_running:
+!                         break
+!                     for layer_name in ["sensory", "working", "short_term", "episodic"]:
+!                         try:
+!                             self._auto_consolidate(layer_name)
+!                         except Exception as e:
+!                             _logger.warning(f"Consolidation daemon error for {layer_name}: {e}")
+!                 except Exception as e:
+!                     _logger.error(f"Consolidation daemon loop error: {e}")
+!                     time.sleep(10)
+  
+!         _t = _th.Thread(target=_daemon_loop, name="ICME-Consolidation-Daemon", daemon=True)
+!         _t.start()
+!         _logger.info(f"Consolidation daemon started (interval={interval}s)")
+  
+>     def build_export_data(self) -> dict:
+!         with self._lock:
+!             layers_data = {}
+!             for name, layer_data in self._layers.items():
+!                 layers_data[name] = [e.to_dict() for e in layer_data.values()]
+!             return {
+!                 "stats": self.stats(),
+!                 "layers": layers_data,
+!                 "archive_count": len(self._archive),
+!                 "exported_at": time.time(),
+!                 "version": "5.0.0-accumulation",
+!             }

@@ -1,0 +1,144 @@
+{
+  "AuditDate": "2026-06-09 05:28:56",
+  "ProjectRoot": "D:\\元初系统\\天机v9.1",
+  "Summary": {
+    "TotalItems": 16,
+    "PassedItems": 16,
+    "FailedItems": 0,
+    "CriticalIssues": 0,
+    "Warnings": 0,
+    "PassRate": 100.0
+  },
+  "CriticalIssues": [],
+  "Warnings": [],
+  "Results": [
+    {
+      "Category": "代码",
+      "Item": "硬编码密钥检测",
+      "Passed": true,
+      "Severity": "Critical",
+      "Detail": "",
+      "Timestamp": "2026-06-09 05:28:54"
+    },
+    {
+      "Category": "代码",
+      "Item": "无bare except",
+      "Passed": true,
+      "Severity": "Warning",
+      "Detail": "文件数: 0",
+      "Timestamp": "2026-06-09 05:28:54"
+    },
+    {
+      "Category": "代码",
+      "Item": "无技术债务",
+      "Passed": true,
+      "Severity": "Warning",
+      "Detail": "TODO/FIXME数: 6",
+      "Timestamp": "2026-06-09 05:28:54"
+    },
+    {
+      "Category": "代码",
+      "Item": "无SQL注入风险",
+      "Passed": true,
+      "Severity": "Critical",
+      "Detail": "",
+      "Timestamp": "2026-06-09 05:28:55"
+    },
+    {
+      "Category": "配置",
+      "Item": "tauri.conf.json productName正确",
+      "Passed": true,
+      "Severity": "Critical",
+      "Detail": "值: 天机v9.1",
+      "Timestamp": "2026-06-09 05:28:55"
+    },
+    {
+      "Category": "配置",
+      "Item": "tauri.conf.json identifier正确",
+      "Passed": true,
+      "Severity": "Critical",
+      "Detail": "值: com.yuanchu.tianji",
+      "Timestamp": "2026-06-09 05:28:55"
+    },
+    {
+      "Category": "配置",
+      "Item": "Cargo.toml版本正确",
+      "Passed": true,
+      "Severity": "Warning",
+      "Detail": "",
+      "Timestamp": "2026-06-09 05:28:55"
+    },
+    {
+      "Category": "配置",
+      "Item": "环境变量无硬编码",
+      "Passed": true,
+      "Severity": "Critical",
+      "Detail": "",
+      "Timestamp": "2026-06-09 05:28:56"
+    },
+    {
+      "Category": "资源",
+      "Item": "图标文件完整",
+      "Passed": true,
+      "Severity": "Warning",
+      "Detail": "",
+      "Timestamp": "2026-06-09 05:28:56"
+    },
+    {
+      "Category": "资源",
+      "Item": "前端构建产物存在",
+      "Passed": true,
+      "Severity": "Critical",
+      "Detail": "",
+      "Timestamp": "2026-06-09 05:28:56"
+    },
+    {
+      "Category": "资源",
+      "Item": "数据目录存在",
+      "Passed": true,
+      "Severity": "Warning",
+      "Detail": "",
+      "Timestamp": "2026-06-09 05:28:56"
+    },
+    {
+      "Category": "资源",
+      "Item": "数据库文件存在",
+      "Passed": true,
+      "Severity": "Warning",
+      "Detail": "",
+      "Timestamp": "2026-06-09 05:28:56"
+    },
+    {
+      "Category": "文档",
+      "Item": "README.md存在",
+      "Passed": true,
+      "Severity": "Warning",
+      "Detail": "",
+      "Timestamp": "2026-06-09 05:28:56"
+    },
+    {
+      "Category": "文档",
+      "Item": "验收标准文档存在",
+      "Passed": true,
+      "Severity": "Warning",
+      "Detail": "",
+      "Timestamp": "2026-06-09 05:28:56"
+    },
+    {
+      "Category": "文档",
+      "Item": "构建脚本存在",
+      "Passed": true,
+      "Severity": "Warning",
+      "Detail": "",
+      "Timestamp": "2026-06-09 05:28:56"
+    },
+    {
+      "Category": "文档",
+      "Item": "测试脚本存在",
+      "Passed": true,
+      "Severity": "Warning",
+      "Detail": "",
+      "Timestamp": "2026-06-09 05:28:56"
+    }
+  ]
+}

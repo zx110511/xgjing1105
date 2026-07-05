@@ -1,0 +1,55 @@
+{
+  "note": "请将此文件复制到 C:\\Users\\Administrator\\.tianji_boundary.json  (用户主目录)",
+  "system": {
+    "name": "天机记忆系统 (TIANJI Memory Engine)",
+    "version": "9.1.0",
+    "edition": "fusion",
+    "codename": "天机·智能v9.1",
+    "boundary_id": "TIANJI-BND-001",
+    "created": "2026-05-21T15:10:00+08:00",
+    "created_by": "天枢 (tianshu)"
+  },
+  "independence": {
+    "directive": "PROTECTED_INDEPENDENT_SYSTEM",
+    "rule": "此目录树为独立运行的记忆系统。外部任何操作（代码修改、文件增删、配置变更）不得影响本系统的正常运行。如需变更，必须通过天枢审批并以TVP协议声明。",
+    "isolation_level": "full",
+    "runtime_port": 8771,
+    "process_name": "天机",
+    "process_owner": "tianji_service.py"
+  },
+  "entry_points": {
+    "tray_service": "launcher/tianji_launcher.py",
+    "http_server": "server/main.py",
+    "mcp_bridge": "mcp/tianji_mcp_server.py",
+    "batch_launcher": "start_tianji.bat",
+    "stop_script": "stop_tianji.bat",
+    "desktop_shortcut": "天机记忆系统.lnk → start_tianji.bat",
+    "mcp_config_canonical": ".trae/mcp.json"
+  },
+  "dependencies": {
+    "python": "3.12.9",
+    "python_executable": "D:\\元初系统\\天机v9.1\\python\\python.exe",
+    "key_packages": ["fastapi", "uvicorn", "deepseek-sdk", "pystray", "Pillow"],
+    "external_brain": "DeepSeek (deepseek-chat)",
+    "embedding_engine": "BGE-M3 (auto-fallback: bge-small-zh → MiniLM → TF-IDF)"
+  },
+  "mcp_servers": {
+    "memory-engine-global": "tianji_mcp_server.py --port 8771",
+    "native_servers": [
+      "agent-framework-global",
+      "command-executor",
+      "ops-engine",
+      "security-scanner",
+      "performance-profiler"
+    ],
+    "config_source": ".trae/mcp.json (authoritative)"
+  },
+  "checkpoint": {
+    "last_audit": "2026-05-29T15:00:00+08:00",
+    "last_action": "商用版python-sdk全量清除: 零外部依赖，唯一路径=项目内置",
+    "python_executable": "D:\\元初系统\\天机v9.1\\python\\python.exe",
+    "zombie_chain_cleared": "23780→319456→84520→0(商用零残留)",
+    "files_fixed": 18,
+    "status": "100% commercial — zero external python dependency, unified path=python/python.exe"
+  }
+}

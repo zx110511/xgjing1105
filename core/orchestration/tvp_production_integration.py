@@ -1,0 +1,532 @@
+"""
+TVP反馈增强 — 生产环境集成
+=============================
+功能:
+1. 创建生产级TVP监控器
+2. 集成到现有TVPBridge
+3. 启动后台监控服务
+4. 生成实时反馈报告
+
+使用方法:
+  python tvp_production_integration.py --install    # 安装集成
+  python tvp_production_integration.py --monitor     # 启动监控
+  python tvp_production_integration.py --report      # 查看报告
+"""
+
+import sqlite3
+import json
+import time
+import uuid
+import threading
+from pathlib import Path
+from datetime import datetime, timedelta
+from typing import Optional, List, Dict, Any
+from dataclasses import dataclass, field
+
+DB_PATH = Path(__file__).resolve().parent.parent / "data" / ".memory" / "icme.db"
+
+@dataclass
+class TVPProductionEvent:
+    """生产环境TVP事件"""
+    event_id: str
+    timestamp: float
+    event_type: str  # delegation / agent_start / agent_complete / cron_trigger / tool_call
+    source_agent: str
+    target_agent: Optional[str]
+    task_type: str
+    success: bool = True
+    duration_ms: float = 0.0
+    metadata: dict = field(default_factory=dict)
+
+
+class TVPProductionIntegrator:
+    """TVP生产环境集成器"""
+
+    def __init__(self, db_path: Path = DB_PATH):
+        self.db_path = db_path
+        self.conn = None
+        self._lock = threading.Lock()
+        self._event_buffer: List[TVPProductionEvent] = []
+        self._buffer_size = 50
+        self._monitoring_active = False
+        self._monitor_thread: Optional[threading.Thread] = None
+
+        # 统计
+        self.stats = {
+            "total_events": 0,
+            "by_type": {},
+            "by_source": {},
+            "success_rate": 0,
+            "avg_duration_ms": 0,
+            "peak_hour": "",
+        }
+
+        # 实时指标
+        self.realtime_metrics = {
+            "events_last_5min": 0,
+            "events_last_hour": 0,
+            "active_agents": set(),
+            "error_rate_5min": 0,
+        }
+
+    def connect(self):
+        if self.conn is None:
+            self.conn = sqlite3.connect(str(self.db_path))
+            self.conn.row_factory = sqlite3.Row
+
+            cur = self.conn.cursor()
+
+            # 创建生产事件表
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS tvp_production_events (
+                    event_id TEXT PRIMARY KEY,
+                    timestamp REAL,
+                    event_type TEXT,
+                    source_agent TEXT,
+                    target_agent TEXT,
+                    task_type TEXT,
+                    success INTEGER DEFAULT 1,
+                    duration_ms REAL DEFAULT 0,
+                    metadata TEXT,
+                    processed INTEGER DEFAULT 0
+                )
+            """)
+
+            # 创建索引
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_tvp_prod_time
+                ON tvp_production_events(timestamp)
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_tvp_prod_type
+                ON tvp_production_events(event_type)
+            """)
+
+            self.conn.commit()
+        return self.conn
+
+    def close(self):
+        if self.conn:
+            self.conn.close()
+            self.conn = None
+
+    def record_event(
+        self,
+        event_type: str,
+        source_agent: str,
+        task_type: str,
+        target_agent: Optional[str] = None,
+        success: bool = True,
+        duration_ms: float = 0.0,
+        metadata: Optional[dict] = None,
+    ) -> str:
+        """
+        记录TVP生产事件
+
+        参数:
+            event_type: delegation / agent_start / agent_complete / etc.
+            source_agent: 发起Agent
+            task_type: 任务类型
+            target_agent: 目标Agent（可选）
+            success: 是否成功
+            duration_ms: 执行时长(毫秒)
+            metadata: 额外信息
+        """
+        event = TVPProductionEvent(
+            event_id=f"tvp_{uuid.uuid4().hex[:10]}",
+            timestamp=time.time(),
+            event_type=event_type,
+            source_agent=source_agent,
+            target_agent=target_agent,
+            task_type=task_type[:100],
+            success=success,
+            duration_ms=duration_ms,
+            metadata={
+                **(metadata or {}),
+                "recorded_by": "tvp_production_integrator",
+            },
+        )
+
+        with self._lock:
+            self._event_buffer.append(event)
+
+            # 更新统计
+            self.stats["total_events"] += 1
+
+            if event_type not in self.stats["by_type"]:
+                self.stats["by_type"][event_type] = 0
+            self.stats["by_type"][event_type] += 1
+
+            if source_agent not in self.stats["by_source"]:
+                self.stats["by_source"][source_agent] = {"total": 0, "success": 0}
+            self.stats["by_source"][source_agent]["total"] += 1
+            if success:
+                self.stats["by_source"][source_agent]["success"] += 1
+
+        # 批量写入
+        if len(self._event_buffer) >= self._buffer_size:
+            self.flush_to_db()
+
+        return event.event_id
+
+    def flush_to_db(self) -> int:
+        """将缓冲区事件写入数据库"""
+        with self._lock:
+            if not self._event_buffer:
+                return 0
+
+            events_to_write = self._event_buffer[:]
+            self._event_buffer.clear()
+
+        conn = self.connect()
+        cur = conn.cursor()
+
+        written = 0
+
+        for event in events_to_write:
+            try:
+                cur.execute("""
+                    INSERT INTO tvp_production_events
+                    (event_id, timestamp, event_type, source_agent,
+                     target_agent, task_type, success, duration_ms, metadata)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    event.event_id,
+                    event.timestamp,
+                    event.event_type,
+                    event.source_agent,
+                    event.target_agent,
+                    event.task_type,
+                    1 if event.success else 0,
+                    event.duration_ms,
+                    json.dumps(event.metadata, ensure_ascii=False),
+                ))
+
+                written += 1
+
+            except Exception as e:
+                print(f"写入TVP事件失败: {e}")
+
+        conn.commit()
+        self.close()
+
+        return written
+
+    def install_tvp_bridge_hook(self, tvp_bridge_instance) -> bool:
+        """
+        将集成器安装到TVPBridge实例
+
+        包装关键方法以捕获所有调度事件
+        """
+        try:
+            original_delegation = tvp_bridge_instance.declare_delegation_decision
+            original_agent_start = tvp_bridge_instance.declare_subagent_start
+            original_agent_complete = tvp_bridge_instance.declare_subagent_complete
+
+            def enhanced_delegation(*args, **kwargs):
+                result = original_delegation(*args, **kwargs)
+
+                # 提取参数
+                if args:
+                    strategy = args[0] if len(args) > 0 else kwargs.get("strategy", "")
+                    targets = args[2] if len(args) > 2 else kwargs.get("target_agents", [])
+
+                    self.record_event(
+                        event_type="delegation",
+                        source_agent="tianshu",
+                        task_type=f"delegation:{strategy}",
+                        target_agent=str(targets)[:50] if targets else None,
+                        metadata={"strategy": strategy},
+                    )
+
+                return result
+
+            def enhanced_agent_start(*args, **kwargs):
+                result = original_agent_start(*args, **kwargs)
+
+                if args:
+                    task_id = args[0] if len(args) > 0 else ""
+                    task_type = args[1] if len(args) > 1 else ""
+
+                    self.record_event(
+                        event_type="agent_start",
+                        source_agent=f"subagent:{task_id}" if task_id else "unknown",
+                        task_type=task_type or "unknown",
+                    )
+
+                return result
+
+            def enhanced_agent_complete(*args, **kwargs):
+                result = original_agent_complete(*args, **kwargs)
+
+                if len(args) >= 4:
+                    task_id, status, summary, duration_s = args[0], args[1], args[2], args[3]
+
+                    self.record_event(
+                        event_type="agent_complete",
+                        source_agent=f"subagent:{task_id}",
+                        task_type=status or "complete",
+                        success=status in ("completed", "success"),
+                        duration_ms=duration_s * 1000 if duration_s else 0,
+                        metadata={"summary": (summary or "")[:200]},
+                    )
+
+                return result
+
+            # 替换方法
+            tvp_bridge_instance.declare_delegation_decision = enhanced_delegation
+            tvp_bridge_instance.declare_subagent_start = enhanced_agent_start
+            tvp_bridge_instance.declare_subagent_complete = enhanced_agent_complete
+
+            print("✅ TVP生产集成已安装到TVPBridge")
+            return True
+
+        except Exception as e:
+            print(f"TVP Hook安装失败: {e}")
+            return False
+
+    def start_monitoring(self, interval_seconds: int = 60):
+        """启动后台监控线程"""
+        if self._monitoring_active:
+            print("⚠️ 监控已在运行")
+            return
+
+        self._monitoring_active = True
+
+        def monitor_loop():
+            while self._monitoring_active:
+                try:
+                    self.update_realtime_metrics()
+                    time.sleep(interval_seconds)
+                except Exception as e:
+                    print(f"监控错误: {e}")
+                    time.sleep(5)
+
+        self._monitor_thread = threading.Thread(target=monitor_loop, daemon=True)
+        self._monitor_thread.start()
+        print(f"✅ 监控已启动 (间隔: {interval_seconds}s)")
+
+    def stop_monitoring(self):
+        """停止监控"""
+        self._monitoring_active = False
+        if self._monitor_thread:
+            self._monitor_thread.join(timeout=5)
+        print("✅ 监控已停止")
+
+    def update_realtime_metrics(self):
+        """更新实时指标"""
+        conn = self.connect()
+        cur = conn.cursor()
+
+        now = time.time()
+        five_min_ago = now - 300
+        one_hour_ago = now - 3600
+
+        # 最近5分钟事件数
+        recent_5m = cur.execute("""
+            SELECT COUNT(*) FROM tvp_production_events
+            WHERE timestamp >= ?
+        """, (five_min_ago,)).fetchone()[0]
+
+        # 最近1小时事件数
+        recent_1h = cur.execute("""
+            SELECT COUNT(*) FROM tvp_production_events
+            WHERE timestamp >= ?
+        """, (one_hour_ago,)).fetchone()[0]
+
+        # 最近5分钟错误率
+        total_5m = recent_5m
+        errors_5m = cur.execute("""
+            SELECT COUNT(*) FROM tvp_production_events
+            WHERE timestamp >= ? AND success = 0
+        """, (five_min_ago,)).fetchone()[0]
+
+        error_rate = (errors_5m / total_5m * 100) if total_5m > 0 else 0
+
+        # 活跃Agent
+        active_agents_raw = cur.execute("""
+            SELECT DISTINCT source_agent FROM tvp_production_events
+            WHERE timestamp >= ?
+        """, (five_min_ago,)).fetchall()
+
+        self.realtime_metrics = {
+            "events_last_5min": recent_5m,
+            "events_last_hour": recent_1h,
+            "active_agents": {a[0] for a in active_agents_raw},
+            "error_rate_5min": round(error_rate, 1),
+            "updated_at": datetime.now().isoformat(),
+        }
+
+        self.close()
+
+    def generate_report(self, hours: int = 24) -> Dict[str, Any]:
+        """生成综合报告"""
+        conn = self.connect()
+        cur = conn.cursor()
+
+        since = time.time() - (hours * 3600)
+
+        report = {
+            "timestamp": datetime.now().isoformat(),
+            "period_hours": hours,
+            "overview": {},
+            "by_event_type": [],
+            "by_agent": [],
+            "realtime": dict(self.realtime_metrics),
+            "health_status": "healthy",
+            "recommendations": [],
+        }
+
+        # 总览统计
+        total = cur.execute("""
+            SELECT COUNT(*) FROM tvp_production_events
+            WHERE timestamp >= ?
+        """, (since,)).fetchone()[0]
+
+        success_total = cur.execute("""
+            SELECT COUNT(*) FROM tvp_production_events
+            WHERE timestamp >= ? AND success = 1
+        """, (since,)).fetchone()[0]
+
+        avg_duration = cur.execute("""
+            SELECT AVG(duration_ms) FROM tvp_production_events
+            WHERE timestamp >= ? AND duration_ms > 0
+        """, (since,)).fetchone()[0] or 0
+
+        report["overview"] = {
+            "total_events": total,
+            "success_count": success_total,
+            "success_rate": round(success_total / total * 100, 1) if total > 0 else 100,
+            "avg_duration_ms": round(avg_duration, 1),
+            "events_per_hour": round(total / hours, 1) if hours > 0 else 0,
+        }
+
+        # 按事件类型分布
+        by_type = cur.execute("""
+            SELECT event_type, COUNT(*) as cnt,
+                   SUM(CASE WHEN success=1 THEN 1 ELSE 0 END) as success_cnt
+            FROM tvp_production_events
+            WHERE timestamp >= ?
+            GROUP BY event_type
+            ORDER BY cnt DESC
+        """, (since,)).fetchall()
+
+        for bt in by_type:
+            rate = round(bt[2] / bt[1] * 100, 1) if bt[1] > 0 else 0
+            report["by_event_type"].append({
+                "type": bt[0],
+                "count": bt[1],
+                "success_rate": rate,
+            })
+
+        # 按Agent分布
+        by_agent = cur.execute("""
+            SELECT source_agent, COUNT(*) as cnt,
+                   SUM(CASE WHEN success=1 THEN 1 ELSE 0 END) as success_cnt,
+                   AVG(duration_ms) as avg_dur
+            FROM tvp_production_events
+            WHERE timestamp >= ?
+            GROUP BY source_agent
+            ORDER BY cnt DESC
+            LIMIT 15
+        """, (since,)).fetchall()
+
+        for ba in by_agent:
+            rate = round(ba[2] / ba[1] * 100, 1) if ba[1] > 0 else 0
+            report["by_agent"].append({
+                "agent": ba[0],
+                "invocations": ba[1],
+                "success_rate": rate,
+                "avg_duration_ms": round(ba[3] or 0, 1),
+            })
+
+        # 健康状态评估
+        error_rate = 100 - report["overview"]["success_rate"]
+        if error_rate > 20:
+            report["health_status"] = "warning"
+            report["recommendations"].append(f"错误率{error_rate:.1f}%偏高，建议检查Agent能力")
+        elif error_rate > 40:
+            report["health_status"] = "critical"
+            report["recommendations"].append(f"错误率{error_rate:.1f}%严重，需立即排查")
+
+        if report["realtime"]["error_rate_5min"] > 30:
+            report["health_status"] = max(report["health_status"], "warning")
+            report["recommendations"].append("最近5分钟错误率飙升")
+
+        if not report["recommendations"]:
+            report["recommendations"].append("系统运行正常")
+
+        self.close()
+        return report
+
+
+def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="TVP生产集成工具")
+    parser.add_argument("--install", action="store_true", help="安装集成")
+    parser.add_argument("--simulate", action="store_true", help="模拟生产事件")
+    parser.add_argument("--flush", action="store_true", help="刷新缓冲区")
+    parser.add_argument("--report", action="store_true", help="生成报告")
+    parser.add_argument("--hours", type=int, default=24, help="报告时间范围(小时)")
+    args = parser.parse_args()
+
+    integrator = TVPProductionIntegrator()
+
+    if args.install:
+        print("\n=== 安装TVP生产集成 ===\n")
+        integrator.connect()
+        print("✅ 数据库表已就绪")
+        print("✅ 集成器初始化完成")
+        print("\n使用说明:")
+        print("  from core.orchestration.tvp_bridge import TVPBridge")
+        print("  from core.orchestration.tvp_production_integration import TVPProductionIntegrator")
+        print("  bridge = TVPBridge()")
+        print("  integrator = TVPProductionIntegrator()")
+        print("  integrator.install_tvp_bridge_hook(bridge)")
+        integrator.close()
+
+    if args.simulate:
+        print("\n=== 模拟生产事件 ===\n")
+        import random
+
+        agents = ["@tianshu", "@yiku", "@miaobi", "@mingjing", "@dongcha"]
+        tasks = [
+            ("delegation", "任务分发"),
+            ("agent_start", "开始执行"),
+            ("agent_complete", "执行完成"),
+            ("cron_trigger", "定时触发"),
+            ("tool_call", "工具调用"),
+        ]
+
+        for _ in range(random.randint(10, 30)):
+            agent = random.choice(agents)
+            ttype, tdesc = random.choice(tasks)
+            success = random.random() > 0.15  # 85%成功率
+
+            eid = integrator.record_event(
+                event_type=ttype,
+                source_agent=agent,
+                task_type=tdesc,
+                success=success,
+                duration_ms=random.uniform(100, 5000),
+            )
+            time.sleep(0.01)
+
+        count = integrator.flush_to_db()
+        print(f"✅ 已模拟并写入 {count} 条事件")
+
+    if args.flush:
+        count = integrator.flush_to_db()
+        print(f"\n✅ 刷新了 {count} 条事件")
+
+    if args.report:
+        print(f"\n=== TVP生产报告 ({args.hours}h) ===\n")
+        report = integrator.generate_report(hours=args.hours)
+        print(json.dumps(report, indent=2, ensure_ascii=False, default=str))
+
+    if not any([args.install, args.simulate, args.flush, args.report]):
+        parser.print_help()
+
+
+if __name__ == "__main__":
+    main()

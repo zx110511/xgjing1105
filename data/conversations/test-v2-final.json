@@ -1,0 +1,26 @@
+{
+  "id": "test-v2-final",
+  "title": "新对话",
+  "messages": [
+    {
+      "id": "msg-62be0f7e",
+      "role": "user",
+      "content": "你好，请用一句话介绍你自己",
+      "timestamp": 1782100623.911801,
+      "token_count": 13
+    },
+    {
+      "id": "msg-6829919d",
+      "role": "assistant",
+      "content": "[AI回复] 已收到消息: 你好，请用一句话介绍你自己...",
+      "timestamp": 1782100623.911801,
+      "token_count": 30
+    }
+  ],
+  "total_tokens": 0,
+  "summary": "",
+  "created_at": 1782100623.9106917,
+  "updated_at": 1782100623.911801,
+  "message_count": 2,
+  "pinned": false
+}

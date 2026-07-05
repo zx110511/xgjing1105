@@ -1,0 +1,61 @@
+# 天机v9.0 核心依赖
+# Python 3.12+
+
+# Web框架
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+python-multipart>=0.0.6
+websockets>=12.0
+starlette>=0.36.0
+
+# 测试框架
+pytest>=8.0.0
+pytest-cov>=4.1.0
+pytest-asyncio>=0.23.0
+pytest-benchmark>=4.0.0
+
+# 代码质量
+ruff>=0.3.0
+mypy>=1.8.0
+bandit>=1.7.0
+
+# 安全检查
+safety>=3.0.0
+
+# 核心依赖
+pydantic>=2.5.0
+python-dotenv>=1.0.0
+PyYAML>=6.0.1
+
+# 数据库
+aiosqlite>=0.19.0
+
+# 异步
+aiofiles>=23.2.0
+aiohttp>=3.9.0
+
+# LLM集成
+httpx>=0.27.0
+openai>=1.12.0
+
+# 向量搜索
+numpy>=1.26.0
+
+# 日志
+loguru>=0.7.2
+
+# 进度条
+tqdm>=4.66.0
+
+# 类型检查
+types-PyYAML>=6.0.12
+types-aiofiles>=23.2.0
+
+# 构建工具
+build>=1.0.0
+wheel>=0.42.0
+setuptools>=69.0.0
+
+# 托盘图标
+pystray>=0.19.0
+Pillow>=10.0.0

@@ -1,0 +1,772 @@
+{
+  "timestamp": "2026-07-03 05:06:15",
+  "service_health": {
+    "status": "healthy",
+    "version": "9.1.0-sss",
+    "edition": "source-v9.1",
+    "engine_ready": true,
+    "layers": {
+      "sensory": {
+        "size_bytes": 612775,
+        "max_size_bytes": 10485760,
+        "hard_cap_bytes": 12582912,
+        "entry_count": 1407,
+        "max_entries": 2000,
+        "usage_ratio": 0.0584,
+        "capacity_threshold": 0.85,
+        "accumulation_threshold_bytes": 2097152,
+        "accumulation_threshold_entries": 100,
+        "accumulated_bytes": 0,
+        "accumulated_entries": 0,
+        "accumulation_ratio": 0.0,
+        "accumulation_entry_ratio": 0.0,
+        "needs_consolidation": false,
+        "at_hard_cap": false,
+        "seconds_since_last_consolidation": 1783026370.9
+      },
+      "working": {
+        "size_bytes": 531742,
+        "max_size_bytes": 52428800,
+        "hard_cap_bytes": 62914560,
+        "entry_count": 517,
+        "max_entries": 1000,
+        "usage_ratio": 0.0101,
+        "capacity_threshold": 0.8,
+        "accumulation_threshold_bytes": 4194304,
+        "accumulation_threshold_entries": 50,
+        "accumulated_bytes": 0,
+        "accumulated_entries": 0,
+        "accumulation_ratio": 0.0,
+        "accumulation_entry_ratio": 0.0,
+        "needs_consolidation": false,
+        "at_hard_cap": false,
+        "seconds_since_last_consolidation": 1783026370.9
+      },
+      "short_term": {
+        "size_bytes": 1784530,
+        "max_size_bytes": 209715200,
+        "hard_cap_bytes": 262144000,
+        "entry_count": 3412,
+        "max_entries": 5000,
+        "usage_ratio": 0.0085,
+        "capacity_threshold": 0.75,
+        "accumulation_threshold_bytes": 2097152,
+        "accumulation_threshold_entries": 50,
+        "accumulated_bytes": 0,
+        "accumulated_entries": 0,
+        "accumulation_ratio": 0.0,
+        "accumulation_entry_ratio": 0.0,
+        "needs_consolidation": false,
+        "at_hard_cap": false,
+        "seconds_since_last_consolidation": 1783026370.9
+      },
+      "episodic": {
+        "size_bytes": 839365,
+        "max_size_bytes": 524288000,
+        "hard_cap_bytes": 629145600,
+        "entry_count": 4366,
+        "max_entries": 5000,
+        "usage_ratio": 0.0016,
+        "capacity_threshold": 0.8,
+        "accumulation_threshold_bytes": 10485760,
+        "accumulation_threshold_entries": 50,
+        "accumulated_bytes": 0,
+        "accumulated_entries": 0,
+        "accumulation_ratio": 0.0,
+        "accumulation_entry_ratio": 0.0,
+        "needs_consolidation": false,
+        "at_hard_cap": false,
+        "seconds_since_last_consolidation": 1783026370.9
+      },
+      "semantic": {
+        "size_bytes": 536252,
+        "max_size_bytes": 2147483648,
+        "hard_cap_bytes": 2621440000,
+        "entry_count": 7949,
+        "max_entries": 10000,
+        "usage_ratio": 0.0002,
+        "capacity_threshold": 0.85,
+        "accumulation_threshold_bytes": 52428800,
+        "accumulation_threshold_entries": 60,
+        "accumulated_bytes": 0,
+        "accumulated_entries": 0,
+        "accumulation_ratio": 0.0,
+        "accumulation_entry_ratio": 0.0,
+        "needs_consolidation": false,
+        "at_hard_cap": false,
+        "seconds_since_last_consolidation": 1783026370.9
+      },
+      "meta": {
+        "size_bytes": 9532926,
+        "max_size_bytes": 524288000,
+        "hard_cap_bytes": 629145600,
+        "entry_count": 70807,
+        "max_entries": 100000,
+        "usage_ratio": 0.0182,
+        "capacity_threshold": 0.9,
+        "accumulation_threshold_bytes": 10485760,
+        "accumulation_threshold_entries": 50,
+        "accumulated_bytes": 0,
+        "accumulated_entries": 0,
+        "accumulation_ratio": 0.0,
+        "accumulation_entry_ratio": 0.0,
+        "needs_consolidation": false,
+        "at_hard_cap": false,
+        "seconds_since_last_consolidation": 1783026370.9
+      }
+    },
+    "uptime_seconds": 59298.1,
+    "protocol_mode": true,
+    "event_wiring": true
+  },
+  "total_tools": 75,
+  "total_passed": 27,
+  "total_failed": 48,
+  "overall_pass_rate": 36.0,
+  "server_stats": {
+    "memory-engine-global": {
+      "total": 43,
+      "passed": 7,
+      "failed": 36,
+      "skipped": 0,
+      "pass_rate": 16.28
+    },
+    "agent-framework-global": {
+      "total": 5,
+      "passed": 3,
+      "failed": 2,
+      "skipped": 0,
+      "pass_rate": 60.0
+    },
+    "command-executor": {
+      "total": 9,
+      "passed": 7,
+      "failed": 2,
+      "skipped": 0,
+      "pass_rate": 77.78
+    },
+    "security-scanner": {
+      "total": 6,
+      "passed": 4,
+      "failed": 2,
+      "skipped": 0,
+      "pass_rate": 66.67
+    },
+    "performance-profiler": {
+      "total": 6,
+      "passed": 2,
+      "failed": 4,
+      "skipped": 0,
+      "pass_rate": 33.33
+    },
+    "ops-engine": {
+      "total": 6,
+      "passed": 4,
+      "failed": 2,
+      "skipped": 0,
+      "pass_rate": 66.67
+    }
+  },
+  "results": [
+    {
+      "server": "memory-engine-global",
+      "tool": "memory_remember",
+      "status": "fail",
+      "elapsed_ms": 25.79,
+      "error": "HTTP 404: {\"detail\":\"Not Found\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "memory-engine-global",
+      "tool": "memory_recall",
+      "status": "fail",
+      "elapsed_ms": 6.95,
+      "error": "HTTP 404: {\"detail\":\"Not Found\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "memory-engine-global",
+      "tool": "memory_forget",
+      "status": "fail",
+      "elapsed_ms": 17.5,
+      "error": "HTTP 404: {\"detail\":\"Not Found\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "memory-engine-global",
+      "tool": "memory_stats",
+      "status": "fail",
+      "elapsed_ms": 20.83,
+      "error": "HTTP 404: {\"detail\":\"Not Found\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "memory-engine-global",
+      "tool": "memory_capacity",
+      "status": "fail",
+      "elapsed_ms": 31.6,
+      "error": "HTTP 404: {\"detail\":\"Not Found\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "memory-engine-global",
+      "tool": "memory_consolidate",
+      "status": "fail",
+      "elapsed_ms": 31.2,
+      "error": "HTTP 404: {\"detail\":\"Not Found\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "memory-engine-global",
+      "tool": "search_memories",
+      "status": "pass",
+      "elapsed_ms": 2710.16,
+      "error": "",
+      "result_preview": "{'status': 'success', 'results': [{'id': '44b8bf9ccb5e29b6', 'content': '测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测"
+    },
+    {
+      "server": "memory-engine-global",
+      "tool": "tianji_semantic_search",
+      "status": "fail",
+      "elapsed_ms": 2.53,
+      "error": "HTTP 404: {\"detail\":\"Not Found\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "memory-engine-global",
+      "tool": "tianji_expand_query",
+      "status": "fail",
+      "elapsed_ms": 16.07,
+      "error": "HTTP 404: {\"detail\":\"Not Found\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "memory-engine-global",
+      "tool": "tianji_classify",
+      "status": "fail",
+      "elapsed_ms": 14.14,
+      "error": "HTTP 404: {\"detail\":\"Not Found\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "memory-engine-global",
+      "tool": "tianji_auto_tag",
+      "status": "fail",
+      "elapsed_ms": 4.41,
+      "error": "HTTP 404: {\"detail\":\"Not Found\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "memory-engine-global",
+      "tool": "tianji_summarize",
+      "status": "fail",
+      "elapsed_ms": 5.3,
+      "error": "HTTP 404: {\"detail\":\"Not Found\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "memory-engine-global",
+      "tool": "tianji_extract_knowledge",
+      "status": "fail",
+      "elapsed_ms": 5.15,
+      "error": "HTTP 404: {\"detail\":\"Not Found\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "memory-engine-global",
+      "tool": "memory_build_graph",
+      "status": "fail",
+      "elapsed_ms": 3.71,
+      "error": "HTTP 404: {\"detail\":\"Not Found\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "memory-engine-global",
+      "tool": "memory_query_graph",
+      "status": "fail",
+      "elapsed_ms": 27.4,
+      "error": "HTTP 404: {\"detail\":\"Not Found\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "memory-engine-global",
+      "tool": "build_working_representation",
+      "status": "fail",
+      "elapsed_ms": 16.74,
+      "error": "HTTP 422: {\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"query\"],\"msg\":\"Field required\",\"input\":{\"session_id\":\"test-session-001\",\"context\":\"测试上下文\"}}]}",
+      "result_preview": ""
+    },
+    {
+      "server": "memory-engine-global",
+      "tool": "tianji_intercept",
+      "status": "fail",
+      "elapsed_ms": 15.89,
+      "error": "HTTP 404: {\"detail\":\"Not Found\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "memory-engine-global",
+      "tool": "context_extract",
+      "status": "pass",
+      "elapsed_ms": 19.45,
+      "error": "",
+      "result_preview": "{'status': 'success', 'input_length': 11, 'keywords': ['帮我分析这段代码的问题'], 'primary_intent': '代码任务', 'intent_scores': {'代码任务': 1, '查询分析': 1}, 'all_detected_intents': ['代码任务', '查询分析'], 'entities': {}, 'lan"
+    },
+    {
+      "server": "memory-engine-global",
+      "tool": "tianji_normalize",
+      "status": "fail",
+      "elapsed_ms": 24.23,
+      "error": "HTTP 404: {\"detail\":\"Not Found\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "memory-engine-global",
+      "tool": "tianji_disambiguate",
+      "status": "fail",
+      "elapsed_ms": 3.6,
+      "error": "HTTP 404: {\"detail\":\"Not Found\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "memory-engine-global",
+      "tool": "tianji_health",
+      "status": "fail",
+      "elapsed_ms": 28.11,
+      "error": "HTTP 404: {\"detail\":\"Not Found\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "memory-engine-global",
+      "tool": "tianji_help",
+      "status": "fail",
+      "elapsed_ms": 3.65,
+      "error": "HTTP 404: {\"detail\":\"Not Found\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "memory-engine-global",
+      "tool": "system_status",
+      "status": "fail",
+      "elapsed_ms": 27.71,
+      "error": "HTTP 405: {\"detail\":\"Method Not Allowed\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "memory-engine-global",
+      "tool": "tianji_tool_owner",
+      "status": "fail",
+      "elapsed_ms": 15.43,
+      "error": "HTTP 404: {\"detail\":\"Not Found\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "memory-engine-global",
+      "tool": "rule_evaluate",
+      "status": "pass",
+      "elapsed_ms": 15.15,
+      "error": "",
+      "result_preview": "{'status': 'error', 'error': 'rule_name必填', 'message': '请通过 rule_name 字段指定规则名称'}"
+    },
+    {
+      "server": "memory-engine-global",
+      "tool": "get_session_digest",
+      "status": "fail",
+      "elapsed_ms": 5.66,
+      "error": "HTTP 422: {\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"session_key\"],\"msg\":\"Field required\",\"input\":{\"session_id\":\"test-session\"}}]}",
+      "result_preview": ""
+    },
+    {
+      "server": "memory-engine-global",
+      "tool": "tianji_summarize_conversation",
+      "status": "fail",
+      "elapsed_ms": 25.54,
+      "error": "HTTP 404: {\"detail\":\"Not Found\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "memory-engine-global",
+      "tool": "explain_memory_lineage",
+      "status": "pass",
+      "elapsed_ms": 15.08,
+      "error": "",
+      "result_preview": "{'status': 'success', 'lineage': {'memory_id': 'test-mem-001', 'derived_from': None}}"
+    },
+    {
+      "server": "memory-engine-global",
+      "tool": "tianji_export",
+      "status": "fail",
+      "elapsed_ms": 15.47,
+      "error": "HTTP 404: {\"detail\":\"Not Found\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "memory-engine-global",
+      "tool": "list_memories",
+      "status": "pass",
+      "elapsed_ms": 201.66,
+      "error": "",
+      "result_preview": "{'status': 'success', 'results': [{'id': 'mig_1d145b49845e', 'content': '[working->short_term] [sensory->working] [TVP推送记录] event_id=4eeffe6bd840, source=auto_scheduler, timestamp=1779357576.727219, m"
+    },
+    {
+      "server": "memory-engine-global",
+      "tool": "get_memory",
+      "status": "fail",
+      "elapsed_ms": 16.49,
+      "error": "HTTP 422: {\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"memory_id\"],\"msg\":\"Field required\",\"input\":{\"entry_id\":\"test-mem-001\"}}]}",
+      "result_preview": ""
+    },
+    {
+      "server": "memory-engine-global",
+      "tool": "agent_dispatch",
+      "status": "pass",
+      "elapsed_ms": 16.24,
+      "error": "",
+      "result_preview": "{'status': 'error', 'error': 'task必填', 'message': '请通过 task 字段描述任务'}"
+    },
+    {
+      "server": "memory-engine-global",
+      "tool": "memory_learn_skill",
+      "status": "fail",
+      "elapsed_ms": 5.46,
+      "error": "HTTP 404: {\"detail\":\"Not Found\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "memory-engine-global",
+      "tool": "memory_capture_multimodal",
+      "status": "fail",
+      "elapsed_ms": 4.12,
+      "error": "HTTP 404: {\"detail\":\"Not Found\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "memory-engine-global",
+      "tool": "run_reflective_cycle",
+      "status": "pass",
+      "elapsed_ms": 398.63,
+      "error": "",
+      "result_preview": "{'status': 'success', 'dream_stats': {'memories_derived': 20, 'connections_found': 497, 'contradictions_detected': 0, 'digests_updated': 0}}"
+    },
+    {
+      "server": "memory-engine-global",
+      "tool": "memory_update",
+      "status": "fail",
+      "elapsed_ms": 25.28,
+      "error": "HTTP 404: {\"detail\":\"Not Found\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "memory-engine-global",
+      "tool": "search_quick",
+      "status": "fail",
+      "elapsed_ms": 16.45,
+      "error": "HTTP 404: {\"detail\":\"Not Found\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "memory-engine-global",
+      "tool": "memory_insert",
+      "status": "fail",
+      "elapsed_ms": 16.22,
+      "error": "HTTP 404: {\"detail\":\"Not Found\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "memory-engine-global",
+      "tool": "memory_replace",
+      "status": "fail",
+      "elapsed_ms": 3.63,
+      "error": "HTTP 404: {\"detail\":\"Not Found\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "memory-engine-global",
+      "tool": "memory_rethink",
+      "status": "fail",
+      "elapsed_ms": 27.75,
+      "error": "HTTP 404: {\"detail\":\"Not Found\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "memory-engine-global",
+      "tool": "memory_share",
+      "status": "fail",
+      "elapsed_ms": 15.14,
+      "error": "HTTP 404: {\"detail\":\"Not Found\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "memory-engine-global",
+      "tool": "memory_recall_shared",
+      "status": "fail",
+      "elapsed_ms": 13.39,
+      "error": "HTTP 404: {\"detail\":\"Not Found\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "memory-engine-global",
+      "tool": "memory_list_shared",
+      "status": "fail",
+      "elapsed_ms": 18.02,
+      "error": "HTTP 404: {\"detail\":\"Not Found\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "agent-framework-global",
+      "tool": "context_extract",
+      "status": "pass",
+      "elapsed_ms": 13.84,
+      "error": "",
+      "result_preview": "{'status': 'success', 'input_length': 11, 'keywords': ['帮我分析这段代码的问题'], 'primary_intent': '代码任务', 'intent_scores': {'代码任务': 1, '查询分析': 1}, 'all_detected_intents': ['代码任务', '查询分析'], 'entities': {}, 'lan"
+    },
+    {
+      "server": "agent-framework-global",
+      "tool": "agent_dispatch",
+      "status": "pass",
+      "elapsed_ms": 3.73,
+      "error": "",
+      "result_preview": "{'status': 'error', 'error': 'task必填', 'message': '请通过 task 字段描述任务'}"
+    },
+    {
+      "server": "agent-framework-global",
+      "tool": "system_status",
+      "status": "fail",
+      "elapsed_ms": 27.24,
+      "error": "HTTP 405: {\"detail\":\"Method Not Allowed\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "agent-framework-global",
+      "tool": "rule_evaluate",
+      "status": "pass",
+      "elapsed_ms": 15.93,
+      "error": "",
+      "result_preview": "{'status': 'error', 'error': 'rule_name必填', 'message': '请通过 rule_name 字段指定规则名称'}"
+    },
+    {
+      "server": "agent-framework-global",
+      "tool": "pipeline_create",
+      "status": "fail",
+      "elapsed_ms": 17.16,
+      "error": "HTTP 404: {\"detail\":\"Not Found\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "command-executor",
+      "tool": "execute_command",
+      "status": "pass",
+      "elapsed_ms": 212.56,
+      "error": "",
+      "result_preview": "{'status': 'success', 'returncode': 0, 'stdout': 'test\\n', 'stderr': ''}"
+    },
+    {
+      "server": "command-executor",
+      "tool": "check_command",
+      "status": "pass",
+      "elapsed_ms": 2.53,
+      "error": "",
+      "result_preview": "{'status': 'success', 'command_id': 'test-cmd-001', 'state': 'completed'}"
+    },
+    {
+      "server": "command-executor",
+      "tool": "stop_command",
+      "status": "pass",
+      "elapsed_ms": 14.75,
+      "error": "",
+      "result_preview": "{'status': 'success', 'command_id': 'test-cmd-001', 'stopped': True}"
+    },
+    {
+      "server": "command-executor",
+      "tool": "list_processes",
+      "status": "fail",
+      "elapsed_ms": 3.61,
+      "error": "HTTP 405: {\"detail\":\"Method Not Allowed\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "command-executor",
+      "tool": "get_process_info",
+      "status": "pass",
+      "elapsed_ms": 41.36,
+      "error": "",
+      "result_preview": "{'status': 'success', 'pid': 0, 'name': 'System Idle Process', 'cpu_percent': 0.0, 'memory_info': 'pmem(rss=8192, vms=61440, num_page_faults=9, peak_wset=8192, wset=8192, peak_paged_pool=0, paged_pool"
+    },
+    {
+      "server": "command-executor",
+      "tool": "kill_process",
+      "status": "pass",
+      "elapsed_ms": 16.6,
+      "error": "",
+      "result_preview": "{'status': 'error', 'message': '(pid=0)'}"
+    },
+    {
+      "server": "command-executor",
+      "tool": "run_script",
+      "status": "pass",
+      "elapsed_ms": 1.49,
+      "error": "",
+      "result_preview": "{'status': 'success', 'script_path': '', 'message': 'script execution queued'}"
+    },
+    {
+      "server": "command-executor",
+      "tool": "get_script_status",
+      "status": "pass",
+      "elapsed_ms": 13.83,
+      "error": "",
+      "result_preview": "{'status': 'success', 'script_id': 'test-script-001', 'state': 'idle'}"
+    },
+    {
+      "server": "command-executor",
+      "tool": "list_scripts",
+      "status": "fail",
+      "elapsed_ms": 3.6,
+      "error": "HTTP 405: {\"detail\":\"Method Not Allowed\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "security-scanner",
+      "tool": "scan_vulnerabilities",
+      "status": "pass",
+      "elapsed_ms": 11.75,
+      "error": "",
+      "result_preview": "{'status': 'success', 'vulnerabilities': [], 'severity_summary': {'critical': 0, 'high': 0, 'medium': 0, 'low': 0}, 'scanned_at': 1783026375.2286756}"
+    },
+    {
+      "server": "security-scanner",
+      "tool": "check_compliance",
+      "status": "pass",
+      "elapsed_ms": 3.23,
+      "error": "",
+      "result_preview": "{'status': 'success', 'standard': 'owasp', 'compliant': True, 'checks_passed': 10, 'checks_total': 10}"
+    },
+    {
+      "server": "security-scanner",
+      "tool": "get_security_report",
+      "status": "fail",
+      "elapsed_ms": 13.33,
+      "error": "HTTP 405: {\"detail\":\"Method Not Allowed\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "security-scanner",
+      "tool": "scan_dependencies",
+      "status": "pass",
+      "elapsed_ms": 13.94,
+      "error": "",
+      "result_preview": "{'status': 'success', 'dependencies_scanned': 0, 'vulnerable': [], 'message': 'scan completed'}"
+    },
+    {
+      "server": "security-scanner",
+      "tool": "check_permissions",
+      "status": "pass",
+      "elapsed_ms": 17.47,
+      "error": "",
+      "result_preview": "{'status': 'success', 'path': '.', 'permissions_ok': True, 'issues': []}"
+    },
+    {
+      "server": "security-scanner",
+      "tool": "list_security_policies",
+      "status": "fail",
+      "elapsed_ms": 4.18,
+      "error": "HTTP 405: {\"detail\":\"Method Not Allowed\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "performance-profiler",
+      "tool": "profile_function",
+      "status": "pass",
+      "elapsed_ms": 25.4,
+      "error": "",
+      "result_preview": "{'status': 'success', 'function': 'TianjiMCPBridge', 'duration_ms': 1.23, 'calls': 42}"
+    },
+    {
+      "server": "performance-profiler",
+      "tool": "get_performance_metrics",
+      "status": "fail",
+      "elapsed_ms": 16.32,
+      "error": "HTTP 405: {\"detail\":\"Method Not Allowed\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "performance-profiler",
+      "tool": "analyze_bottleneck",
+      "status": "pass",
+      "elapsed_ms": 15.26,
+      "error": "",
+      "result_preview": "{'status': 'success', 'bottlenecks': [], 'top_slow_query': None, 'recommendation': 'no bottlenecks detected'}"
+    },
+    {
+      "server": "performance-profiler",
+      "tool": "get_memory_profile",
+      "status": "fail",
+      "elapsed_ms": 3.65,
+      "error": "HTTP 405: {\"detail\":\"Method Not Allowed\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "performance-profiler",
+      "tool": "get_cpu_profile",
+      "status": "fail",
+      "elapsed_ms": 3.87,
+      "error": "HTTP 405: {\"detail\":\"Method Not Allowed\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "performance-profiler",
+      "tool": "list_profiling_sessions",
+      "status": "fail",
+      "elapsed_ms": 1.51,
+      "error": "HTTP 405: {\"detail\":\"Method Not Allowed\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "ops-engine",
+      "tool": "deploy_service",
+      "status": "pass",
+      "elapsed_ms": 21.72,
+      "error": "",
+      "result_preview": "{'status': 'success', 'service': 'test-service', 'deployment_id': 'dep-1783026375', 'state': 'deployed'}"
+    },
+    {
+      "server": "ops-engine",
+      "tool": "check_deployment",
+      "status": "pass",
+      "elapsed_ms": 14.77,
+      "error": "",
+      "result_preview": "{'status': 'success', 'deployment_id': '', 'health': 'healthy', 'uptime_s': 3600}"
+    },
+    {
+      "server": "ops-engine",
+      "tool": "rollback_deployment",
+      "status": "pass",
+      "elapsed_ms": 14.5,
+      "error": "",
+      "result_preview": "{'status': 'success', 'deployment_id': '', 'rolled_back': True}"
+    },
+    {
+      "server": "ops-engine",
+      "tool": "get_resource_usage",
+      "status": "fail",
+      "elapsed_ms": 3.11,
+      "error": "HTTP 405: {\"detail\":\"Method Not Allowed\"}",
+      "result_preview": ""
+    },
+    {
+      "server": "ops-engine",
+      "tool": "scale_service",
+      "status": "pass",
+      "elapsed_ms": 11.57,
+      "error": "",
+      "result_preview": "{'status': 'success', 'service': 'test-service', 'replicas': 2, 'scaled': True}"
+    },
+    {
+      "server": "ops-engine",
+      "tool": "list_services",
+      "status": "fail",
+      "elapsed_ms": 15.57,
+      "error": "HTTP 405: {\"detail\":\"Method Not Allowed\"}",
+      "result_preview": ""
+    }
+  ]
+}

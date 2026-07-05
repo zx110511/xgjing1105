@@ -1,0 +1,504 @@
+> r"""
+> 天机 (TIANJI) - 独立配置管理 v8.1
+> ============================================
+> 天机AI平台化研究独立体系 | 自进化闭环架构
+  
+> M28升级: ConfigManager管理类 + StoragePathConfig(D9-1) + EvolutionLoop + health()
+> 灵境道谱溯源: D9-1【存储路径煞】· 道九·配置体 · 四地煞之配之术
+>   - 15个标准化存储子路径 + 自动创建 + 权限校验 + 合规审计
+>   - 源文件: core/config.py → StoragePathConfig + ConfigManager
+  
+> 系统标识:
+>   name:          天机 v8.1
+>   codename:      天机·平台化研究版
+>   source:        《天机·星枢运转》— 智能驱动，AI自主运行
+>   version:       v8.1
+>   port:          8771
+>   root:          D:\元初系统\天机v8.1
+>   架构:          天机原生 + 多智能体协同 + 自进化闭环
+> """
+  
+> import os
+> import logging
+> from pathlib import Path
+> from dataclasses import dataclass, field
+> from typing import Optional, List, Dict, Any
+  
+> logger = logging.getLogger("tianji.config")
+  
+> try:
+>     from .version import __version__, __edition__, get_version_string, SYSTEM_IDENTITY as _VERSION_IDENTITY
+! except ImportError:
+!     __version__ = "9.0.0"
+!     __edition__ = "source-v8.1-fusion"
+!     def get_version_string(short=False): return "9.0.0-fusion" if not short else "9.0.0"
+!     _VERSION_IDENTITY = {"name": "天机", "version": __version__}
+  
+> try:
+>     from .evolution_loop import EvolutionLoop, CausalPairRecorder
+! except ImportError:
+!     EvolutionLoop = None
+!     CausalPairRecorder = None
+  
+> SYSTEM_IDENTITY = {
+>     "name": _VERSION_IDENTITY.get("name", "天机"),
+>     "name_en": f"TIANJI v{get_version_string(short=True)}",
+>     "codename": "天枢",
+>     "codename_en": "TIANSHU",
+>     "version": get_version_string(short=True),
+>     "classical_source": "《天机·星枢运转》— 智能驱动，AI自主运行",
+>     "tag": f"【天机·智能v{get_version_string(short=True)}】",
+>     "port": 8771,
+>     "edition": "source-v8.1-fusion",
+> }
+  
+> AI_MEMORY_ROOT = Path(os.environ.get(
+>     "AI_MEMORY_ROOT",
+>     str(Path(__file__).resolve().parent.parent)
+> ))
+> MEMORY_DATA_PATH = Path(os.environ.get(
+>     "AI_MEMORY_DATA",
+>     AI_MEMORY_ROOT / "data" / ".memory"
+> ))
+  
+> PYTHON_EXECUTABLE = AI_MEMORY_ROOT / "python" / "python.exe"
+  
+  
+> def get_python_executable() -> Path:
+!     if PYTHON_EXECUTABLE.exists():
+!         return PYTHON_EXECUTABLE
+!     import sys
+!     return Path(sys.executable)
+  
+  
+> @dataclass
+> class MemoryLayerConfig:
+>     name: str
+>     layer_index: int
+>     max_size_bytes: int
+>     max_entries: int
+>     capacity_threshold: float
+>     accumulation_threshold_bytes: int
+>     accumulation_threshold_entries: int
+>     hard_cap_bytes: int
+>     min_consolidation_interval_seconds: float
+>     priority: str
+>     description: str
+  
+>     @property
+>     def max_size_mb(self) -> float:
+!         return self.max_size_bytes / (1024 * 1024)
+  
+>     @property
+>     def accumulation_threshold_mb(self) -> float:
+!         return self.accumulation_threshold_bytes / (1024 * 1024)
+  
+>     @property
+>     def hard_cap_mb(self) -> float:
+!         return self.hard_cap_bytes / (1024 * 1024)
+  
+  
+> @dataclass
+> class QualityGateConfig:
+>     min_content_length: int = 10
+>     max_similarity_for_duplicate: float = 0.85
+>     minimum_value_score_for_direct_write: float = 0.3
+>     noise_patterns: List[str] = field(default_factory=lambda: [
+>         "嗯", "哦", "好", "行", "OK", "ok", "是的", "对",
+>     ])
+>     require_tags_for_layers: List[str] = field(default_factory=lambda: [
+>         "episodic", "semantic", "meta"
+>     ])
+>     require_upstream_for_layers: List[str] = field(default_factory=lambda: [
+>         "semantic", "meta"
+>     ])
+>     auto_downgrade_noisy_to: str = "sensory"
+>     conflict_detection_enabled: bool = True
+>     max_conflict_retention: int = 5
+  
+  
+> @dataclass
+> class PromotionScoreWeights:
+>     priority_weight: float = 0.30
+>     effectiveness: float = 0.20
+>     recency: float = 0.10
+>     access_count: float = 0.10
+>     upstream_depth: float = 0.15
+>     connectedness: float = 0.15
+  
+  
+> @dataclass
+> class ICMEConfig:
+>     layers: list[MemoryLayerConfig] = field(default_factory=lambda: [
+>         MemoryLayerConfig(
+>             name="sensory", layer_index=0,
+>             max_size_bytes=10 * 1024 * 1024, max_entries=2000,
+>             capacity_threshold=0.85,
+>             accumulation_threshold_bytes=2 * 1024 * 1024,
+>             accumulation_threshold_entries=100,
+>             hard_cap_bytes=12 * 1024 * 1024,
+>             min_consolidation_interval_seconds=30.0,
+>             priority="low",
+>             description="感知记忆层 | 即时输入捕获 → working"
+>         ),
+>         MemoryLayerConfig(
+>             name="working", layer_index=1,
+>             max_size_bytes=50 * 1024 * 1024, max_entries=500,
+>             capacity_threshold=0.80,
+>             accumulation_threshold_bytes=4 * 1024 * 1024,
+>             accumulation_threshold_entries=50,
+>             hard_cap_bytes=60 * 1024 * 1024,
+>             min_consolidation_interval_seconds=60.0,
+>             priority="medium",
+>             description="工作记忆层 | 会话上下文管理 → short_term"
+>         ),
+>         MemoryLayerConfig(
+>             name="short_term", layer_index=2,
+>             max_size_bytes=200 * 1024 * 1024, max_entries=5000,
+>             capacity_threshold=0.75,
+>             accumulation_threshold_bytes=2 * 1024 * 1024,
+>             accumulation_threshold_entries=50,
+>             hard_cap_bytes=250 * 1024 * 1024,
+>             min_consolidation_interval_seconds=120.0,
+>             priority="medium",
+>             description="短期记忆层 | 关键信息保持 → episodic"
+>         ),
+>         MemoryLayerConfig(
+>             name="episodic", layer_index=3,
+>             max_size_bytes=500 * 1024 * 1024, max_entries=2000,
+>             capacity_threshold=0.80,
+>             accumulation_threshold_bytes=10 * 1024 * 1024,
+>             accumulation_threshold_entries=50,
+>             hard_cap_bytes=600 * 1024 * 1024,
+>             min_consolidation_interval_seconds=300.0,
+>             priority="high",
+>             description="情景记忆层 | 决策记录/AI经验 → semantic"
+>         ),
+>         MemoryLayerConfig(
+>             name="semantic", layer_index=4,
+>             max_size_bytes=2 * 1024 * 1024 * 1024, max_entries=10000,
+>             capacity_threshold=0.85,
+>             accumulation_threshold_bytes=50 * 1024 * 1024,
+>             accumulation_threshold_entries=60,
+>             hard_cap_bytes=2500 * 1024 * 1024,
+>             min_consolidation_interval_seconds=600.0,
+>             priority="high",
+>             description="语义记忆层 | 知识图谱/概念关系 → meta"
+>         ),
+>         MemoryLayerConfig(
+>             name="meta", layer_index=5,
+>             max_size_bytes=500 * 1024 * 1024, max_entries=100000,
+>             capacity_threshold=0.90,
+>             accumulation_threshold_bytes=10 * 1024 * 1024,
+>             accumulation_threshold_entries=50,
+>             hard_cap_bytes=600 * 1024 * 1024,
+>             min_consolidation_interval_seconds=900.0,
+>             priority="critical",
+>             description="元记忆层 | 策略自优化 (顶端, 无晋升目标)"
+>         ),
+>     ])
+  
+>     data_path: Path = MEMORY_DATA_PATH
+>     auto_indexing_enabled: bool = True
+>     consolidation_interval_minutes: int = 5
+>     session_timeout_minutes: int = 60
+>     max_context_tokens: int = 16000
+>     embedding_model_name: str = "paraphrase-multilingual-MiniLM-L12-v2"
+>     embedding_cache_size: int = 5000
+>     embedding_dim: int = 384
+>     ws_heartbeat_interval: int = 30
+>     quality_gate: QualityGateConfig = field(default_factory=QualityGateConfig)
+>     promotion_weights: PromotionScoreWeights = field(default_factory=PromotionScoreWeights)
+  
+>     def get_layer(self, name: str) -> Optional[MemoryLayerConfig]:
+!         for layer in self.layers:
+!             if layer.name == name:
+!                 return layer
+!         return None
+  
+>     def get_next_layer(self, current_layer_name: str) -> Optional[MemoryLayerConfig]:
+!         for i, layer in enumerate(self.layers):
+!             if layer.name == current_layer_name and i < len(self.layers) - 1:
+!                 return self.layers[i + 1]
+!         return None
+  
+>     def get_prev_layer(self, current_layer_name: str) -> Optional[MemoryLayerConfig]:
+!         for i, layer in enumerate(self.layers):
+!             if layer.name == current_layer_name and i > 0:
+!                 return self.layers[i - 1]
+!         return None
+  
+>     def get_layer_index(self, name: str) -> int:
+!         for layer in self.layers:
+!             if layer.name == name:
+!                 return layer.layer_index
+!         return -1
+  
+  
+> DEFAULT_CONFIG = ICMEConfig()
+  
+  
+> _STORAGE_SUB_PATHS = [
+>     "causal_pairs", "evolution_history", "stats", "logs", "backups",
+>     "knowledge_graph", "cognition", "sessions", "queue", "cache",
+>     "embeddings", "audit_reports", "snapshots", "exports", "tmp",
+> ]
+  
+  
+> @dataclass
+> class StoragePathConfig:
+>     root: Path = MEMORY_DATA_PATH
+>     sub_paths: List[str] = field(default_factory=lambda: _STORAGE_SUB_PATHS)
+  
+>     def ensure(self) -> Dict[str, Path]:
+!         created = {}
+!         self.root.mkdir(parents=True, exist_ok=True)
+!         for sub in self.sub_paths:
+!             p = self.root / sub
+!             p.mkdir(parents=True, exist_ok=True)
+!             created[sub] = p
+!         logger.info(f"[StoragePathConfig] 15个存储子路径就绪: {self.root}")
+!         return created
+  
+>     def validate(self) -> Dict[str, Any]:
+!         result = {"root": str(self.root), "root_readable": True, "root_writable": True,
+!                   "issues": [], "sub_paths": {}}
+!         if not os.access(str(self.root), os.R_OK):
+!             result["root_readable"] = False
+!             result["issues"].append("root not readable")
+!         if not os.access(str(self.root), os.W_OK):
+!             result["root_writable"] = False
+!             result["issues"].append("root not writable")
+!         for sub in self.sub_paths:
+!             p = self.root / sub
+!             r, w = os.access(str(p), os.R_OK), os.access(str(p), os.W_OK)
+!             result["sub_paths"][sub] = {"exists": p.exists(), "readable": r, "writable": w}
+!             if not r or not w:
+!                 result["issues"].append(f"{sub}: {'not readable' if not r else ''}{'not writable' if not w else ''}".strip())
+!         return result
+  
+>     def audit(self) -> Dict[str, Any]:
+!         import fnmatch
+!         allowed = set(self.sub_paths)
+!         violations = []
+!         for item in self.root.iterdir():
+!             if item.is_file() and item.name not in allowed:
+!                 violations.append({"name": item.name, "path": str(item), "reason": "out of bounds file"})
+!             elif item.is_dir() and item.name not in allowed:
+!                 violations.append({"name": item.name, "path": str(item), "reason": "out of bounds dir"})
+!         return {"root": str(self.root), "allowed_paths": sorted(allowed),
+!                 "violations": violations, "violation_count": len(violations),
+!                 "clean": len(violations) == 0}
+  
+  
+> class ConfigManager:
+>     """
+>     配置管理中心 v8.1 — 天机配置的统一入口 + 自进化闭环
+  
+>     职责:
+>       1. 统一管理 ICMEConfig / MemoryLayerConfig / QualityGateConfig
+>       2. StoragePathConfig 存储路径全生命周期 (D9-1 存储路径煞)
+>       3. 配置变更追踪 + EvolutionLoop 自进化
+>       4. 健康检查 + 合规审计
+  
+>     灵境道谱溯源: D9-1【存储路径煞】· 道九·配置体
+>     """
+  
+>     def __init__(self, config: Optional[ICMEConfig] = None,
+>                  recorder: Optional[Any] = None,
+>                  learning_engine: Optional[Any] = None):
+!         self._config = config or DEFAULT_CONFIG
+!         self._recorder = recorder
+!         self._learning_engine = learning_engine
+!         self._storage = StoragePathConfig(root=self._config.data_path)
+!         self._change_log: List[Dict[str, Any]] = []
+!         self._change_count = 0
+!         self._error_count = 0
+  
+!         self._evo_loop = None
+!         if EvolutionLoop is not None:
+!             try:
+!                 self._evo_loop = EvolutionLoop(
+!                     module_name="config_manager",
+!                     effectiveness_fn=self._calc_config_effectiveness,
+!                     learn_fn=self._learn_from_config,
+!                     evolve_fn=self._evolve_config,
+!                     mutable_config={
+!                         "consolidation_interval_minutes": self._config.consolidation_interval_minutes,
+!                         "session_timeout_minutes": self._config.session_timeout_minutes,
+!                         "max_context_tokens": self._config.max_context_tokens,
+!                         "quality_gate_min_content_length": self._config.quality_gate.min_content_length,
+!                     },
+!                     recorder=recorder,
+!                     learning_engine=learning_engine,
+!                 )
+!             except Exception as e:
+!                 logger.warning(f"ConfigManager EvolutionLoop init failed: {e}")
+  
+>     @property
+>     def config(self) -> ICMEConfig:
+!         return self._config
+  
+>     @property
+>     def storage(self) -> StoragePathConfig:
+!         return self._storage
+  
+>     def ensure_storage(self) -> Dict[str, Path]:
+!         paths = self._storage.ensure()
+!         if self._evo_loop is not None:
+!             try:
+!                 self._evo_loop.record_action(
+!                     action="ensure_storage",
+!                     state_before={"sub_paths_ready": False},
+!                     state_after={"sub_paths_ready": True, "path_count": len(paths)},
+!                 )
+!             except Exception:
+!                 pass
+!         return paths
+  
+>     def validate_storage(self) -> Dict[str, Any]:
+!         result = self._storage.validate()
+!         if self._evo_loop is not None:
+!             try:
+!                 issue_count = len(result.get("issues", []))
+!                 self._evo_loop.record_action(
+!                     action="validate_storage",
+!                     state_before={"issues": 0},
+!                     state_after={"issues": issue_count, "root_readable": result["root_readable"]},
+!                 )
+!             except Exception:
+!                 pass
+!         return result
+  
+>     def audit_storage(self) -> Dict[str, Any]:
+!         result = self._storage.audit()
+!         if self._evo_loop is not None:
+!             try:
+!                 self._evo_loop.record_action(
+!                     action="audit_storage",
+!                     state_before={"violations": 0},
+!                     state_after={"violations": result["violation_count"], "clean": result["clean"]},
+!                 )
+!             except Exception:
+!                 pass
+!         return result
+  
+>     def update_config(self, updates: Dict[str, Any]) -> Dict[str, Any]:
+!         old_snapshot = {
+!             "consolidation_interval_minutes": self._config.consolidation_interval_minutes,
+!             "session_timeout_minutes": self._config.session_timeout_minutes,
+!             "max_context_tokens": self._config.max_context_tokens,
+!         }
+!         for key, value in updates.items():
+!             if hasattr(self._config, key):
+!                 old_val = getattr(self._config, key)
+!                 setattr(self._config, key, value)
+!                 self._change_log.append({
+!                     "key": key, "old": old_val, "new": value,
+!                     "timestamp": __import__("time").time(),
+!                 })
+!                 self._change_count += 1
+!                 logger.info(f"[ConfigManager] 配置变更: {key} {old_val}→{value}")
+  
+!         if self._evo_loop is not None:
+!             try:
+!                 self._evo_loop.record_action(
+!                     action="update_config",
+!                     state_before=old_snapshot,
+!                     state_after={
+!                         "consolidation_interval_minutes": self._config.consolidation_interval_minutes,
+!                         "session_timeout_minutes": self._config.session_timeout_minutes,
+!                         "max_context_tokens": self._config.max_context_tokens,
+!                     },
+!                 )
+!             except Exception:
+!                 pass
+  
+!         return {"changes": len(updates), "change_count": self._change_count}
+  
+>     def get_layer_config(self, layer_name: str) -> Optional[MemoryLayerConfig]:
+!         return self._config.get_layer(layer_name)
+  
+>     def health(self) -> Dict[str, Any]:
+!         storage_ok = True
+!         try:
+!             self._storage.root.mkdir(parents=True, exist_ok=True)
+!         except Exception:
+!             storage_ok = False
+!             self._error_count += 1
+  
+!         return {
+!             "status": "healthy" if storage_ok else "degraded",
+!             "version": get_version_string(),
+!             "edition": f"{__edition__}-v{get_version_string(short=True)}",
+!             "storage_root": str(self._storage.root),
+!             "storage_accessible": storage_ok,
+!             "layers_configured": len(self._config.layers),
+!             "change_count": self._change_count,
+!             "error_count": self._error_count,
+!             "evo_loop_active": self._evo_loop is not None,
+!             "recorder_attached": self._recorder is not None,
+!             "consolidation_interval_minutes": self._config.consolidation_interval_minutes,
+!             "session_timeout_minutes": self._config.session_timeout_minutes,
+!         }
+  
+>     def get_stats(self) -> Dict[str, Any]:
+!         return {
+!             "version": "8.1",
+!             "storage": str(self._storage.root),
+!             "change_count": self._change_count,
+!             "error_count": self._error_count,
+!             "layers": [layer.name for layer in self._config.layers],
+!             "quality_gate": {
+!                 "min_content_length": self._config.quality_gate.min_content_length,
+!                 "max_similarity_for_duplicate": self._config.quality_gate.max_similarity_for_duplicate,
+!             },
+!             "health": self.health(),
+!             "evo_loop": self._evo_loop.get_stats() if self._evo_loop else {},
+!         }
+  
+>     def tick(self):
+!         if self._evo_loop is not None:
+!             try:
+!                 self._evo_loop.tick()
+!             except Exception:
+!                 pass
+  
+>     def _calc_config_effectiveness(self, action: str,
+>                                     state_before: Dict[str, Any],
+>                                     state_after: Dict[str, Any]) -> float:
+!         if action == "ensure_storage":
+!             return 0.5 if state_after.get("path_count", 0) >= len(_STORAGE_SUB_PATHS) else -0.3
+!         elif action == "validate_storage":
+!             issues = state_after.get("issues", 0)
+!             return max(-0.5, -0.1 * issues) if issues > 0 else 0.3
+!         elif action == "audit_storage":
+!             violations = state_after.get("violations", 0)
+!             return max(-0.6, -0.15 * violations) if violations > 0 else 0.4
+!         elif action == "update_config":
+!             delta = abs(
+!                 state_after.get("session_timeout_minutes", 60)
+!                 - state_before.get("session_timeout_minutes", 60)
+!             )
+!             return min(0.3, delta * 0.02) if delta > 0 else 0.0
+!         return 0.0
+  
+>     def _learn_from_config(self, causal_pairs: List[Any],
+>                             effectiveness_summary: Dict[str, Any]) -> Dict[str, Any]:
+!         return {
+!             "patterns_found": len(causal_pairs),
+!             "avg_effectiveness": effectiveness_summary.get("avg_effectiveness", 0.0),
+!             "change_frequency": self._change_count,
+!         }
+  
+>     def _evolve_config(self, learn_result: Dict[str, Any],
+>                         mutable_config: Dict[str, Any]) -> Dict[str, Any]:
+!         changes = {}
+!         avg_eff = learn_result.get("avg_effectiveness", 0.0)
+!         if avg_eff < -0.2 and mutable_config.get("consolidation_interval_minutes", 5) < 30:
+!             changes["consolidation_interval_minutes"] = min(30,
+!                 mutable_config.get("consolidation_interval_minutes", 5) + 2)
+!         if avg_eff > 0.3 and mutable_config.get("consolidation_interval_minutes", 5) > 2:
+!             changes["consolidation_interval_minutes"] = max(2,
+!                 mutable_config.get("consolidation_interval_minutes", 5) - 1)
+!         return {"rules_modified": changes, "skills_created": []}

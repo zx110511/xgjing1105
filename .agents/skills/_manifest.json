@@ -1,0 +1,183 @@
+{
+    "bridge": {
+        "catalog_path": ".trae/skills/",
+        "invoke_tool": "skill_invoke",
+        "mcp_server": "agent-framework",
+        "type": "mcp_proxy"
+    },
+    "description": "元初系统技能目录 v6.0 — AMIM M37对齐，29 Skills覆盖23 Agent体系（100%覆盖）",
+    "project": "元初系统",
+    "schema_version": "4.0",
+    "skills": [
+        {
+            "agent": "kuangshi",
+            "file": ".trae/skills/corpus-batch-import/SKILL.md",
+            "id": "corpus/batch-import:1.0",
+            "name": "语料批量导入"
+        },
+        {
+            "agent": "dongcha",
+            "file": ".trae/skills/corpus-extract/SKILL.md",
+            "id": "corpus/extract:1.0",
+            "name": "语料提取"
+        },
+        {
+            "agent": "dongcha",
+            "file": ".trae/skills/corpus-retrieve/SKILL.md",
+            "id": "corpus/retrieve:1.0",
+            "name": "语料检索"
+        },
+        {
+            "agent": "kuangshi",
+            "file": ".trae/skills/corpus-quality-score/SKILL.md",
+            "id": "corpus/quality-score:1.0",
+            "name": "语料质量评分"
+        },
+        {
+            "agent": "miaobi",
+            "file": ".trae/skills/novel-chapter-create/SKILL.md",
+            "id": "novel/chapter-create:1.0",
+            "name": "章节创作"
+        },
+        {
+            "agent": "jingwei",
+            "file": ".trae/skills/novel-worldbuilding-expand/SKILL.md",
+            "id": "novel/worldbuilding-expand:1.0",
+            "name": "世界观扩展"
+        },
+        {
+            "agent": "mingjing",
+            "file": ".trae/skills/novel-consistency-check/SKILL.md",
+            "id": "novel/consistency-check:1.0",
+            "name": "一致性检查"
+        },
+        {
+            "agent": "shiguan",
+            "file": ".trae/skills/novel-version-track/SKILL.md",
+            "id": "novel/version-track:1.0",
+            "name": "设定版本追踪"
+        },
+        {
+            "agent": "jinshu",
+            "file": ".trae/skills/novel-format-export/SKILL.md",
+            "id": "novel/format-export:1.0",
+            "name": "成品格式化导出"
+        },
+        {
+            "agent": "tianshu",
+            "file": ".trae/skills/novel-multi-schedule/SKILL.md",
+            "id": "novel/multi-schedule:1.0",
+            "name": "多小说并行调度"
+        },
+        {
+            "agent": "mingjing",
+            "file": ".trae/skills/novel-setting-consistency-deep/SKILL.md",
+            "id": "novel/setting-consistency-deep:1.0",
+            "name": "深度设定一致性检查"
+        },
+        {
+            "agent": "yiku",
+            "file": ".trae/skills/memory-remember/SKILL.md",
+            "id": "memory/remember:1.0",
+            "name": "记忆存储"
+        },
+        {
+            "agent": "yiku",
+            "file": ".trae/skills/memory-recall/SKILL.md",
+            "id": "memory/recall:1.0",
+            "name": "记忆检索"
+        },
+        {
+            "agent": "qianli",
+            "file": ".trae/skills/system-diagnose/SKILL.md",
+            "id": "system/diagnose:1.0",
+            "name": "系统诊断"
+        },
+        {
+            "agent": "dongcha",
+            "file": ".trae/skills/context-extract/SKILL.md",
+            "id": "context/extract:1.0",
+            "name": "上下文提取"
+        },
+        {
+            "agent": "tianshu",
+            "file": ".trae/skills/agent-dispatch/SKILL.md",
+            "id": "agent/dispatch:1.0",
+            "name": "任务分发"
+        },
+        {
+            "agent": "tianshu",
+            "file": ".trae/skills/agent-transparent-dispatch/SKILL.md",
+            "id": "agent/transparent-dispatch:1.0",
+            "name": "透明调度可视化 (v6.0 AMIM对齐)"
+        },
+        {
+            "agent": "yiku",
+            "file": ".trae/skills/auto-memory-capture/SKILL.md",
+            "id": "memory/auto-capture:1.0",
+            "name": "记忆自动收集 (MM-001触发)"
+        },
+        {
+            "agent": "tiewei",
+            "file": ".trae/skills/test-gate/SKILL.md",
+            "id": "test/gate:1.0",
+            "name": "测试门禁"
+        },
+        {
+            "agent": "zhenshan",
+            "file": ".trae/skills/security-audit/SKILL.md",
+            "id": "security/audit:1.0",
+            "name": "安全审计"
+        },
+        {
+            "agent": "zhuiguang",
+            "file": ".trae/skills/perf-profile/SKILL.md",
+            "id": "perf/profile:1.0",
+            "name": "性能剖析"
+        },
+        {
+            "agent": "gongzao",
+            "file": ".trae/skills/ops-deploy/SKILL.md",
+            "id": "ops/deploy:1.0",
+            "name": "运维部署"
+        },
+        {
+            "agent": "tianji",
+            "file": ".trae/skills/tianji-orchestrate/SKILL.md",
+            "id": "tianji/orchestrate:1.0",
+            "name": "天机总控调度"
+        },
+        {
+            "agent": "tiansuan",
+            "file": ".trae/skills/data-analyze/SKILL.md",
+            "id": "data/analyze:1.0",
+            "name": "数据分析"
+        },
+        {
+            "agent": "baiqiao",
+            "file": ".trae/skills/skill-route/SKILL.md",
+            "id": "skill/route:1.0",
+            "name": "技能路由"
+        },
+        {
+            "agent": "luling",
+            "file": ".trae/skills/rule-check/SKILL.md",
+            "id": "rule/check:1.0",
+            "name": "规则检查"
+        },
+        {
+            "agent": "lingxi",
+            "file": ".trae/skills/dialogue-quality/SKILL.md",
+            "id": "dialogue/quality:1.0",
+            "name": "对话质量检查"
+        },
+        {
+            "agent": "wenzong",
+            "file": ".trae/skills/editor-review/SKILL.md",
+            "id": "editor/review:1.0",
+            "name": "编辑器审查"
+        }
+    ],
+    "total_count": 29,
+    "update_note": "v9.0-SSS - 2026-06-03: SSS级升级，新增10个Agent专属Skill，Skill覆盖率从43%→100%，实现Agent-Skill-MCP矩阵全映射"
+}

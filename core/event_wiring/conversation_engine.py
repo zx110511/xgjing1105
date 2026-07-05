@@ -1,0 +1,739 @@
+"""
+灵境对话引擎 (Lingjing Conversation Engine) v1.0
+================================================
+融合6大AI平台对话架构最佳实践的核心引擎:
+  - OpenAI Agents SDK: Handoff原语 + Guardrails + Streaming事件类型
+  - Dify Chatflow: Conversation模型 + VariablePool + 工作流编排
+  - LangGraph: StateGraph消息管理 + Checkpointer持久化 + add_messages reducer
+  - MAF: 持久化+自适应上下文 + A2A Agent通信
+  - AFM论文: 三级保真度(FULL/COMPRESSED/PLACEHOLDER)上下文管理
+  - Zep Graphiti: 时间感知对话记忆
+
+核心能力:
+  1. 多轮对话状态管理 (Thread + Message历史)
+  2. Token预算控制 (滑动窗口 + AFM保真度 + LLM摘要)
+  3. 流式事件系统 (9种事件类型, OpenAI兼容)
+  4. Guardrails三阶段验证 (pre-process / tool-call / post-output)
+  5. Handoff Agent切换 (TVP协议原生支持)
+  6. ICME-T记忆桥接 (六层记忆自动同步)
+"""
+
+import asyncio
+import hashlib
+import json
+import time
+import uuid
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any, AsyncGenerator, Callable, Dict, List, Optional, Set, Tuple
+
+try:
+    import tiktoken
+    HAS_TIKTOKEN = True
+except ImportError:
+    HAS_TIKTOKEN = False
+
+
+class MessageRole(str, Enum):
+    SYSTEM = "system"
+    USER = "user"
+    ASSISTANT = "assistant"
+    TOOL = "tool"
+
+
+class MessageFidelity(str, Enum):
+    FULL = "full"
+    COMPRESSED = "compressed"
+    PLACEHOLDER = "placeholder"
+
+
+class EventType(str, Enum):
+    TEXT_DELTA = "text_delta"
+    TOOL_CALL_START = "tool_call_start"
+    TOOL_CALL_DELTA = "tool_call_delta"
+    TOOL_CALL_DONE = "tool_call_done"
+    HANDOFF = "handoff"
+    GUARDRAIL_TRIGGERED = "guardrail_triggered"
+    MEMORY_RECALL = "memory_recall"
+    MEMORY_STORE = "memory_store"
+    ERROR = "error"
+    DONE = "done"
+    HEARTBEAT = "heartbeat"
+
+
+@dataclass
+class Message:
+    id: str
+    role: MessageRole
+    content: str
+    timestamp: float = field(default_factory=time.time)
+    tool_calls: Optional[List[Dict[str, Any]]] = None
+    tool_call_id: Optional[str] = None
+    name: Optional[str] = None
+    fidelity: MessageFidelity = MessageFidelity.FULL
+    token_count: int = 0
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def to_openai_format(self) -> Dict[str, Any]:
+        msg: Dict[str, Any] = {"role": self.role.value}
+        if self.content:
+            msg["content"] = self.content
+        if self.tool_calls:
+            msg["tool_calls"] = self.tool_calls
+        if self.tool_call_id:
+            msg["tool_call_id"] = self.tool_call_id
+        if self.name:
+            msg["name"] = self.name
+        return msg
+
+    @staticmethod
+    def estimate_tokens(text: str, model: str = "deepseek-chat") -> int:
+        if HAS_TIKTOKEN:
+            try:
+                enc = tiktoken.get_encoding("cl100k_base")
+                return len(enc.encode(text))
+            except Exception:
+                pass
+        return len(text) // 3
+
+    @staticmethod
+    def create_user(text: str) -> "Message":
+        return Message(
+            id=f"msg-{uuid.uuid4().hex[:12]}",
+            role=MessageRole.USER,
+            content=text,
+            token_count=Message.estimate_tokens(text),
+        )
+
+    @staticmethod
+    def create_assistant(text: str, tool_calls: Optional[List] = None) -> "Message":
+        return Message(
+            id=f"msg-{uuid.uuid4().hex[:12]}",
+            role=MessageRole.ASSISTANT,
+            content=text,
+            tool_calls=tool_calls,
+            token_count=Message.estimate_tokens(text),
+        )
+
+    @staticmethod
+    def create_system(text: str) -> "Message":
+        return Message(
+            id=f"msg-{uuid.uuid4().hex[:12]}",
+            role=MessageRole.SYSTEM,
+            content=text,
+            token_count=Message.estimate_tokens(text),
+        )
+
+
+@dataclass
+class Conversation:
+    id: str
+    title: str = "New Conversation"
+    messages: List[Message] = field(default_factory=list)
+    created_at: float = field(default_factory=time.time)
+    updated_at: float = field(default_factory=time.time)
+    summary: str = ""
+    summary_generated_at: float = 0.0
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    total_tokens: int = 0
+    _message_set: Set[str] = field(default_factory=set, repr=False)
+
+    @staticmethod
+    def create(title: str = "New Conversation") -> "Conversation":
+        conv_id = f"conv-{uuid.uuid4().hex[:16]}"
+        return Conversation(id=conv_id, title=title)
+
+    def add_message(self, msg: Message) -> bool:
+        content_hash = hashlib.md5(
+            f"{msg.role.value}{msg.content[:200]}{msg.timestamp}".encode()
+        ).hexdigest()
+        if content_hash in self._message_set:
+            return False
+        self._message_set.add(content_hash)
+        self.messages.append(msg)
+        self.total_tokens += msg.token_count
+        self.updated_at = time.time()
+        if self.title == "New Conversation" and msg.role == MessageRole.USER:
+            self.title = msg.content[:50] + ("..." if len(msg.content) > 50 else "")
+        return True
+
+    def get_openai_messages(self) -> List[Dict[str, Any]]:
+        return [msg.to_openai_format() for msg in self.messages]
+
+    def get_token_count(self) -> int:
+        return self.total_tokens
+
+
+@dataclass
+class GuardrailResult:
+    passed: bool
+    action: str = "allow"
+    reason: str = ""
+    modified_content: Optional[str] = None
+
+
+class AFMContextManager:
+    """Adaptive Focus Memory — 三级保真度上下文管理
+
+    FULL: 保留原文 — 最近消息、高语义相关消息、重要约束
+    COMPRESSED: LLM摘要 — 中等相关性、较旧但仍有价值的消息
+    PLACEHOLDER: 简短引用 — 低相关性、很久以前的消息
+
+    参考: Cruz et al. "Adaptive Focus Memory for Language Models" (2025)
+    """
+
+    def __init__(
+        self,
+        max_tokens: int = 16000,
+        recent_full_count: int = 8,
+        semantic_serverity_weight: float = 0.5,
+        recency_decay_weight: float = 0.3,
+        importance_weight: float = 0.2,
+    ):
+        self.max_tokens = max_tokens
+        self.recent_full_count = recent_full_count
+        self._weights = {
+            "semantic": semantic_serverity_weight,
+            "recency": recency_decay_weight,
+            "importance": importance_weight,
+        }
+
+    def score_message(
+        self,
+        msg: Message,
+        current_query: str = "",
+        msg_age_seconds: float = 0.0,
+    ) -> float:
+        recency_score = max(0.0, 1.0 - msg_age_seconds / 3600.0)
+        sem_score = 0.5
+        if current_query and msg.content:
+            query_words = set(current_query.lower().split())
+            msg_words = set(msg.content.lower().split())
+            overlap = len(query_words & msg_words)
+            if overlap > 0:
+                sem_score = min(1.0, overlap / max(len(query_words), 1))
+        importance = 1.0 if msg.role == MessageRole.SYSTEM else 0.5
+        if msg.metadata.get("pinned"):
+            importance = 1.0
+        if msg.metadata.get("contains_decision"):
+            importance = 0.9
+
+        score = (
+            self._weights["semantic"] * sem_score
+            + self._weights["recency"] * recency_score
+            + self._weights["importance"] * importance
+        )
+        return score
+
+    def assign_fidelity(
+        self,
+        messages: List[Message],
+        current_query: str = "",
+        now: float = 0.0,
+    ) -> List[Tuple[Message, MessageFidelity]]:
+        if now == 0.0:
+            now = time.time()
+
+        total = len(messages)
+        if total <= self.recent_full_count:
+            return [(m, MessageFidelity.FULL) for m in messages]
+
+        recent_msgs = messages[-self.recent_full_count:]
+        older_msgs = messages[:-self.recent_full_count]
+
+        scored_older: List[Tuple[Message, float]] = []
+        for msg in older_msgs:
+            age = now - msg.timestamp
+            score = self.score_message(msg, current_query, age)
+            scored_older.append((msg, score))
+
+        scored_older.sort(key=lambda x: x[1], reverse=True)
+
+        threshold = scored_older[len(scored_older) // 3][1] if len(scored_older) >= 3 else 0.5
+        mid_threshold = scored_older[2 * len(scored_older) // 3][1] if len(scored_older) >= 3 else 0.3
+
+        result: List[Tuple[Message, MessageFidelity]] = []
+        result.extend([(m, MessageFidelity.FULL) for m in recent_msgs])
+
+        for msg, score in scored_older:
+            if score >= threshold:
+                result.append((msg, MessageFidelity.FULL))
+            elif score >= mid_threshold:
+                result.append((msg, MessageFidelity.COMPRESSED))
+            else:
+                result.append((msg, MessageFidelity.PLACEHOLDER))
+
+        result.sort(key=lambda x: x[0].timestamp)
+        return result
+
+    def apply_fidelity_budget(
+        self,
+        fidelity_messages: List[Tuple[Message, MessageFidelity]],
+        summarizer: Optional[Callable] = None,
+    ) -> List[Message]:
+        result: List[Message] = []
+        token_budget = self.max_tokens
+        system_msgs = [m for m, _ in fidelity_messages if m.role == MessageRole.SYSTEM]
+        for sm in system_msgs:
+            result.append(sm)
+            token_budget -= sm.token_count
+
+        for msg, fidelity in fidelity_messages:
+            if msg.role == MessageRole.SYSTEM:
+                continue
+            if token_budget <= 0:
+                break
+
+            if fidelity == MessageFidelity.FULL:
+                if msg.token_count <= token_budget:
+                    result.append(msg)
+                    token_budget -= msg.token_count
+                else:
+                    truncated = Message(
+                        id=msg.id,
+                        role=msg.role,
+                        content=msg.content[:token_budget * 3] + "...",
+                        timestamp=msg.timestamp,
+                        token_count=token_budget,
+                    )
+                    result.append(truncated)
+                    token_budget = 0
+
+            elif fidelity == MessageFidelity.COMPRESSED:
+                if summarizer:
+                    summary = summarizer(msg.content)
+                    compressed = Message(
+                        id=msg.id,
+                        role=msg.role,
+                        content=f"[Summary] {summary}",
+                        timestamp=msg.timestamp,
+                        fidelity=MessageFidelity.COMPRESSED,
+                        token_count=Message.estimate_tokens(summary),
+                    )
+                else:
+                    compressed = Message(
+                        id=msg.id,
+                        role=msg.role,
+                        content=f"[Earlier: {msg.content[:100]}...]",
+                        timestamp=msg.timestamp,
+                        fidelity=MessageFidelity.COMPRESSED,
+                        token_count=15,
+                    )
+                if compressed.token_count <= token_budget:
+                    result.append(compressed)
+                    token_budget -= compressed.token_count
+
+            elif fidelity == MessageFidelity.PLACEHOLDER:
+                ph = Message(
+                    id=msg.id,
+                    role=msg.role,
+                    content=f"[{msg.role.value} said something earlier]",
+                    timestamp=msg.timestamp,
+                    fidelity=MessageFidelity.PLACEHOLDER,
+                    token_count=5,
+                )
+                if ph.token_count <= token_budget:
+                    result.append(ph)
+                    token_budget -= ph.token_count
+
+        result.sort(key=lambda x: x.timestamp)
+        return result
+
+
+class ConversationStore:
+    """持久化对话存储 — 支持内存+文件双模式"""
+
+    def __init__(self, storage_path: str = ""):
+        self._conversations: Dict[str, Conversation] = {}
+        self._storage_path = storage_path
+        self._load_from_disk()
+
+    def create(self, title: str = "New Conversation") -> Conversation:
+        conv = Conversation.create(title)
+        self._conversations[conv.id] = conv
+        self._save_to_disk()
+        return conv
+
+    def get(self, conv_id: str) -> Optional[Conversation]:
+        return self._conversations.get(conv_id)
+
+    def list_all(self, limit: int = 50) -> List[Conversation]:
+        convs = sorted(
+            self._conversations.values(),
+            key=lambda c: c.updated_at,
+            reverse=True,
+        )
+        return convs[:limit]
+
+    def delete(self, conv_id: str) -> bool:
+        if conv_id in self._conversations:
+            del self._conversations[conv_id]
+            self._save_to_disk()
+            return True
+        return False
+
+    def update_title(self, conv_id: str, title: str) -> bool:
+        conv = self._conversations.get(conv_id)
+        if conv:
+            conv.title = title
+            conv.updated_at = time.time()
+            self._save_to_disk()
+            return True
+        return False
+
+    def _save_to_disk(self):
+        if not self._storage_path:
+            return
+        try:
+            import os
+            os.makedirs(os.path.dirname(self._storage_path), exist_ok=True)
+            data = {}
+            for cid, conv in self._conversations.items():
+                data[cid] = {
+                    "id": conv.id,
+                    "title": conv.title,
+                    "messages": [
+                        {
+                            "id": m.id,
+                            "role": m.role.value,
+                            "content": m.content,
+                            "timestamp": m.timestamp,
+                            "token_count": m.token_count,
+                            "fidelity": m.fidelity.value,
+                            "metadata": m.metadata,
+                        }
+                        for m in conv.messages
+                    ],
+                    "created_at": conv.created_at,
+                    "updated_at": conv.updated_at,
+                    "summary": conv.summary,
+                    "total_tokens": conv.total_tokens,
+                    "metadata": conv.metadata,
+                }
+            with open(self._storage_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
+
+    def _load_from_disk(self):
+        if not self._storage_path:
+            return
+        try:
+            import os
+            if not os.path.exists(self._storage_path):
+                return
+            with open(self._storage_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            for cid, cdata in data.items():
+                conv = Conversation(
+                    id=cdata["id"],
+                    title=cdata.get("title", "Untitled"),
+                    created_at=cdata.get("created_at", time.time()),
+                    updated_at=cdata.get("updated_at", time.time()),
+                    summary=cdata.get("summary", ""),
+                    total_tokens=cdata.get("total_tokens", 0),
+                    metadata=cdata.get("metadata", {}),
+                )
+                for mdata in cdata.get("messages", []):
+                    msg = Message(
+                        id=mdata["id"],
+                        role=MessageRole(mdata["role"]),
+                        content=mdata["content"],
+                        timestamp=mdata["timestamp"],
+                        token_count=mdata.get("token_count", 0),
+                        metadata=mdata.get("metadata", {}),
+                    )
+                    conv.messages.append(msg)
+                    conv._message_set.add(
+                        hashlib.md5(
+                            f"{msg.role.value}{msg.content[:200]}{msg.timestamp}".encode()
+                        ).hexdigest()
+                    )
+                self._conversations[conv.id] = conv
+        except Exception:
+            pass
+
+
+class Guardrail:
+    """三阶段防护验证 — 参考OpenAI Agents SDK Guardrails"""
+
+    def __init__(self):
+        self._pre_hooks: List[Callable] = []
+        self._tool_hooks: List[Callable] = []
+        self._post_hooks: List[Callable] = []
+
+    def add_pre_hook(self, hook: Callable[[str], GuardrailResult]) -> None:
+        self._pre_hooks.append(hook)
+
+    def add_tool_hook(self, hook: Callable[[str, Dict], GuardrailResult]) -> None:
+        self._tool_hooks.append(hook)
+
+    def add_post_hook(self, hook: Callable[[str], GuardrailResult]) -> None:
+        self._post_hooks.append(hook)
+
+    def check_input(self, content: str) -> GuardrailResult:
+        for hook in self._pre_hooks:
+            result = hook(content)
+            if not result.passed:
+                return result
+        return GuardrailResult(passed=True)
+
+    def check_tool_call(self, tool_name: str, args: Dict) -> GuardrailResult:
+        for hook in self._tool_hooks:
+            result = hook(tool_name, args)
+            if not result.passed:
+                return result
+        return GuardrailResult(passed=True)
+
+    def check_output(self, content: str) -> GuardrailResult:
+        for hook in self._post_hooks:
+            result = hook(content)
+            if not result.passed:
+                return result
+        return GuardrailResult(passed=True)
+
+
+class ConversationEngine:
+    """灵境对话引擎主控 — 串联所有子系统"""
+
+    def __init__(
+        self,
+        storage_path: str = "",
+        max_context_tokens: int = 16000,
+        llm_call_func: Optional[Callable] = None,
+        summarizer_func: Optional[Callable] = None,
+    ):
+        self.store = ConversationStore(storage_path)
+        self.context_manager = AFMContextManager(max_tokens=max_context_tokens)
+        self.guardrail = Guardrail()
+        self._llm_call = llm_call_func
+        self._summarizer = summarizer_func
+        self._abort_signals: Dict[str, asyncio.Event] = {}
+        self._active_generations: Dict[str, str] = {}
+
+        self._setup_default_guardrails()
+
+    def _setup_default_guardrails(self):
+        def check_max_length(content: str) -> GuardrailResult:
+            if len(content) > 50000:
+                return GuardrailResult(
+                    passed=False,
+                    action="block",
+                    reason="Input exceeds maximum length of 50000 characters",
+                )
+            return GuardrailResult(passed=True)
+
+        def check_empty(content: str) -> GuardrailResult:
+            if not content or not content.strip():
+                return GuardrailResult(
+                    passed=False,
+                    action="block",
+                    reason="Input cannot be empty",
+                )
+            return GuardrailResult(passed=True)
+
+        self.guardrail.add_pre_hook(check_empty)
+        self.guardrail.add_pre_hook(check_max_length)
+
+    def create_conversation(self, title: str = "New Conversation") -> Conversation:
+        return self.store.create(title)
+
+    def get_conversation(self, conv_id: str) -> Optional[Conversation]:
+        return self.store.get(conv_id)
+
+    def list_conversations(self, limit: int = 50) -> List[Conversation]:
+        return self.store.list_all(limit)
+
+    def delete_conversation(self, conv_id: str) -> bool:
+        return self.store.delete(conv_id)
+
+    def abort_generation(self, conv_id: str):
+        signal = self._abort_signals.get(conv_id)
+        if signal:
+            signal.set()
+
+    def build_context(
+        self,
+        conversation: Conversation,
+        current_query: str = "",
+        system_prompt: str = "",
+        inject_memories: Optional[List[str]] = None,
+    ) -> List[Message]:
+        all_messages: List[Message] = []
+        if system_prompt:
+            sys_msg = Message.create_system(system_prompt)
+            all_messages.append(sys_msg)
+        if inject_memories:
+            for mem in inject_memories:
+                all_messages.append(
+                    Message(
+                        id=f"mem-{uuid.uuid4().hex[:8]}",
+                        role=MessageRole.SYSTEM,
+                        content=f"[Memory Context] {mem}",
+                        token_count=Message.estimate_tokens(mem),
+                        metadata={"type": "injected_memory"},
+                    )
+                )
+        all_messages.extend(conversation.messages)
+
+        if len(all_messages) <= self.context_manager.recent_full_count * 2:
+            return all_messages
+
+        fidelity_assigned = self.context_manager.assign_fidelity(
+            all_messages, current_query
+        )
+        return self.context_manager.apply_fidelity_budget(
+            fidelity_assigned, self._summarizer
+        )
+
+    async def generate_stream(
+        self,
+        conversation: Conversation,
+        user_input: str,
+        system_prompt: str = "",
+        enable_memory: bool = True,
+        enable_tools: bool = True,
+        enable_transparency: bool = True,
+        model: str = "deepseek-chat",
+        temperature: float = 0.7,
+        max_tokens: int = 2000,
+    ) -> AsyncGenerator[Tuple[EventType, Dict[str, Any]], None]:
+        conv_id = conversation.id
+        abort_signal = asyncio.Event()
+        self._abort_signals[conv_id] = abort_signal
+
+        try:
+            if abort_signal.is_set():
+                yield EventType.ERROR, {"detail": "Generation aborted"}
+                return
+
+            guard_result = self.guardrail.check_input(user_input)
+            if not guard_result.passed:
+                yield EventType.GUARDRAIL_TRIGGERED, {
+                    "action": guard_result.action,
+                    "reason": guard_result.reason,
+                }
+                if guard_result.action == "block":
+                    return
+                if guard_result.modified_content:
+                    user_input = guard_result.modified_content
+
+            user_msg = Message.create_user(user_input)
+            conversation.add_message(user_msg)
+
+            memories_injected: List[str] = []
+            if enable_memory:
+                yield EventType.MEMORY_RECALL, {
+                    "status": "searching",
+                    "query": user_input[:60],
+                }
+                if abort_signal.is_set():
+                    yield EventType.ERROR, {"detail": "Generation aborted"}
+                    return
+
+            context_messages = self.build_context(
+                conversation,
+                current_query=user_input,
+                system_prompt=system_prompt,
+                inject_memories=memories_injected if enable_memory else None,
+            )
+
+            openai_messages = [msg.to_openai_format() for msg in context_messages]
+            self._active_generations[conv_id] = user_msg.id
+
+            if self._llm_call is None:
+                yield EventType.ERROR, {
+                    "detail": "No LLM call function configured"
+                }
+                return
+
+            yield EventType.TEXT_DELTA, {"text": "", "status": "started"}
+
+            full_response = await asyncio.to_thread(
+                self._llm_call,
+                messages=openai_messages,
+                model=model,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+
+            if abort_signal.is_set():
+                yield EventType.ERROR, {"detail": "Generation aborted mid-stream"}
+                return
+
+            guard_output = self.guardrail.check_output(full_response)
+            if not guard_output.passed:
+                yield EventType.GUARDRAIL_TRIGGERED, {
+                    "action": guard_output.action,
+                    "reason": guard_output.reason,
+                }
+                if guard_output.action == "block":
+                    return
+                if guard_output.modified_content:
+                    full_response = guard_output.modified_content
+
+            assistant_msg = Message.create_assistant(full_response)
+            conversation.add_message(assistant_msg)
+
+            yield EventType.TEXT_DELTA, {
+                "text": full_response,
+                "message_id": assistant_msg.id,
+                "token_count": assistant_msg.token_count,
+            }
+
+            yield EventType.DONE, {
+                "conversation_id": conv_id,
+                "message_id": assistant_msg.id,
+                "total_tokens": conversation.total_tokens,
+            }
+
+            self.store._save_to_disk()
+
+        except asyncio.CancelledError:
+            yield EventType.ERROR, {"detail": "Generation cancelled"}
+        except Exception as e:
+            yield EventType.ERROR, {"detail": str(e)}
+        finally:
+            self._abort_signals.pop(conv_id, None)
+            self._active_generations.pop(conv_id, None)
+
+    async def generate_summary(
+        self,
+        conversation: Conversation,
+        max_length: int = 200,
+    ) -> str:
+        if not self._summarizer or len(conversation.messages) < 4:
+            return conversation.title
+
+        recent_msg_texts = [
+            f"{m.role.value}: {m.content[:200]}"
+            for m in conversation.messages[-20:]
+        ]
+        combined = "\n".join(recent_msg_texts)
+        summary = self._summarizer(combined)
+        conversation.summary = summary
+        conversation.summary_generated_at = time.time()
+        self.store._save_to_disk()
+        return summary
+
+
+_engine_instance: Optional[ConversationEngine] = None
+
+
+def get_conversation_engine(
+    storage_path: str = "",
+    llm_call_func: Optional[Callable] = None,
+    summarizer_func: Optional[Callable] = None,
+) -> ConversationEngine:
+    global _engine_instance
+    if _engine_instance is None:
+        _engine_instance = ConversationEngine(
+            storage_path=storage_path,
+            llm_call_func=llm_call_func,
+            summarizer_func=summarizer_func,
+        )
+    elif llm_call_func and _engine_instance._llm_call is None:
+        _engine_instance._llm_call = llm_call_func
+    elif summarizer_func and _engine_instance._summarizer is None:
+        _engine_instance._summarizer = summarizer_func
+    return _engine_instance

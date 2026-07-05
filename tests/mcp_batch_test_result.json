@@ -1,0 +1,338 @@
+{
+  "total": 59,
+  "passed": 25,
+  "failed": 34,
+  "skipped": 0,
+  "not_found": 13,
+  "results": [
+    {
+      "name": "memory_remember",
+      "status": "error",
+      "error": "HTTP 500",
+      "method": "POST"
+    },
+    {
+      "name": "memory_recall",
+      "status": "error",
+      "error": "HTTP 500",
+      "method": "POST"
+    },
+    {
+      "name": "memory_stats",
+      "status": "error",
+      "error": "HTTP 405",
+      "method": "GET"
+    },
+    {
+      "name": "memory_capacity",
+      "status": "error",
+      "error": "HTTP 405",
+      "method": "GET"
+    },
+    {
+      "name": "memory_consolidate",
+      "status": "error",
+      "error": "HTTP 500",
+      "method": "POST"
+    },
+    {
+      "name": "search_memories",
+      "status": "passed",
+      "method": "POST"
+    },
+    {
+      "name": "get_memory",
+      "status": "error",
+      "error": "HTTP 405",
+      "method": "GET"
+    },
+    {
+      "name": "list_memories",
+      "status": "error",
+      "error": "HTTP 405",
+      "method": "GET"
+    },
+    {
+      "name": "get_session_digest",
+      "status": "passed",
+      "method": "POST"
+    },
+    {
+      "name": "build_working_representation",
+      "status": "error",
+      "error": "HTTP 422",
+      "method": "POST"
+    },
+    {
+      "name": "explain_memory_lineage",
+      "status": "passed",
+      "method": "POST"
+    },
+    {
+      "name": "context_extract",
+      "status": "passed",
+      "method": "POST"
+    },
+    {
+      "name": "tianji_health",
+      "status": "error",
+      "error": "HTTP 405",
+      "method": "GET"
+    },
+    {
+      "name": "tianji_help",
+      "status": "error",
+      "error": "HTTP 405",
+      "method": "GET"
+    },
+    {
+      "name": "tianji_classify",
+      "status": "error",
+      "error": "HTTP 500",
+      "method": "POST"
+    },
+    {
+      "name": "tianji_auto_tag",
+      "status": "error",
+      "error": "HTTP 500",
+      "method": "POST"
+    },
+    {
+      "name": "tianji_summarize",
+      "status": "error",
+      "error": "HTTP 500",
+      "method": "POST"
+    },
+    {
+      "name": "tianji_extract_knowledge",
+      "status": "error",
+      "error": "HTTP 500",
+      "method": "POST"
+    },
+    {
+      "name": "tianji_expand_query",
+      "status": "error",
+      "error": "HTTP 500",
+      "method": "POST"
+    },
+    {
+      "name": "tianji_semantic_search",
+      "status": "error",
+      "error": "HTTP 500",
+      "method": "POST"
+    },
+    {
+      "name": "tianji_normalize",
+      "status": "error",
+      "error": "HTTP 500",
+      "method": "POST"
+    },
+    {
+      "name": "tianji_disambiguate",
+      "status": "error",
+      "error": "HTTP 500",
+      "method": "POST"
+    },
+    {
+      "name": "tianji_intercept",
+      "status": "error",
+      "error": "HTTP 500",
+      "method": "POST"
+    },
+    {
+      "name": "tianji_summarize_conversation",
+      "status": "error",
+      "error": "HTTP 500",
+      "method": "POST"
+    },
+    {
+      "name": "tianji_tool_owner",
+      "status": "error",
+      "error": "HTTP 405",
+      "method": "GET"
+    },
+    {
+      "name": "tianji_amim_status",
+      "status": "error",
+      "error": "HTTP 405",
+      "method": "GET"
+    },
+    {
+      "name": "tianji_operation_header",
+      "status": "error",
+      "error": "HTTP 405",
+      "method": "GET"
+    },
+    {
+      "name": "memory_build_graph",
+      "status": "error",
+      "error": "HTTP 500",
+      "method": "POST"
+    },
+    {
+      "name": "memory_query_graph",
+      "status": "error",
+      "error": "HTTP 500",
+      "method": "POST"
+    },
+    {
+      "name": "memory_learn_skill",
+      "status": "error",
+      "error": "HTTP 500",
+      "method": "POST"
+    },
+    {
+      "name": "memory_capture_multimodal",
+      "status": "error",
+      "error": "HTTP 500",
+      "method": "POST"
+    },
+    {
+      "name": "run_reflective_cycle",
+      "status": "passed",
+      "method": "POST"
+    },
+    {
+      "name": "agent_dispatch",
+      "status": "passed",
+      "method": "POST"
+    },
+    {
+      "name": "system_status",
+      "status": "passed",
+      "method": "GET"
+    },
+    {
+      "name": "rule_evaluate",
+      "status": "passed",
+      "method": "POST"
+    },
+    {
+      "name": "tool_help",
+      "status": "passed",
+      "method": "GET"
+    },
+    {
+      "name": "execute_command",
+      "status": "passed",
+      "method": "POST"
+    },
+    {
+      "name": "list_processes",
+      "status": "error",
+      "error": "timed out",
+      "method": "GET"
+    },
+    {
+      "name": "get_process_info",
+      "status": "error",
+      "error": "HTTP 405",
+      "method": "GET"
+    },
+    {
+      "name": "list_scripts",
+      "status": "passed",
+      "method": "GET"
+    },
+    {
+      "name": "run_script",
+      "status": "passed",
+      "method": "POST"
+    },
+    {
+      "name": "get_resource_usage",
+      "status": "passed",
+      "method": "GET"
+    },
+    {
+      "name": "list_services",
+      "status": "passed",
+      "method": "GET"
+    },
+    {
+      "name": "check_deployment",
+      "status": "error",
+      "error": "HTTP 405",
+      "method": "GET"
+    },
+    {
+      "name": "deploy_service",
+      "status": "passed",
+      "method": "POST"
+    },
+    {
+      "name": "get_performance_metrics",
+      "status": "passed",
+      "method": "GET"
+    },
+    {
+      "name": "get_memory_profile",
+      "status": "passed",
+      "method": "GET"
+    },
+    {
+      "name": "get_cpu_profile",
+      "status": "passed",
+      "method": "GET"
+    },
+    {
+      "name": "list_profiling_sessions",
+      "status": "passed",
+      "method": "GET"
+    },
+    {
+      "name": "get_security_report",
+      "status": "passed",
+      "method": "GET"
+    },
+    {
+      "name": "check_compliance",
+      "status": "passed",
+      "method": "POST"
+    },
+    {
+      "name": "scan_dependencies",
+      "status": "passed",
+      "method": "POST"
+    },
+    {
+      "name": "list_security_policies",
+      "status": "passed",
+      "method": "GET"
+    },
+    {
+      "name": "trae_stream_capture",
+      "status": "error",
+      "error": "HTTP 500",
+      "method": "POST"
+    },
+    {
+      "name": "trae_stream_snapshot",
+      "status": "error",
+      "error": "HTTP 405",
+      "method": "GET"
+    },
+    {
+      "name": "trae_monitoring_stats",
+      "status": "error",
+      "error": "HTTP 405",
+      "method": "GET"
+    },
+    {
+      "name": "store_memory",
+      "status": "error",
+      "error": "timed out",
+      "method": "POST"
+    },
+    {
+      "name": "search_perspective_memories",
+      "status": "passed",
+      "method": "POST"
+    },
+    {
+      "name": "delete_memory",
+      "status": "passed",
+      "method": "POST"
+    }
+  ]
+}

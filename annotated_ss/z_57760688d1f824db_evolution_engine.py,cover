@@ -1,0 +1,948 @@
+> r"""
+> 天机进化引擎 (Tianji Evolution Engine) v1.1
+> =============================================
+> 让天机从"被动仓库"变成"能自我进化的主动大脑"的关键模块。
+  
+> v1.1: M7 升级 — _tick_loop自动闭环 + SQLite持久化 + _report_to_monitor
+  
+> OBSERVE → LEARN → EVOLVE 闭环的第三步:
+>   OBSERVE: CausalPairRecorder 记录行动前后状态和效果
+>   LEARN:   ClosedLoopLearningEngine 三层学习(模式识别+策略优化+能力发现)
+>   EVOLVE:  EvolutionEngine 自修改规则系统(参数调优+规则增补+架构演化)
+  
+> DeepSeek驾驭者角色:
+>   - 参数调优: DeepSeek分析效果数据，建议最优参数值
+>   - 规则增补: DeepSeek发现新模式，生成新规则并验证
+>   - 架构演化: DeepSeek评估系统瓶颈，建议架构级变更
+  
+> 三级进化:
+>   Level-1 参数调优: 修改阈值、权重、间隔等可调参数 (自动执行)
+>   Level-2 规则增补: 添加新的决策规则/处理逻辑 (需DeepSeek验证)
+>   Level-3 架构演化: 修改模块间关系/数据流/处理管线 (需人工确认)
+  
+> 安全约束:
+>   - Level-1: 自动执行，但记录变更日志
+>   - Level-2: DeepSeek验证后自动执行，保留回滚能力
+>   - Level-3: 仅生成建议，必须人工确认后才执行
+>   - 所有变更必须可回滚(保留变更前快照)
+>   - 变更频率限制: Level-1每小时最多10次, Level-2每天最多5次, Level-3每周最多1次
+  
+> 架构位置: 天机/core/evolution_engine.py
+> 依赖: 天机/core/deepseek_driver.py, 天机/core/learning_loop.py
+> """
+  
+> import json
+> import time
+> import copy
+> import hashlib
+> import sqlite3
+> import threading
+> import logging
+> from typing import Any, Optional, Dict, List, Tuple
+> from dataclasses import dataclass, field
+> from datetime import datetime
+> from pathlib import Path
+> from enum import Enum
+  
+> _DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+  
+  
+> logger = logging.getLogger("tianji.evolution")
+  
+  
+> class EvolutionLevel(str, Enum):
+>     PARAMETER_TUNING = "level_1_parameter_tuning"
+>     RULE_ADDITION = "level_2_rule_addition"
+>     ARCHITECTURE_EVOLUTION = "level_3_architecture_evolution"
+  
+  
+> class EvolutionStatus(str, Enum):
+>     PROPOSED = "proposed"
+>     VALIDATED = "validated"
+>     APPLIED = "applied"
+>     ROLLED_BACK = "rolled_back"
+>     REJECTED = "rejected"
+  
+  
+> @dataclass
+> class RuleChange:
+>     rule_name: str
+>     old_value: Any
+>     new_value: Any
+>     level: EvolutionLevel
+>     reason: str
+>     confidence: float
+>     deepseek_validated: bool = False
+>     deepseek_assessment: str = ""
+>     change_id: str = ""
+>     timestamp: float = field(default_factory=time.time)
+>     status: EvolutionStatus = EvolutionStatus.PROPOSED
+>     rollback_snapshot: Dict[str, Any] = field(default_factory=dict)
+  
+>     def __post_init__(self):
+!         if not self.change_id:
+!             raw = f"{self.rule_name}:{self.new_value}:{self.timestamp}"
+!             self.change_id = hashlib.md5(raw.encode()).hexdigest()[:12]
+  
+>     def to_dict(self) -> dict:
+!         return {
+!             "change_id": self.change_id,
+!             "rule_name": self.rule_name,
+!             "old_value": str(self.old_value)[:200],
+!             "new_value": str(self.new_value)[:200],
+!             "level": self.level.value,
+!             "reason": self.reason[:500],
+!             "confidence": self.confidence,
+!             "deepseek_validated": self.deepseek_validated,
+!             "status": self.status.value,
+!             "timestamp": self.timestamp,
+!         }
+  
+  
+> @dataclass
+> class ArchitectureProposal:
+>     proposal_id: str
+>     title: str
+>     description: str
+>     current_architecture: str
+>     proposed_change: str
+>     expected_benefit: str
+>     risk_assessment: str
+>     deepseek_analysis: str
+>     confidence: float
+>     requires_human_approval: bool = True
+>     status: EvolutionStatus = EvolutionStatus.PROPOSED
+>     timestamp: float = field(default_factory=time.time)
+  
+>     def to_dict(self) -> dict:
+!         return {
+!             "proposal_id": self.proposal_id,
+!             "title": self.title,
+!             "description": self.description[:500],
+!             "proposed_change": self.proposed_change[:500],
+!             "expected_benefit": self.expected_benefit[:300],
+!             "risk_assessment": self.risk_assessment[:300],
+!             "confidence": self.confidence,
+!             "requires_human_approval": self.requires_human_approval,
+!             "status": self.status.value,
+!         }
+  
+  
+> class EvolutionEngine:
+>     """
+>     天机进化引擎 — EVOLVE核心
+  
+>     三级进化能力:
+>       Level-1 参数调优: 自动修改阈值/权重/间隔
+>       Level-2 规则增补: DeepSeek验证后添加新规则
+>       Level-3 架构演化: 生成架构变更建议(需人工确认)
+  
+>     DeepSeek驾驭者在此模块的核心作用:
+>       1. 分析因果对数据，判断哪些参数需要调优
+>       2. 验证新规则的有效性和安全性
+>       3. 评估架构瓶颈并生成演化建议
+>     """
+  
+>     RATE_LIMITS = {
+>         EvolutionLevel.PARAMETER_TUNING: {"max_per_hour": 10, "max_per_day": 50},
+>         EvolutionLevel.RULE_ADDITION: {"max_per_hour": 3, "max_per_day": 5},
+>         EvolutionLevel.ARCHITECTURE_EVOLUTION: {"max_per_hour": 1, "max_per_day": 1},
+>     }
+  
+>     PARAMETER_SCHEMA = {
+>         "deep_think_interval": {
+>             "type": "float",
+>             "min": 60.0,
+>             "max": 3600.0,
+>             "description": "深度思考循环间隔(秒)",
+>         },
+>         "evolution_interval": {
+>             "type": "float",
+>             "min": 3600.0,
+>             "max": 604800.0,
+>             "description": "进化反思循环间隔(秒)",
+>         },
+>         "complexity_threshold_mcp_calls": {
+>             "type": "int",
+>             "min": 2,
+>             "max": 20,
+>             "description": "MCP调用次数复杂度阈值",
+>         },
+>         "complexity_threshold_duration_ms": {
+>             "type": "int",
+>             "min": 5000,
+>             "max": 120000,
+>             "description": "持续时间复杂度阈值(毫秒)",
+>         },
+>         "error_target_layer": {
+>             "type": "str",
+>             "allowed": ["sensory", "working", "episodic", "semantic", "meta"],
+>             "description": "错误信息存储目标层",
+>         },
+>         "conversation_target_layer": {
+>             "type": "str",
+>             "allowed": ["sensory", "working", "episodic", "semantic"],
+>             "description": "对话内容存储目标层",
+>         },
+>         "complete_conversation_target_layer": {
+>             "type": "str",
+>             "allowed": ["working", "episodic", "semantic"],
+>             "description": "完整对话存储目标层",
+>         },
+>     }
+  
+>     def __init__(self, config: Optional[Dict] = None,
+>                  persist_dir: Optional[Path] = None,
+>                  recorder: Optional[Any] = None):
+!         self._config = config or {}
+!         self._persist_dir = persist_dir or _DATA_DIR / "evolution_history"
+!         self._change_history: List[RuleChange] = []
+!         self._architecture_proposals: List[ArchitectureProposal] = []
+!         self._lock = threading.Lock()
+!         self._recorder = recorder
+!         self._tick_thread: Optional[threading.Thread] = None
+!         self._tick_running = False
+!         self._tick_interval = 300.0
+!         self._rate_tracker: Dict[str, List[float]] = {
+!             "level_1_parameter_tuning": [],
+!             "level_2_rule_addition": [],
+!             "level_3_architecture_evolution": [],
+!         }
+  
+!         self._stats = {
+!             "total_changes_proposed": 0,
+!             "total_changes_applied": 0,
+!             "total_changes_rolled_back": 0,
+!             "total_architecture_proposals": 0,
+!             "deepseek_validations": 0,
+!             "auto_tuning_successes": 0,
+!             "auto_tuning_failures": 0,
+!             "tick_loops": 0,
+!         }
+  
+!         self._init_sqlite()
+  
+>     def evolve_from_learning(self, causal_pairs: List,
+>                               effectiveness_summary: Dict,
+>                               mutable_rules: Dict[str, Any],
+>                               decision_engine=None) -> Dict:
+>         """
+>         从LEARN结果执行EVOLVE — 进化反思循环C的核心
+  
+>         流程:
+>           1. 分析因果对和效果摘要
+>           2. Level-1: 参数调优 (自动)
+>           3. Level-2: 规则增补 (DeepSeek验证)
+>           4. Level-3: 架构演化 (生成建议)
+>           5. 返回所有变更记录
+>         """
+!         result = {
+!             "rules_modified": [],
+!             "rules_added": [],
+!             "skills_created": [],
+!             "architecture_proposals": [],
+!             "evolution_summary": "",
+!         }
+  
+!         if not causal_pairs and not effectiveness_summary:
+!             return result
+  
+!         level1_changes = self._evolve_parameter_tuning(
+!             causal_pairs, effectiveness_summary, mutable_rules, decision_engine
+!         )
+!         result["rules_modified"].extend(level1_changes)
+  
+!         level2_changes = self._evolve_rule_addition(
+!             causal_pairs, effectiveness_summary, mutable_rules, decision_engine
+!         )
+!         result["rules_added"].extend(level2_changes)
+  
+!         level3_proposals = self._evolve_architecture(
+!             causal_pairs, effectiveness_summary, decision_engine
+!         )
+!         result["architecture_proposals"].extend(level3_proposals)
+  
+!         total_changes = len(level1_changes) + len(level2_changes)
+!         result["evolution_summary"] = (
+!             f"参数调优={len(level1_changes)}, "
+!             f"规则增补={len(level2_changes)}, "
+!             f"架构建议={len(level3_proposals)}"
+!         )
+  
+!         self._persist_evolution_result(result)
+!         return result
+  
+>     def _evolve_parameter_tuning(self, causal_pairs: List,
+>                                   effectiveness_summary: Dict,
+>                                   mutable_rules: Dict[str, Any],
+>                                   decision_engine=None) -> List[Dict]:
+>         """
+>         Level-1 参数调优 — 自动修改可调参数
+  
+>         调优策略:
+>           1. 如果某行动效果持续好 → 提升相关参数(更积极)
+>           2. 如果某行动效果持续差 → 降低相关参数(更保守)
+>           3. DeepSeek参与: 当效果数据模糊时，DeepSeek给出调优方向
+>         """
+!         changes: List[Dict] = []
+  
+!         if not self._check_rate_limit(EvolutionLevel.PARAMETER_TUNING):
+!             return changes
+  
+!         for action, stats in effectiveness_summary.items():
+!             avg_eff = stats.get("avg_effectiveness", 0.0)
+!             positive_rate = stats.get("positive_rate", 0.0)
+!             count = stats.get("count", 0)
+  
+!             if count < 5:
+!                 continue
+  
+!             tuning_suggestions = self._generate_tuning_suggestions(
+!                 action, avg_eff, positive_rate, count, mutable_rules
+!             )
+  
+!             for suggestion in tuning_suggestions:
+!                 rule_name = suggestion["rule_name"]
+!                 new_value = suggestion["new_value"]
+  
+!                 if rule_name not in mutable_rules:
+!                     continue
+  
+!                 if not self._validate_parameter(rule_name, new_value):
+!                     continue
+  
+!                 if not self._check_rate_limit(EvolutionLevel.PARAMETER_TUNING):
+!                     break
+  
+!                 old_value = mutable_rules[rule_name]
+!                 if old_value == new_value:
+!                     continue
+  
+!                 deepseek_validated = False
+!                 deepseek_assessment = ""
+  
+!                 if decision_engine and decision_engine.is_ready:
+!                     try:
+!                         validation = self._deepseek_validate_tuning(
+!                             rule_name, old_value, new_value,
+!                             action, stats, decision_engine
+!                         )
+!                         deepseek_validated = validation.get("approved", False)
+!                         deepseek_assessment = validation.get("reason", "")
+!                         self._stats["deepseek_validations"] += 1
+!                     except Exception as e:
+!                         logger.warning(f"DeepSeek tuning validation failed: {e}")
+!                         deepseek_validated = True
+!                 else:
+!                     deepseek_validated = True
+  
+!                 if not deepseek_validated:
+!                     continue
+  
+!                 change = RuleChange(
+!                     rule_name=rule_name,
+!                     old_value=old_value,
+!                     new_value=new_value,
+!                     level=EvolutionLevel.PARAMETER_TUNING,
+!                     reason=suggestion["reason"],
+!                     confidence=suggestion["confidence"],
+!                     deepseek_validated=deepseek_validated,
+!                     deepseek_assessment=deepseek_assessment,
+!                     rollback_snapshot={rule_name: copy.deepcopy(old_value)},
+!                 )
+  
+!                 change.status = EvolutionStatus.APPLIED
+!                 self._record_change(change)
+!                 self._stats["total_changes_applied"] += 1
+!                 self._stats["auto_tuning_successes"] += 1
+!                 mutable_rules[rule_name] = new_value
+  
+!                 changes.append({
+!                     "rule": rule_name,
+!                     "old_value": old_value,
+!                     "new_value": new_value,
+!                     "reason": suggestion["reason"],
+!                     "confidence": suggestion["confidence"],
+!                     "deepseek_validated": deepseek_validated,
+!                 })
+  
+!         return changes
+  
+>     def _generate_tuning_suggestions(self, action: str, avg_eff: float,
+>                                       positive_rate: float, count: int,
+>                                       mutable_rules: Dict) -> List[Dict]:
+!         suggestions = []
+  
+!         if action in ("store_conversation_input", "store_conversation_output"):
+!             if avg_eff > 0.5 and positive_rate > 0.8:
+!                 if mutable_rules.get("conversation_target_layer") == "sensory":
+!                     suggestions.append({
+!                         "rule_name": "conversation_target_layer",
+!                         "new_value": "working",
+!                         "reason": f"对话存储效果优秀(avg_eff={avg_eff:.2f})，提升到working层",
+!                         "confidence": min(0.95, positive_rate),
+!                     })
+!             elif avg_eff < -0.05 and positive_rate < 0.4:
+!                 if mutable_rules.get("conversation_target_layer") != "sensory":
+!                     suggestions.append({
+!                         "rule_name": "conversation_target_layer",
+!                         "new_value": "sensory",
+!                         "reason": f"对话存储效果不佳(avg_eff={avg_eff:.2f})，降级到sensory层",
+!                         "confidence": min(0.9, 1 - positive_rate),
+!                     })
+  
+!         if action == "store_error":
+!             if avg_eff > 0.3 and positive_rate > 0.7:
+!                 if mutable_rules.get("error_target_layer") == "episodic":
+!                     suggestions.append({
+!                         "rule_name": "error_target_layer",
+!                         "new_value": "semantic",
+!                         "reason": f"错误存储效果好(avg_eff={avg_eff:.2f})，提升到semantic层",
+!                         "confidence": min(0.9, positive_rate),
+!                     })
+  
+!         if action == "deep_think_evolution":
+!             if avg_eff < 0.1:
+!                 current_interval = mutable_rules.get("deep_think_interval", 300.0)
+!                 new_interval = min(3600.0, current_interval * 1.5)
+!                 suggestions.append({
+!                     "rule_name": "deep_think_interval",
+!                     "new_value": new_interval,
+!                     "reason": f"深度思考效果低(avg_eff={avg_eff:.2f})，降低频率到{new_interval:.0f}秒",
+!                     "confidence": 0.7,
+!                 })
+!             elif avg_eff > 0.5 and positive_rate > 0.8:
+!                 current_interval = mutable_rules.get("deep_think_interval", 300.0)
+!                 new_interval = max(60.0, current_interval * 0.8)
+!                 suggestions.append({
+!                     "rule_name": "deep_think_interval",
+!                     "new_value": new_interval,
+!                     "reason": f"深度思考效果优秀(avg_eff={avg_eff:.2f})，提高频率到{new_interval:.0f}秒",
+!                     "confidence": min(0.9, positive_rate),
+!                 })
+  
+!         if action == "fallback_store":
+!             if positive_rate < 0.3:
+!                 current_threshold = mutable_rules.get(
+!                     "complexity_threshold_mcp_calls", 5
+!                 )
+!                 new_threshold = max(2, current_threshold - 1)
+!                 suggestions.append({
+!                     "rule_name": "complexity_threshold_mcp_calls",
+!                     "new_value": new_threshold,
+!                     "reason": f"fallback比例过高(正面率={positive_rate:.0%})，降低复杂度阈值",
+!                     "confidence": 0.75,
+!                 })
+  
+!         return suggestions
+  
+>     def _validate_parameter(self, rule_name: str, new_value: Any) -> bool:
+!         schema = self.PARAMETER_SCHEMA.get(rule_name)
+!         if not schema:
+!             return False
+  
+!         if schema["type"] == "float":
+!             try:
+!                 val = float(new_value)
+!                 return schema.get("min", float("-inf")) <= val <= schema.get("max", float("inf"))
+!             except (TypeError, ValueError):
+!                 return False
+  
+!         if schema["type"] == "int":
+!             try:
+!                 val = int(new_value)
+!                 return schema.get("min", float("-inf")) <= val <= schema.get("max", float("inf"))
+!             except (TypeError, ValueError):
+!                 return False
+  
+!         if schema["type"] == "str":
+!             allowed = schema.get("allowed", [])
+!             return new_value in allowed if allowed else True
+  
+!         return True
+  
+>     def _deepseek_validate_tuning(self, rule_name: str, old_value: Any,
+>                                    new_value: Any, action: str, stats: Dict,
+>                                    decision_engine) -> Dict:
+!         try:
+!             prompt = f"""验证天机系统参数调优是否安全合理:
+  
+! 参数: {rule_name}
+! 当前值: {old_value}
+! 建议值: {new_value}
+! 触发行动: {action}
+! 效果数据: {json.dumps(stats, ensure_ascii=False)}
+  
+! 请判断:
+! 1. 这个调优是否安全? (不会导致系统崩溃或数据丢失)
+! 2. 这个调优是否合理? (方向正确，幅度适中)
+! 3. 是否有更好的调优值?
+  
+! 返回JSON:
+! {{"approved": true/false, "reason": "...", "better_value": null或建议值}}"""
+  
+!             result = decision_engine.client.chat_sync(
+!                 prompt,
+!                 "你是天机系统的参数调优验证专家。严格验证参数变更的安全性和合理性。返回JSON。"
+!             )
+!             if isinstance(result, dict):
+!                 better = result.get("better_value")
+!                 if better is not None:
+!                     if self._validate_parameter(rule_name, better):
+!                         result["adjusted_value"] = better
+!                 return result
+!             return {"approved": True, "reason": "DeepSeek返回格式异常，默认通过"}
+!         except Exception as e:
+!             logger.warning(f"DeepSeek tuning validation error: {e}")
+!             return {"approved": True, "reason": f"验证异常: {e}"}
+  
+>     def _evolve_rule_addition(self, causal_pairs: List,
+>                                effectiveness_summary: Dict,
+>                                mutable_rules: Dict[str, Any],
+>                                decision_engine=None) -> List[Dict]:
+>         """
+>         Level-2 规则增补 — DeepSeek验证后添加新规则
+  
+>         场景:
+>           1. 发现新的行动模式 → 添加对应处理规则
+>           2. 发现反模式 → 添加规避规则
+>           3. DeepSeek分析效果数据 → 建议新规则
+>         """
+!         new_rules: List[Dict] = []
+  
+!         if not self._check_rate_limit(EvolutionLevel.RULE_ADDITION):
+!             return new_rules
+  
+!         for action, stats in effectiveness_summary.items():
+!             avg_eff = stats.get("avg_effectiveness", 0.0)
+!             count = stats.get("count", 0)
+  
+!             if count < 10:
+!                 continue
+  
+!             if avg_eff < -0.2 and count >= 10:
+!                 rule_name = f"avoid_{action}"
+!                 if rule_name not in mutable_rules:
+!                     if decision_engine and decision_engine.is_ready:
+!                         try:
+!                             new_rule = self._deepseek_propose_rule(
+!                                 action, stats, decision_engine
+!                             )
+!                             if new_rule and new_rule.get("approved"):
+!                                 mutable_rules[rule_name] = new_rule.get(
+!                                     "rule_value", True
+!                                 )
+!                                 change = RuleChange(
+!                                     rule_name=rule_name,
+!                                     old_value=None,
+!                                     new_value=new_rule.get("rule_value", True),
+!                                     level=EvolutionLevel.RULE_ADDITION,
+!                                     reason=new_rule.get("reason", ""),
+!                                     confidence=new_rule.get("confidence", 0.5),
+!                                     deepseek_validated=True,
+!                                     deepseek_assessment=new_rule.get("reason", ""),
+!                                 )
+!                                 change.status = EvolutionStatus.APPLIED
+!                                 self._record_change(change)
+!                                 self._stats["total_changes_applied"] += 1
+  
+!                                 new_rules.append({
+!                                     "rule": rule_name,
+!                                     "value": new_rule.get("rule_value", True),
+!                                     "reason": new_rule.get("reason", ""),
+!                                     "deepseek_validated": True,
+!                                 })
+!                         except Exception as e:
+!                             logger.warning(f"Rule addition failed: {e}")
+  
+!         return new_rules
+  
+>     def _deepseek_propose_rule(self, action: str, stats: Dict,
+>                                 decision_engine) -> Optional[Dict]:
+!         try:
+!             prompt = f"""天机系统发现一个持续效果差的行动模式，请提出规避规则:
+  
+! 行动: {action}
+! 效果数据: {json.dumps(stats, ensure_ascii=False)}
+  
+! 请分析:
+! 1. 为什么这个行动效果差?
+! 2. 应该添加什么规则来规避或改善?
+! 3. 规则的具体值应该是什么?
+  
+! 返回JSON:
+! {{"approved": true, "rule_value": "...", "reason": "...", "confidence": 0.8}}"""
+  
+!             result = decision_engine.client.chat_sync(
+!                 prompt,
+!                 "你是天机系统的规则设计专家。为效果差的行动设计规避规则。返回JSON。"
+!             )
+!             return result if isinstance(result, dict) else None
+!         except Exception:
+!             return None
+  
+>     def _evolve_architecture(self, causal_pairs: List,
+>                               effectiveness_summary: Dict,
+>                               decision_engine=None) -> List[Dict]:
+>         """
+>         Level-3 架构演化 — 生成架构变更建议(需人工确认)
+  
+>         DeepSeek在此层的核心作用:
+>           1. 分析系统级瓶颈(如某层过度膨胀、某路径反复失败)
+>           2. 提出架构级改进建议(如新增处理管线、修改数据流)
+>           3. 评估风险和收益
+>         """
+!         proposals: List[Dict] = []
+  
+!         if not self._check_rate_limit(EvolutionLevel.ARCHITECTURE_EVOLUTION):
+!             return proposals
+  
+!         bottleneck_signals = self._detect_architecture_bottlenecks(
+!             causal_pairs, effectiveness_summary
+!         )
+  
+!         if not bottleneck_signals:
+!             return proposals
+  
+!         if decision_engine and decision_engine.is_ready:
+!             try:
+!                 arch_proposals = self._deepseek_architecture_analysis(
+!                     bottleneck_signals, decision_engine
+!                 )
+!                 for prop in arch_proposals:
+!                     proposal = ArchitectureProposal(
+!                         proposal_id=hashlib.md5(
+!                             f"arch:{prop.get('title', '')}:{time.time()}".encode()
+!                         ).hexdigest()[:12],
+!                         title=prop.get("title", "架构优化建议"),
+!                         description=prop.get("description", ""),
+!                         current_architecture=prop.get("current", ""),
+!                         proposed_change=prop.get("proposed", ""),
+!                         expected_benefit=prop.get("benefit", ""),
+!                         risk_assessment=prop.get("risk", ""),
+!                         deepseek_analysis=prop.get("analysis", ""),
+!                         confidence=prop.get("confidence", 0.5),
+!                     )
+!                     self._architecture_proposals.append(proposal)
+!                     self._stats["total_architecture_proposals"] += 1
+!                     proposals.append(proposal.to_dict())
+!             except Exception as e:
+!                 logger.warning(f"Architecture evolution failed: {e}")
+  
+!         return proposals
+  
+>     def _detect_architecture_bottlenecks(self, causal_pairs: List,
+>                                           effectiveness_summary: Dict) -> List[Dict]:
+!         bottlenecks = []
+  
+!         for action, stats in effectiveness_summary.items():
+!             count = stats.get("count", 0)
+!             avg_eff = stats.get("avg_effectiveness", 0.0)
+!             if count > 50 and avg_eff < -0.1:
+!                 bottlenecks.append({
+!                     "type": "persistent_negative_action",
+!                     "action": action,
+!                     "count": count,
+!                     "avg_effectiveness": avg_eff,
+!                     "severity": "high",
+!                     "description": f"行动'{action}'执行{count}次，平均效果{avg_eff:.2f}，可能需要架构级改进",
+!                 })
+  
+!         fallback_count = sum(
+!             1 for p in causal_pairs
+!             if "fallback" in getattr(p, 'action', '')
+!         )
+!         total = len(causal_pairs)
+!         if total > 20 and fallback_count / total > 0.4:
+!             bottlenecks.append({
+!                 "type": "high_fallback_rate",
+!                 "metric": f"{fallback_count}/{total} = {fallback_count/total:.0%}",
+!                 "severity": "high",
+!                 "description": "系统fallback比例过高，DeepSeek决策覆盖不足，可能需要架构级改进",
+!             })
+  
+!         return bottlenecks
+  
+>     def _deepseek_architecture_analysis(self, bottlenecks: List[Dict],
+>                                          decision_engine) -> List[Dict]:
+!         try:
+!             prompt = f"""天机系统检测到以下架构级瓶颈，请提出架构演化建议:
+  
+! 瓶颈:
+! {json.dumps(bottlenecks[:5], ensure_ascii=False, indent=2)}
+  
+! 当前架构概要:
+! - DeepSeek驾驶者: 三循环并行(快速反应/深度思考/进化反思)
+! - 记忆系统: ICME六层(sensory/working/short_term/episodic/semantic/meta)
+! - 学习引擎: 三层学习(模式识别/策略优化/能力发现)
+! - 进化引擎: 三级进化(参数调优/规则增补/架构演化)
+  
+! 请提出架构改进建议，每个建议包含:
+! 1. 标题和描述
+! 2. 当前架构的问题
+! 3. 建议的变更
+! 4. 预期收益
+! 5. 风险评估
+! 6. 置信度(0-1)
+  
+! 返回JSON数组:
+! [{{"title": "...", "description": "...", "current": "...", "proposed": "...", "benefit": "...", "risk": "...", "analysis": "...", "confidence": 0.7}}]"""
+  
+!             result = decision_engine.client.chat_sync(
+!                 prompt,
+!                 "你是天机系统的架构师。分析系统瓶颈并提出架构级改进建议。返回JSON数组。"
+!             )
+!             if isinstance(result, list):
+!                 return result
+!             return []
+!         except Exception:
+!             return []
+  
+>     def _check_rate_limit(self, level: EvolutionLevel) -> bool:
+!         now = time.time()
+!         level_key = level.value
+!         if level_key not in self._rate_tracker:
+!             return True
+  
+!         recent = self._rate_tracker[level_key]
+!         recent[:] = [t for t in recent if now - t < 86400]
+  
+!         limits = self.RATE_LIMITS.get(level, {})
+!         if len(recent) >= limits.get("max_per_day", 999):
+!             return False
+  
+!         hour_ago = now - 3600
+!         hourly = sum(1 for t in recent if t > hour_ago)
+!         if hourly >= limits.get("max_per_hour", 999):
+!             return False
+  
+!         return True
+  
+>     def _record_change(self, change: RuleChange):
+!         with self._lock:
+!             self._change_history.append(change)
+!             self._stats["total_changes_proposed"] += 1
+  
+!             level_key = change.level.value
+!             if level_key in self._rate_tracker:
+!                 self._rate_tracker[level_key].append(time.time())
+  
+>     def rollback_change(self, change_id: str,
+>                          mutable_rules: Dict[str, Any]) -> bool:
+!         with self._lock:
+!             for change in self._change_history:
+!                 if change.change_id == change_id and change.status == EvolutionStatus.APPLIED:
+!                     if change.rollback_snapshot:
+!                         for rule, value in change.rollback_snapshot.items():
+!                             if rule in mutable_rules:
+!                                 mutable_rules[rule] = value
+!                         change.status = EvolutionStatus.ROLLED_BACK
+!                         self._stats["total_changes_rolled_back"] += 1
+!                         logger.info(
+!                             f"[EvolutionEngine] 回滚变更 {change_id}: "
+!                             f"{change.rule_name} 恢复到 {change.rollback_snapshot}"
+!                         )
+!                         return True
+!         return False
+  
+>     def process_evolution_signal(self, signal) -> Optional[str]:
+!         if not signal or not isinstance(signal, object):
+!             return None
+  
+!         signal_dict = {}
+!         if hasattr(signal, 'signal_type') and hasattr(signal, 'severity'):
+!             sig_type_raw = getattr(signal, 'signal_type', '')
+!             signal_dict = {
+!                 "signal_type": sig_type_raw.value if hasattr(sig_type_raw, 'value') else str(sig_type_raw),
+!                 "severity": getattr(signal, 'severity', 0.0),
+!                 "source_module": getattr(signal, 'source_module', ''),
+!             }
+!             if hasattr(signal, 'evolution_value'):
+!                 signal_dict["evolution_value"] = getattr(signal, 'evolution_value', 0)
+!         elif hasattr(signal, 'to_dict'):
+!             signal_dict = signal.to_dict()
+!         elif isinstance(signal, dict):
+!             signal_dict = signal
+  
+!         sig_type = signal_dict.get("signal_type", signal_dict.get("type", ""))
+!         severity = signal_dict.get("severity", 0.0)
+!         source = signal_dict.get("source_module", "")
+  
+!         if severity >= 0.6:
+!             self._stats["high_severity_signals"] = self._stats.get("high_severity_signals", 0) + 1
+!             return f"signal_routed:source={source},type={sig_type},severity={severity:.2f}"
+  
+!         evolution_value = signal_dict.get("evolution_value", 0)
+!         if evolution_value < 0.5:
+!             return None
+  
+!         return f"signal_recorded:evolution_value={evolution_value:.2f}"
+  
+>     def get_pending_architecture_proposals(self) -> List[Dict]:
+!         with self._lock:
+!             return [
+!                 p.to_dict() for p in self._architecture_proposals
+!                 if p.status == EvolutionStatus.PROPOSED
+!             ]
+  
+>     def approve_architecture_proposal(self, proposal_id: str) -> bool:
+!         with self._lock:
+!             for proposal in self._architecture_proposals:
+!                 if proposal.proposal_id == proposal_id:
+!                     proposal.status = EvolutionStatus.VALIDATED
+!                     logger.info(
+!                         f"[EvolutionEngine] 架构建议 {proposal_id} 已批准: "
+!                         f"{proposal.title}"
+!                     )
+!                     return True
+!         return False
+  
+>     def get_change_history(self, limit: int = 50) -> List[Dict]:
+!         with self._lock:
+!             return [c.to_dict() for c in self._change_history[-limit:]]
+  
+>     def get_stats(self) -> Dict:
+!         with self._lock:
+!             return {
+!                 **self._stats,
+!                 "total_changes_in_history": len(self._change_history),
+!                 "pending_architecture_proposals": len(
+!                     [p for p in self._architecture_proposals
+!                      if p.status == EvolutionStatus.PROPOSED]
+!                 ),
+!                 "rate_tracker": {
+!                     k: len(v) for k, v in self._rate_tracker.items()
+!                 },
+!             }
+  
+>     def _persist_evolution_result(self, result: Dict):
+!         try:
+!             self._persist_dir.mkdir(parents=True, exist_ok=True)
+!             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+!             result_file = self._persist_dir / f"evolution_{timestamp}.json"
+!             result_file.write_text(
+!                 json.dumps(result, ensure_ascii=False, indent=2, default=str),
+!                 encoding="utf-8",
+!             )
+!             self._persist_to_sqlite(result, timestamp)
+!         except Exception as e:
+!             logger.warning(f"Evolution result persist failed: {e}")
+  
+>     def _init_sqlite(self):
+!         try:
+!             self._persist_dir.mkdir(parents=True, exist_ok=True)
+!             db_path = self._persist_dir / "evolution_history.db"
+!             self._sqlite_conn = sqlite3.connect(str(db_path), check_same_thread=False)
+!             self._sqlite_conn.execute("""
+!                 CREATE TABLE IF NOT EXISTS evolution_history (
+!                     id INTEGER PRIMARY KEY AUTOINCREMENT,
+!                     timestamp TEXT NOT NULL,
+!                     result_json TEXT NOT NULL,
+!                     rules_modified INTEGER DEFAULT 0,
+!                     rules_added INTEGER DEFAULT 0,
+!                     architecture_proposals INTEGER DEFAULT 0,
+!                     summary TEXT DEFAULT ''
+!                 )
+!             """)
+!             self._sqlite_conn.execute("""
+!                 CREATE TABLE IF NOT EXISTS rule_changes (
+!                     change_id TEXT PRIMARY KEY,
+!                     timestamp REAL NOT NULL,
+!                     rule_name TEXT NOT NULL,
+!                     level TEXT NOT NULL,
+!                     old_value TEXT,
+!                     new_value TEXT,
+!                     reason TEXT,
+!                     confidence REAL,
+!                     status TEXT DEFAULT 'applied'
+!                 )
+!             """)
+!             self._sqlite_conn.commit()
+!             logger.info(f"[EvolutionEngine] SQLite初始化: {db_path}")
+!         except Exception as e:
+!             logger.warning(f"[EvolutionEngine] SQLite初始化失败: {e}")
+!             self._sqlite_conn = None
+  
+>     def _persist_to_sqlite(self, result: Dict, timestamp: str):
+!         if not self._sqlite_conn:
+!             return
+!         try:
+!             self._sqlite_conn.execute(
+!                 "INSERT INTO evolution_history (timestamp, result_json, rules_modified, rules_added, architecture_proposals, summary) VALUES (?, ?, ?, ?, ?, ?)",
+!                 (timestamp, json.dumps(result, ensure_ascii=False, default=str),
+!                  len(result.get("rules_modified", [])),
+!                  len(result.get("rules_added", [])),
+!                  len(result.get("architecture_proposals", [])),
+!                  result.get("evolution_summary", ""))
+!             )
+!             self._sqlite_conn.commit()
+!         except Exception as e:
+!             logger.debug(f"SQLite持久化跳过: {e}")
+  
+>     def _tick(self, mutable_rules: Dict[str, Any], decision_engine=None) -> Dict:
+!         causal_pairs = []
+!         effectiveness_summary = {}
+!         if self._recorder:
+!             try:
+!                 causal_pairs = self._recorder.get_pairs(limit=100)
+!                 raw_summary = self._recorder.get_effectiveness_summary()
+!                 by_action = raw_summary.get("by_action", {})
+!                 for act, s in by_action.items():
+!                     effectiveness_summary[act] = {
+!                         "avg_effectiveness": s.get("avg_effect", 0.0),
+!                         "positive_rate": s.get("positive_rate", 0.0),
+!                         "count": s.get("count", 0),
+!                     }
+!             except Exception:
+!                 pass
+  
+!         result = self.evolve_from_learning(
+!             causal_pairs, effectiveness_summary,
+!             mutable_rules, decision_engine
+!         )
+!         self._stats["tick_loops"] += 1
+!         self._report_to_monitor(result)
+!         return result
+  
+>     def _tick_loop(self, mutable_rules_getter, decision_engine_getter=None):
+!         while self._tick_running:
+!             try:
+!                 mutable_rules = mutable_rules_getter() if callable(mutable_rules_getter) else {}
+!                 de = decision_engine_getter() if callable(decision_engine_getter) else None
+!                 self._tick(mutable_rules, de)
+!             except Exception as e:
+!                 logger.debug(f"[EvolutionEngine] tick异常: {e}")
+!             time.sleep(self._tick_interval)
+  
+>     def start_tick_loop(self, mutable_rules_getter, decision_engine_getter=None):
+!         if self._tick_running:
+!             return
+!         self._tick_running = True
+!         self._tick_thread = threading.Thread(
+!             target=self._tick_loop,
+!             args=(mutable_rules_getter, decision_engine_getter),
+!             daemon=True,
+!         )
+!         self._tick_thread.start()
+!         logger.info(f"[EvolutionEngine] 自动Tick启动, 间隔={self._tick_interval}s")
+  
+>     def stop_tick_loop(self):
+!         self._tick_running = False
+!         if self._tick_thread:
+!             self._tick_thread.join(timeout=5.0)
+!             self._tick_thread = None
+!         logger.info("[EvolutionEngine] 自动Tick停止")
+  
+>     def _report_to_monitor(self, result: Dict):
+!         mod = len(result.get("rules_modified", []))
+!         add = len(result.get("rules_added", []))
+!         arch = len(result.get("architecture_proposals", []))
+!         if mod or add or arch:
+!             logger.info(
+!                 f"[EvolutionEngine] Tick报告: "
+!                 f"参数调优={mod}, 规则增补={add}, 架构建议={arch}"
+!             )
+  
+>     @property
+>     def is_tick_running(self) -> bool:
+!         return self._tick_running

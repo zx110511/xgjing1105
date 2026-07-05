@@ -1,0 +1,307 @@
+> r"""
+> 天机分布式事件总线 (Tianji Evolution Bus) v1.0
+> ========================================================
+> 灵境分布式就绪 — 函数调用→事件总线迁移核心
+  
+> 核心特性:
+>   1. 发布/订阅: 任意模块→事件广播→多订阅者解耦
+>   2. 事件类型路由: 按EventType过滤订阅
+>   3. 死信队列: 失败事件隔离+重试
+>   4. 持久化: SQLite事件日志，重启不丢
+>   5. 异步发布: 非阻塞publish
+  
+> 与灵境对接:
+>   灵境Phase 2: EvolutionBus → Kafka消息队列
+>   灵境Phase 3: 跨服务事件路由
+  
+> 架构位置: 天机/core/evolution_bus.py
+> 依赖: core/deepseek_driver (EventBus基类 + TianjiEvent/EventType)
+  
+> 灵境道谱溯源: D5-6【事件总线煞】· 道五·编排体道 · 四地煞之制之术
+> """
+  
+> import time
+> import json
+> import sqlite3
+> import logging
+> import threading
+> from typing import Any, Optional, Dict, List, Callable, Set
+> from pathlib import Path
+> from dataclasses import dataclass, field
+> from collections import deque, defaultdict
+> from concurrent.futures import ThreadPoolExecutor
+  
+> logger = logging.getLogger(__name__)
+  
+> try:
+>     from .deepseek_driver import EventBus, TianjiEvent, EventType
+! except ImportError:
+!     EventBus = object
+!     TianjiEvent = None
+!     EventType = None
+  
+  
+> @dataclass
+> class BusEvent:
+>     event_type: str
+>     source: str
+>     payload: Dict[str, Any]
+>     timestamp: float = field(default_factory=time.time)
+>     event_id: str = ""
+>     retry_count: int = 0
+>     max_retries: int = 3
+  
+>     def __post_init__(self):
+!         if not self.event_id:
+!             import hashlib
+!             raw = f"{self.event_type}:{self.source}:{self.timestamp}"
+!             self.event_id = hashlib.md5(raw.encode()).hexdigest()[:12]
+  
+>     def to_dict(self) -> dict:
+!         return {
+!             "event_id": self.event_id,
+!             "event_type": self.event_type,
+!             "source": self.source,
+!             "payload": self.payload,
+!             "timestamp": self.timestamp,
+!             "retry_count": self.retry_count,
+!         }
+  
+  
+> class EvolutionBus:
+>     """
+>     天机分布式事件总线 v1.0
+  
+>     用法:
+>       bus = EvolutionBus()
+>       bus.subscribe("module_a", "agent_action", handler_func)
+>       bus.publish("agent_action", "module_b", {"key": "val"})
+>     """
+  
+>     def __init__(
+>         self,
+>         db_path: str = "data/evolution_bus.db",
+>         max_queue: int = 5000,
+>         dlq_max: int = 500,
+>         async_workers: int = 2
+>     ):
+!         self._db_path = Path(db_path)
+!         self._db_path.parent.mkdir(parents=True, exist_ok=True)
+  
+!         self._queue: deque = deque(maxlen=max_queue)
+!         self._dlq: deque = deque(maxlen=dlq_max)
+!         self._subscribers: Dict[str, Dict[str, List[Callable]]] = defaultdict(lambda: defaultdict(list))
+!         self._lock = threading.RLock()
+!         self._executor = ThreadPoolExecutor(max_workers=async_workers)
+  
+!         self._stats = {
+!             "published": 0,
+!             "delivered": 0,
+!             "failed": 0,
+!             "dlq_size": 0,
+!             "started_at": time.time()
+!         }
+  
+!         self._init_db()
+!         self._replay_events()
+!         logger.info(f"EvolutionBus v1.0 initialized: {len(self._queue)} pending events")
+  
+>     def _init_db(self):
+!         try:
+!             conn = sqlite3.connect(str(self._db_path))
+!             conn.execute("PRAGMA journal_mode=WAL")
+!             conn.execute("""
+!                 CREATE TABLE IF NOT EXISTS event_log (
+!                     id INTEGER PRIMARY KEY AUTOINCREMENT,
+!                     event_id TEXT UNIQUE,
+!                     event_type TEXT NOT NULL,
+!                     source TEXT NOT NULL,
+!                     payload TEXT,
+!                     timestamp REAL,
+!                     status TEXT DEFAULT 'pending',
+!                     delivered_at REAL
+!                 )
+!             """)
+!             conn.execute("CREATE INDEX IF NOT EXISTS idx_event_type ON event_log(event_type)")
+!             conn.execute("CREATE INDEX IF NOT EXISTS idx_event_status ON event_log(status)")
+!             conn.commit()
+!             conn.close()
+!         except Exception as e:
+!             logger.warning(f"EvolutionBus DB init failed: {e}")
+  
+>     def _replay_events(self):
+!         try:
+!             conn = sqlite3.connect(str(self._db_path))
+!             rows = conn.execute(
+!                 "SELECT event_id, event_type, source, payload, timestamp FROM event_log WHERE status='pending' ORDER BY id LIMIT 200"
+!             ).fetchall()
+!             for row in rows:
+!                 event = BusEvent(
+!                     event_type=row[1], source=row[2],
+!                     payload=json.loads(row[3]) if row[3] else {},
+!                     timestamp=row[4], event_id=row[0]
+!                 )
+!                 self._queue.append(event)
+!             conn.close()
+!             if rows:
+!                 logger.info(f"EvolutionBus replayed {len(rows)} pending events")
+!         except Exception as e:
+!             logger.warning(f"Event replay failed: {e}")
+  
+>     def _persist_event(self, event: BusEvent):
+!         try:
+!             conn = sqlite3.connect(str(self._db_path))
+!             conn.execute(
+!                 "INSERT OR IGNORE INTO event_log(event_id, event_type, source, payload, timestamp, status) VALUES(?,?,?,?,?,?)",
+!                 (event.event_id, event.event_type, event.source, json.dumps(event.payload, ensure_ascii=False), event.timestamp, 'pending')
+!             )
+!             conn.commit()
+!             conn.close()
+!         except Exception:
+!             pass
+  
+>     def _mark_delivered(self, event_id: str):
+!         try:
+!             conn = sqlite3.connect(str(self._db_path))
+!             conn.execute("UPDATE event_log SET status='delivered', delivered_at=? WHERE event_id=?", (time.time(), event_id))
+!             conn.commit()
+!             conn.close()
+!         except Exception:
+!             pass
+  
+>     def _mark_failed(self, event_id: str):
+!         try:
+!             conn = sqlite3.connect(str(self._db_path))
+!             conn.execute("UPDATE event_log SET status='failed' WHERE event_id=?", (event_id,))
+!             conn.commit()
+!             conn.close()
+!         except Exception:
+!             pass
+  
+>     def publish(self, event_type: str, source: str, payload: Dict[str, Any], async_mode: bool = True) -> str:
+>         """
+>         发布事件
+  
+>         Args:
+>             event_type: 事件类型 (agent_action/memory_write/module_status/...)
+>             source: 事件来源模块
+>             payload: 事件负载
+>             async_mode: 是否异步投递
+  
+>         Returns:
+>             event_id
+>         """
+!         event = BusEvent(event_type=event_type, source=source, payload=payload)
+  
+!         with self._lock:
+!             self._queue.append(event)
+!             self._stats["published"] += 1
+  
+!         self._persist_event(event)
+  
+!         if async_mode:
+!             self._executor.submit(self._deliver, event)
+!         else:
+!             self._deliver(event)
+  
+!         return event.event_id
+  
+>     def subscribe(self, subscriber_id: str, event_type: str, callback: Callable):
+>         """
+>         订阅事件
+  
+>         Args:
+>             subscriber_id: 订阅者ID (模块名)
+>             event_type: 关注的事件类型 ('*' = 全订阅)
+>             callback: 回调函数 callback(event: BusEvent)
+>         """
+!         with self._lock:
+!             self._subscribers[subscriber_id][event_type].append(callback)
+!             logger.debug(f"Subscriber '{subscriber_id}' -> event_type='{event_type}'")
+  
+>     def unsubscribe(self, subscriber_id: str, event_type: str = None):
+!         with self._lock:
+!             if event_type:
+!                 self._subscribers[subscriber_id].pop(event_type, None)
+!             else:
+!                 self._subscribers.pop(subscriber_id, None)
+  
+>     def _deliver(self, event: BusEvent):
+!         delivered_any = False
+!         for sub_id, type_map in self._subscribers.items():
+!             callbacks = type_map.get(event.event_type, [])
+!             callbacks += type_map.get("*", [])
+!             for cb in callbacks:
+!                 try:
+!                     cb(event)
+!                     delivered_any = True
+!                     self._stats["delivered"] += 1
+!                 except Exception as e:
+!                     logger.warning(f"Delivery failed: {sub_id}→{event.event_type}: {e}")
+!                     self._stats["failed"] += 1
+!                     self._handle_delivery_failure(event)
+  
+!         if delivered_any:
+!             self._mark_delivered(event.event_id)
+  
+>     def _handle_delivery_failure(self, event: BusEvent):
+!         event.retry_count += 1
+!         if event.retry_count < event.max_retries:
+!             self._queue.appendleft(event)
+!             logger.debug(f"Event {event.event_id} retry {event.retry_count}/{event.max_retries}")
+!         else:
+!             self._dlq.append(event)
+!             self._stats["dlq_size"] += 1
+!             self._mark_failed(event.event_id)
+!             logger.warning(f"Event {event.event_id} moved to DLQ after {event.retry_count} retries")
+  
+>     def drain_dlq(self, max_items: int = 50) -> int:
+>         """从死信队列恢复事件"""
+!         recovered = 0
+!         with self._lock:
+!             for _ in range(min(max_items, len(self._dlq))):
+!                 event = self._dlq.popleft()
+!                 event.retry_count = 0
+!                 self._queue.append(event)
+!                 recovered += 1
+!                 self._stats["dlq_size"] -= 1
+!         if recovered:
+!             logger.info(f"DLQ drained: {recovered} events recovered")
+!         return recovered
+  
+>     def get_stats(self) -> Dict[str, Any]:
+!         with self._lock:
+!             return {
+!                 **self._stats,
+!                 "queue_size": len(self._queue),
+!                 "dlq_size": len(self._dlq),
+!                 "subscriber_count": len(self._subscribers),
+!                 "event_types_watched": len({et for m in self._subscribers.values() for et in m.keys()}),
+!                 "uptime_seconds": round(time.time() - self._stats["started_at"], 1),
+!             }
+  
+>     def health_check(self) -> Dict[str, Any]:
+!         stats = self.get_stats()
+!         is_healthy = stats["failed"] < max(stats["delivered"], 1) * 0.05
+!         return {
+!             "status": "healthy" if is_healthy else "degraded",
+!             "failure_rate": round(stats["failed"] / max(stats["delivered"] + stats["failed"], 1) * 100, 1),
+!             **stats
+!         }
+  
+>     def shutdown(self):
+!         self._executor.shutdown(wait=True)
+!         logger.info("EvolutionBus shutdown complete")
+  
+  
+> _GLOBAL_BUS: Optional[EvolutionBus] = None
+> _BUS_LOCK = threading.Lock()
+  
+  
+> def get_evolution_bus() -> EvolutionBus:
+>     """获取全局单例EvolutionBus"""
+>     global _GLOBAL_BUS
+!     with _BUS_LOCK:
+!         if _GLOBAL_BUS is None:
+!             _GLOBAL_BUS = EvolutionBus()
+!         return _GLOBAL_BUS

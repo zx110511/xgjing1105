@@ -1,0 +1,28 @@
+{
+  "id": "test-verify",
+  "title": "新对话",
+  "messages": [
+    {
+      "id": "msg-b26917fd",
+      "role": "user",
+      "content": "你好,请简短回复",
+      "timestamp": 1782087008.0041547,
+      "token_count": 8,
+      "fidelity": "full"
+    },
+    {
+      "id": "msg-b867a613",
+      "role": "assistant",
+      "content": "你好！我是**天机AI助手**，随时为你服务。请说。",
+      "timestamp": 1782087020.8533673,
+      "token_count": 17,
+      "fidelity": "full"
+    }
+  ],
+  "total_tokens": 17,
+  "summary": "",
+  "created_at": 1782087008.0020359,
+  "updated_at": 1782087020.8533673,
+  "message_count": 2,
+  "pinned": false
+}

@@ -1,0 +1,59 @@
+# 天机v9.1 Nuitka编译配置
+# 用于将Python后端编译为独立exe
+
+[project]
+name = "tianji-backend"
+version = "9.1.0"
+description = "天机v9.1 Python后端 - Nuitka编译配置"
+
+[nuitka]
+# 基础编译选项
+standalone = true
+onefile = false  # 不打包单文件，便于调试和资源访问
+follow-imports = true
+lto = "yes"  # 链接时优化
+
+# 包含插件目录
+include-package = [
+    "core",
+    "server",
+    "mcp",
+    "agents",
+    "adapters",
+    "active_memory",
+    "config",
+]
+
+# 数据文件包含
+include-data-file = [
+    "data/.memory/=data/.memory/",
+    "config/tianji.conf=config/tianji.conf",
+]
+
+# 隐式导入处理（FastAPI/Pydantic等需要）
+follow-include = [
+    "pydantic",
+    "fastapi",
+    "uvicorn",
+    "starlette",
+    "sqlalchemy",
+    "aiohttp",
+    "httpx",
+    "openai",
+    "tiktoken",
+    "numpy",
+    "orjson",
+]
+
+# Windows特定选项
+windows-disable-console = false  # 保留控制台便于调试
+windows-icon-from-ico = "assets/icon.ico"
+
+# 输出目录
+output-dir = "dist/binaries"
+output-filename = "tianji-backend.exe"
+
+[environment]
+# 环境变量
+AI_MEMORY_PORT = "8778"
+TIANJI_EDITION = "compiled-exe"

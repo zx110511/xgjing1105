@@ -1,0 +1,211 @@
+{
+  "_meta": {
+    "version": "1.1.0",
+    "description": "天机v9.1 对话生命周期自检参考 (Trae IDE不识别此格式，由Agent自觉执行)",
+    "scope": "project",
+    "created": "2026-06-29",
+    "created_by": "@lingxi (灵犀) - 对话完整性守护者",
+    "source": "天机自定义 (Trae IDE原生不支持lifecycle hooks，本文件作为Agent自检参考)",
+    "last_updated": "2026-07-04",
+    "important_note": "Trae IDE不执行本文件，Agent必须依据 .trae/rules/project_rules.md 第0节必做清单自觉执行"
+  },
+
+  "hooks": {
+    "onConversationStart": {
+      "enabled": true,
+      "actions": [
+        {
+          "type": "injectContext",
+          "source": ".trae/rules/project_rules.md",
+          "priority": "high"
+        },
+        {
+          "type": "loadMcpServers",
+          "source": ".trae/mcp.json",
+          "priority": "critical"
+        },
+        {
+          "type": "memoryRecall",
+          "source": "memory-engine-global",
+          "query": "会话启动: 项目上下文 + 最近操作历史",
+          "layer": "L3",
+          "priority": "high"
+        }
+      ]
+    },
+
+    "onConversationEnd": {
+      "enabled": true,
+      "actions": [
+        {
+          "type": "memoryRemember",
+          "source": "memory-engine-global",
+          "content": "对话完整记录归档",
+          "layer": "L3",
+          "tags": ["conversation-archive", "auto-capture"],
+          "priority": "critical"
+        },
+        {
+          "type": "auditCheck",
+          "checklist": [
+            "对话是否完整记录到L3 Episodic",
+            "文件变更是否同步到记忆系统",
+            "关键决策是否记录到L5 Meta"
+          ],
+          "onFailure": "补充记录后重试",
+          "priority": "high"
+        },
+        {
+          "type": "conversationSummary",
+          "source": "memory-engine-global",
+          "tool": "tianji_summarize_conversation",
+          "priority": "high"
+        }
+      ]
+    },
+
+    "onTaskStart": {
+      "enabled": true,
+      "actions": [
+        {
+          "type": "contextExtract",
+          "source": "agent-framework-global",
+          "tool": "context_extract",
+          "description": "提取任务结构化信息",
+          "priority": "high"
+        },
+        {
+          "type": "memoryRecall",
+          "source": "memory-engine-global",
+          "query": "任务相关历史经验和知识",
+          "layers": ["L3", "L4"],
+          "priority": "high"
+        },
+        {
+          "type": "ruleEvaluate",
+          "source": "agent-framework-global",
+          "tool": "rule_evaluate",
+          "description": "评估任务是否符合天机宪法和法则",
+          "priority": "critical"
+        }
+      ]
+    },
+
+    "onTaskComplete": {
+      "enabled": true,
+      "actions": [
+        {
+          "type": "memoryRemember",
+          "source": "memory-engine-global",
+          "content": "任务完成: 结果+影响+教训归档",
+          "layer": "L3",
+          "tags": ["task-complete", "auto-capture"],
+          "priority": "critical"
+        },
+        {
+          "type": "qualityGate",
+          "source": "agent-framework-global",
+          "tool": "rule_evaluate",
+          "check": "六维评分 >= 9.95",
+          "priority": "high"
+        },
+        {
+          "type": "soulQuestion",
+          "question": "真的能用吗？代码真的能跑通、能闭环、能支撑真实场景？",
+          "priority": "critical"
+        }
+      ]
+    },
+
+    "onTaskError": {
+      "enabled": true,
+      "actions": [
+        {
+          "type": "captureError",
+          "content": "原始错误捕获",
+          "layer": "L0",
+          "priority": "critical"
+        },
+        {
+          "type": "rootCauseAnalysis",
+          "source": "memory-engine-global",
+          "tool": "tianji_extract_knowledge",
+          "priority": "high"
+        },
+        {
+          "type": "evolutionTrigger",
+          "source": "agent-framework-global",
+          "tool": "system_status",
+          "description": "触发进化反思环，更新L5 Meta策略",
+          "condition": "error.is_critical === true",
+          "priority": "critical"
+        },
+        {
+          "type": "escalate",
+          "target": "@tianshu",
+          "condition": "error.severity === 'severe'",
+          "priority": "critical"
+        }
+      ]
+    },
+
+    "onAgentSwitch": {
+      "enabled": true,
+      "actions": [
+        {
+          "type": "tvpDeclare",
+          "format": "TVP: {source_agent} → {target_agent} | 任务: {task_type} | 原因: {reason}",
+          "priority": "critical"
+        },
+        {
+          "type": "contextHandoff",
+          "source": "agent-framework-global",
+          "tool": "vap_handoff",
+          "description": "传递上下文到目标Agent",
+          "priority": "high"
+        }
+      ]
+    },
+
+    "onFileWrite": {
+      "enabled": true,
+      "actions": [
+        {
+          "type": "memoryFileCapture",
+          "source": "memory-engine-global",
+          "tool": "trae_stream_capture",
+          "description": "文件变更自动捕获到记忆系统",
+          "priority": "high"
+        },
+        {
+          "type": "workingMemoryUpdate",
+          "content": "文件操作意图记录",
+          "layer": "L1",
+          "priority": "medium"
+        }
+      ]
+    },
+
+    "onDecision": {
+      "enabled": true,
+      "actions": [
+        {
+          "type": "memoryRecall",
+          "source": "memory-engine-global",
+          "description": "决策前检索历史经验和知识",
+          "layers": ["L3", "L4", "L5"],
+          "priority": "high",
+          "condition": "decision.complexity !== 'trivial'"
+        },
+        {
+          "type": "memoryRemember",
+          "source": "memory-engine-global",
+          "description": "决策后记录决策过程",
+          "layer": "L5",
+          "priority": "high",
+          "condition": "decision.impact === 'system'"
+        }
+      ]
+    }
+  }
+}

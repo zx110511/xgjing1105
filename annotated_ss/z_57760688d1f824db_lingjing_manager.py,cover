@@ -1,0 +1,505 @@
+> r"""
+> 灵境分布式总控管理器 (Lingjing Distributed Manager) v1.0
+> ==============================================================
+> 天机v8.2灵境完全体 — 统一管理gRPC/注册中心/熔断限流/事件总线/Docker
+  
+> 核心特性:
+>   1. gRPC服务器生命周期: start/stop/status
+>   2. ServiceRegistry聚合视图: 服务清单+健康状态
+>   3. CircuitBreaker/RateLimiter实时状态
+>   4. EvolutionBus事件统计+死信队列
+>   5. Docker compose编排状态
+>   6. Knowledge Graph拓扑统计
+>   7. SSS审计结果
+>   8. Agent调度能力总览
+  
+> 与桌面启动器集成:
+>   tianji_launcher.py → LingjingManager → 托盘菜单"灵境分布式"
+  
+> 架构位置: 天机/core/lingjing_manager.py
+> 依赖: core/grpc_server, core/grpc_client, core/service_registry, core/resilience, core/evolution_bus
+> """
+  
+> import os
+> import sys
+> import json
+> import time
+> import threading
+> import logging
+> import subprocess
+> import http.client
+> from pathlib import Path
+> from datetime import datetime
+> from typing import Any, Optional, Dict, List, Callable
+  
+> logger = logging.getLogger(__name__)
+  
+> APP_DIR = Path(__file__).resolve().parent.parent
+> PORT = 8771
+> GRPC_PORT = 8701
+> REGISTRY_GRPC_PORT = 8702
+> BASE_URL = f"http://127.0.0.1:{PORT}"
+  
+  
+> def _api_get(path: str, timeout: int = 5) -> Optional[dict]:
+!     try:
+!         conn = http.client.HTTPConnection("127.0.0.1", PORT, timeout=timeout)
+!         conn.request("GET", path)
+!         resp = conn.getresponse()
+!         if resp.status == 200:
+!             return json.loads(resp.read().decode())
+!         return None
+!     except Exception:
+!         return None
+  
+  
+> def _api_post(path: str, data: dict = None, timeout: int = 10) -> Optional[dict]:
+!     try:
+!         body = json.dumps(data) if data else "{}"
+!         conn = http.client.HTTPConnection("127.0.0.1", PORT, timeout=timeout)
+!         conn.request("POST", path, body, {"Content-Type": "application/json"})
+!         resp = conn.getresponse()
+!         if resp.status in (200, 201, 202):
+!             return json.loads(resp.read().decode())
+!         return None
+!     except Exception:
+!         return None
+  
+  
+> class GRPCServerManager:
+>     def __init__(self):
+!         self._process: Optional[subprocess.Popen] = None
+!         self._running = False
+  
+>     def start(self) -> dict:
+!         if self._running:
+!             return {"status": "already_running", "port": GRPC_PORT}
+  
+!         try:
+!             from core.grpc_server import TianjiGRPCServer
+!             self._server = TianjiGRPCServer(port=GRPC_PORT, registry_port=REGISTRY_GRPC_PORT)
+!             self._thread = threading.Thread(target=self._server.start, daemon=True)
+!             self._thread.start()
+!             time.sleep(0.5)
+!             self._running = True
+!             return {"status": "started", "port": GRPC_PORT, "registry_port": REGISTRY_GRPC_PORT}
+!         except ImportError as e:
+!             return {"status": "error", "msg": f"grpc模块不可用: {e}"}
+!         except Exception as e:
+!             return {"status": "error", "msg": str(e)}
+  
+>     def stop(self) -> dict:
+!         if not self._running:
+!             return {"status": "not_running"}
+  
+!         try:
+!             if hasattr(self, '_server') and self._server:
+!                 self._server.stop()
+!             self._running = False
+!             return {"status": "stopped"}
+!         except Exception as e:
+!             return {"status": "error", "msg": str(e)}
+  
+>     def status(self) -> dict:
+!         result = {
+!             "running": self._running,
+!             "port": GRPC_PORT,
+!             "registry_port": REGISTRY_GRPC_PORT,
+!         }
+!         try:
+!             import socket
+!             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+!             s.settimeout(1)
+!             result["port_listening"] = s.connect_ex(("127.0.0.1", GRPC_PORT)) == 0
+!             s.close()
+!         except Exception:
+!             result["port_listening"] = False
+!         return result
+  
+  
+> class ServiceRegistryViewer:
+>     def __init__(self):
+!         self._last_scan: Optional[datetime] = None
+  
+>     def status(self) -> dict:
+!         result = {
+!             "services": [],
+!             "total": 0,
+!             "online": 0,
+!             "degraded": 0,
+!             "offline": 0,
+!             "last_scan": self._last_scan.isoformat() if self._last_scan else None,
+!         }
+  
+!         try:
+!             from core.service_registry import get_service_registry
+!             reg = get_service_registry()
+!             all_services = reg.discover()
+  
+!             for svc in all_services:
+!                 entry = {
+!                     "service_id": getattr(svc, "service_id", "unknown"),
+!                     "name": getattr(svc, "name", "unknown"),
+!                     "host": getattr(svc, "host", "unknown"),
+!                     "port": getattr(svc, "port", 0),
+!                     "layer": getattr(svc, "layer", "L0"),
+!                     "status": getattr(svc, "status", "unknown"),
+!                     "last_heartbeat": getattr(svc, "last_heartbeat", None),
+!                 }
+!                 if hasattr(entry["status"], "value"):
+!                     entry["status"] = entry["status"].value
+!                 result["services"].append(entry)
+!                 if entry["status"] == "online":
+!                     result["online"] += 1
+!                 elif entry["status"] == "degraded":
+!                     result["degraded"] += 1
+!                 else:
+!                     result["offline"] += 1
+  
+!             result["total"] = len(all_services)
+!             result["agent_capabilities"] = reg.get_agent_capabilities() if hasattr(reg, "get_agent_capabilities") else {}
+!         except ImportError:
+!             result["error"] = "service_registry模块未加载"
+!         except Exception as e:
+!             result["error"] = str(e)
+  
+!         self._last_scan = datetime.now()
+!         return result
+  
+  
+> class ResilienceViewer:
+>     def __init__(self):
+!         self._last_scan: Optional[datetime] = None
+  
+>     def status(self) -> dict:
+!         result = {
+!             "circuit_breakers": [],
+!             "rate_limiters": [],
+!             "total_cb": 0,
+!             "total_rl": 0,
+!             "last_scan": self._last_scan.isoformat() if self._last_scan else None,
+!         }
+  
+!         try:
+!             from core.resilience import get_resilience_manager
+!             rm = get_resilience_manager()
+  
+!             cb_status = rm.get_circuit_breaker_status() if hasattr(rm, "get_circuit_breaker_status") else {}
+!             for name, cb in cb_status.items():
+!                 result["circuit_breakers"].append({
+!                     "name": name,
+!                     "state": getattr(cb, "state", "unknown") if hasattr(cb, "state") else cb.get("state", "unknown"),
+!                     "failure_count": getattr(cb, "failure_count", 0) if hasattr(cb, "failure_count") else cb.get("failure_count", 0),
+!                     "success_count": getattr(cb, "success_count", 0) if hasattr(cb, "success_count") else cb.get("success_count", 0),
+!                 })
+  
+!             rl_status = rm.get_rate_limiter_status() if hasattr(rm, "get_rate_limiter_status") else {}
+!             for name, rl in rl_status.items():
+!                 result["rate_limiters"].append({
+!                     "name": name,
+!                     "tokens_available": getattr(rl, "tokens", 0) if hasattr(rl, "tokens") else rl.get("tokens", 0),
+!                     "max_tokens": getattr(rl, "max_tokens", 0) if hasattr(rl, "max_tokens") else rl.get("max_tokens", 0),
+!                 })
+  
+!             result["total_cb"] = len(result["circuit_breakers"])
+!             result["total_rl"] = len(result["rate_limiters"])
+!             result["manager_healthy"] = rm.health_check() if hasattr(rm, "health_check") else True
+!         except ImportError:
+!             result["error"] = "resilience模块未加载"
+!         except Exception as e:
+!             result["error"] = str(e)
+  
+!         self._last_scan = datetime.now()
+!         return result
+  
+  
+> class EvolutionBusViewer:
+>     def __init__(self):
+!         self._last_scan: Optional[datetime] = None
+  
+>     def status(self) -> dict:
+!         result = {
+!             "total_events": 0,
+!             "active_subscribers": 0,
+!             "dlq_size": 0,
+!             "module_count": 0,
+!             "modules": [],
+!             "events_by_type": {},
+!             "last_scan": self._last_scan.isoformat() if self._last_scan else None,
+!         }
+  
+!         try:
+!             from core.evolution_bus import get_evolution_bus
+!             bus = get_evolution_bus()
+!             stats = bus.get_stats() if hasattr(bus, "get_stats") else {}
+  
+!             result["total_events"] = stats.get("total_events", 0)
+!             result["active_subscribers"] = stats.get("active_subscribers", 0)
+!             result["dlq_size"] = stats.get("dlq_size", 0)
+!             result["module_count"] = stats.get("module_count", 0)
+!             result["modules"] = stats.get("modules", [])
+!             result["events_by_type"] = stats.get("events_by_type", {})
+!             result["healthy"] = bus.is_healthy() if hasattr(bus, "is_healthy") else True
+!         except ImportError:
+!             result["error"] = "evolution_bus模块未加载"
+!         except Exception as e:
+!             result["error"] = str(e)
+  
+!         self._last_scan = datetime.now()
+!         return result
+  
+  
+> class DockerManager:
+>     def __init__(self):
+!         self._compose_file = APP_DIR / "docker-compose.yml"
+!         self._dockerfile = APP_DIR / "Dockerfile.lingjing"
+  
+>     def status(self) -> dict:
+!         result = {
+!             "compose_exists": self._compose_file.exists(),
+!             "dockerfile_exists": self._dockerfile.exists(),
+!             "docker_installed": False,
+!             "containers_running": [],
+!             "total_containers": 0,
+!         }
+  
+!         try:
+!             r = subprocess.run(["docker", "--version"], capture_output=True, text=True, timeout=5)
+!             result["docker_installed"] = r.returncode == 0
+!             result["docker_version"] = r.stdout.strip() if r.returncode == 0 else "N/A"
+!         except FileNotFoundError:
+!             result["docker_installed"] = False
+!         except Exception as e:
+!             result["docker_error"] = str(e)
+  
+!         if result["docker_installed"]:
+!             try:
+!                 r = subprocess.run(
+!                     ["docker", "compose", "-f", str(self._compose_file), "ps", "--format", "json"],
+!                     capture_output=True, text=True, timeout=10
+!                 )
+!                 if r.returncode == 0 and r.stdout.strip():
+!                     for line in r.stdout.strip().splitlines():
+!                         try:
+!                             c = json.loads(line)
+!                             result["containers_running"].append({
+!                                 "name": c.get("Name", "?"),
+!                                 "status": c.get("State", "?"),
+!                                 "port": c.get("PublishedPorts", "?"),
+!                             })
+!                         except json.JSONDecodeError:
+!                             pass
+!             except Exception as e:
+!                 result["compose_error"] = str(e)
+  
+!         result["total_containers"] = len(result["containers_running"])
+!         return result
+  
+>     def up(self) -> dict:
+!         if not self._compose_file.exists():
+!             return {"status": "error", "msg": "docker-compose.yml不存在"}
+!         try:
+!             r = subprocess.run(
+!                 ["docker", "compose", "-f", str(self._compose_file), "up", "-d"],
+!                 capture_output=True, text=True, timeout=60
+!             )
+!             return {
+!                 "status": "started" if r.returncode == 0 else "error",
+!                 "returncode": r.returncode,
+!                 "stdout": r.stdout[-500:],
+!                 "stderr": r.stderr[-500:],
+!             }
+!         except FileNotFoundError:
+!             return {"status": "error", "msg": "Docker未安装"}
+!         except Exception as e:
+!             return {"status": "error", "msg": str(e)}
+  
+>     def down(self) -> dict:
+!         if not self._compose_file.exists():
+!             return {"status": "error", "msg": "docker-compose.yml不存在"}
+!         try:
+!             r = subprocess.run(
+!                 ["docker", "compose", "-f", str(self._compose_file), "down"],
+!                 capture_output=True, text=True, timeout=30
+!             )
+!             return {
+!                 "status": "stopped" if r.returncode == 0 else "error",
+!                 "returncode": r.returncode,
+!             }
+!         except FileNotFoundError:
+!             return {"status": "error", "msg": "Docker未安装"}
+!         except Exception as e:
+!             return {"status": "error", "msg": str(e)}
+  
+  
+> class KnowledgeGraphViewer:
+>     def __init__(self):
+!         self._last_scan: Optional[datetime] = None
+  
+>     def status(self) -> dict:
+!         result = {
+!             "node_count": 0,
+!             "edge_count": 0,
+!             "sss_audit": {},
+!             "topology_sample": {},
+!             "last_scan": self._last_scan.isoformat() if self._last_scan else None,
+!         }
+  
+!         db_path = APP_DIR / "data" / ".memory" / "icme.db"
+!         if not db_path.exists():
+!             result["error"] = "icme.db不存在"
+!             return result
+  
+!         try:
+!             import sqlite3
+!             conn = sqlite3.connect(str(db_path), timeout=10)
+!             c = conn.cursor()
+  
+!             tables = [r[0] for r in c.execute(
+!                 "SELECT name FROM sqlite_master WHERE type='table'"
+!             ).fetchall()]
+  
+!             if "knowledge_graph" in tables:
+!                 result["node_count"] = c.execute(
+!                     "SELECT COUNT(*) FROM knowledge_graph"
+!                 ).fetchone()[0]
+!             if "knowledge_edges" in tables:
+!                 result["edge_count"] = c.execute(
+!                     "SELECT COUNT(*) FROM knowledge_edges"
+!                 ).fetchone()[0]
+  
+!             conn.close()
+!         except Exception as e:
+!             result["error"] = str(e)
+  
+!         audit = _api_get("/api/kg/sss-audit")
+!         if audit:
+!             results = audit.get("results", [])
+!             passed = sum(1 for r in results if r.get("passed"))
+!             result["sss_audit"] = {
+!                 "total": len(results),
+!                 "passed": passed,
+!                 "failed": len(results) - passed,
+!             }
+  
+!         topo = _api_get("/api/kg/topology?mode=sample&sample_rate=0.1&max_nodes=50")
+!         if topo:
+!             result["topology_sample"] = {
+!                 "nodes": len(topo.get("nodes", [])),
+!                 "edges": len(topo.get("edges", [])),
+!             }
+  
+!         self._last_scan = datetime.now()
+!         return result
+  
+  
+> class AgentDispatchViewer:
+>     def __init__(self):
+!         self._agent_count = 23
+!         self._agent_names = [
+!             "tiewei", "yiku", "dongcha", "luling", "lingxi",
+!             "tianshu", "wenzong", "miaobi", "mingjing", "tiansuan", "jingwei", "kuangshi",
+!             "baiqiao", "shiguan", "jinshu",
+!             "qianli", "gongzao", "zhenshan", "zhuiguang",
+!             "lianli", "huasheng", "wanxiang"
+!         ]
+  
+>     def status(self) -> dict:
+!         result = {
+!             "total_agents": self._agent_count,
+!             "agents": [],
+!             "scheduler_status": {},
+!         }
+  
+!         sch = _api_get("/api/orchestrator/status")
+!         if sch:
+!             result["scheduler_status"] = sch
+  
+!         for name in self._agent_names:
+!             agent_file = APP_DIR / "agents" / f"{name}.py"
+!             result["agents"].append({
+!                 "name": name,
+!                 "file_exists": agent_file.exists(),
+!                 "file_size_kb": round(agent_file.stat().st_size / 1024, 2) if agent_file.exists() else 0,
+!             })
+  
+!         try:
+!             from core.agent_serializer import get_serializer
+!             serializer = get_serializer()
+!             result["serialization"] = {
+!                 "ready": True,
+!                 "count": len(serializer.list_agents()) if hasattr(serializer, "list_agents") else 0,
+!             }
+!         except ImportError:
+!             result["serialization"] = {"ready": False, "msg": "agent_serializer未加载"}
+  
+!         try:
+!             from core.agent_orchestrator import AgentOrchestrator
+!             orch = AgentOrchestrator()
+!             pipelines = getattr(orch, "active_pipelines", [])
+!             result["active_pipelines"] = len(pipelines) if pipelines else 0
+!         except ImportError:
+!             result["active_pipelines"] = 0
+  
+!         return result
+  
+  
+> class LingjingManager:
+>     def __init__(self):
+!         self.grpc = GRPCServerManager()
+!         self.registry = ServiceRegistryViewer()
+!         self.resilience = ResilienceViewer()
+!         self.eventbus = EvolutionBusViewer()
+!         self.docker = DockerManager()
+!         self.kg = KnowledgeGraphViewer()
+!         self.agents = AgentDispatchViewer()
+!         self._start_time = datetime.now()
+  
+>     def full_status(self) -> dict:
+!         return {
+!             "timestamp": datetime.now().isoformat(),
+!             "uptime_seconds": int((datetime.now() - self._start_time).total_seconds()),
+!             "grpc_server": self.grpc.status(),
+!             "service_registry": self.registry.status(),
+!             "resilience": self.resilience.status(),
+!             "event_bus": self.eventbus.status(),
+!             "docker": self.docker.status(),
+!             "knowledge_graph": self.kg.status(),
+!             "agent_dispatch": self.agents.status(),
+!             "server_health": _api_get("/api/health"),
+!         }
+  
+>     def summary(self) -> dict:
+!         status = self.full_status()
+!         return {
+!             "grpc": "running" if status["grpc_server"]["running"] else "stopped",
+!             "services": status["service_registry"]["total"],
+!             "circuit_breakers": status["resilience"]["total_cb"],
+!             "events": status["event_bus"]["total_events"],
+!             "docker_containers": status["docker"]["total_containers"],
+!             "kg_nodes": status["knowledge_graph"]["node_count"],
+!             "agents": status["agent_dispatch"]["total_agents"],
+!         }
+  
+>     def start_all(self) -> dict:
+!         results = {}
+!         results["grpc"] = self.grpc.start()
+!         if self.docker._compose_file.exists():
+!             results["docker"] = self.docker.up()
+!         return results
+  
+>     def stop_all(self) -> dict:
+!         results = {}
+!         results["grpc"] = self.grpc.stop()
+!         results["docker"] = self.docker.down()
+!         return results
+  
+  
+> _lingjing_instance: Optional[LingjingManager] = None
+  
+  
+> def get_lingjing_manager() -> LingjingManager:
+>     global _lingjing_instance
+!     if _lingjing_instance is None:
+!         _lingjing_instance = LingjingManager()
+!     return _lingjing_instance

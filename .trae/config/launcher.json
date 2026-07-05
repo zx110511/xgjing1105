@@ -1,0 +1,80 @@
+{
+    "version": "4.1.0",
+    "name": "元初系统 Trae 启动配置",
+    "description": "天机v9.1原生集成 - AI记忆系统平台级服务 + MCP六Server",
+    "services": {
+        "auto_start": {
+            "enabled": false,
+            "comment": "v4.2: 天机服务通过launcher.tianji_v91_launcher启动, 端口8771"
+        },
+        "ports": {
+            "tianji_native": {
+                "port": 8771,
+                "api_docs": "http://127.0.0.1:8771/docs",
+                "status": "primary"
+            },
+            "nexus_memory": {
+                "port": 8768,
+                "api_docs": "http://127.0.0.1:8768/docs",
+                "status": "deprecated"
+            },
+            "unified_bridge": {
+                "port": 8080,
+                "api_docs": "http://127.0.0.1:8080/docs",
+                "status": "deprecated"
+            },
+            "trae_runtime": {
+                "port": 8000,
+                "api_docs": "http://127.0.0.1:8000/docs",
+                "status": "deprecated"
+            }
+        }
+    },
+    "launch_sequence": [
+        {
+            "step": 1,
+            "service": "memory-engine-global",
+            "port": 8771,
+            "command": "D:\\元初系统\\天机v9.1\\python\\python.exe -m launcher.tianji_v91_launcher",
+            "workdir": "D:\\元初系统\\天机v9.1",
+            "wait_timeout_secs": 30
+        }
+    ],
+    "health_endpoints": {
+        "primary": "http://127.0.0.1:8771/api/health",
+        "legacy_runtime": "http://127.0.0.1:8000/api/health",
+        "legacy_nexus": "http://127.0.0.1:8768/health"
+    },
+    "trae_integration": {
+        "mode": "standalone",
+        "primary_memory_endpoint": "http://127.0.0.1:8771",
+        "mcp_servers": "stdio (保持运行, 不影响性能)"
+    },
+    "tianji_system": {
+        "endpoint": "http://127.0.0.1:8771",
+        "api_docs": "http://127.0.0.1:8771/docs",
+        "health": "http://127.0.0.1:8771/api/health",
+        "version": "9.1.0",
+        "features": [
+            "REST API",
+            "WebSocket",
+            "语义搜索",
+            "自动摘要",
+            "知识图谱",
+            "多平台适配",
+            "Skill自动发现",
+            "闭环学习",
+            "工作流编排",
+            "异步桥接",
+            "统一网关",
+            "DeepSeek驾驶",
+            "TVP透明调度",
+            "主动记忆推送",
+            "治理模块",
+            "模块注册表",
+            "静态分析",
+            "质量门禁",
+            "治理流水线"
+        ]
+    }
+}

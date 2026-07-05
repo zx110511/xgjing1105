@@ -1,0 +1,28 @@
+{
+  "id": "test-stream",
+  "title": "新对话",
+  "messages": [
+    {
+      "id": "msg-1da9f95d",
+      "role": "user",
+      "content": "测试修复后对话",
+      "timestamp": 1782090106.01681,
+      "token_count": 7,
+      "fidelity": "full"
+    },
+    {
+      "id": "msg-2bd7e0e1",
+      "role": "assistant",
+      "content": "好的！我来测试修复后的对话功能。首先，根据 **常识1（对话全量录入审计）** 和 **常识6（修复闭环审计）**，我需要先检索相关记忆，了解修复上下文。好的，环境是Windows系统，我用正确的命令检查：\n\n<｜｜DSML｜｜tool_calls>\n<｜｜DSML｜｜invoke name=\"execute_command\">\n<｜｜DSML｜｜parameter name=\"command\" string=\"true\">dir C:\\Users\\Administrator\\AppData\\Local\\tianji-memory\\ 2>nul || dir C:\\tianji-memory 2>nul || echo 检查其他路径</｜｜DSML｜｜parameter>\n<｜｜DSML｜｜parameter name=\"timeout\" string=\"false\">15</｜｜DSML｜｜parameter>\n</｜｜DSML｜｜invoke>\n</｜｜DSML｜｜tool_calls>",
+      "timestamp": 1782090156.6257224,
+      "token_count": 158,
+      "fidelity": "full"
+    }
+  ],
+  "total_tokens": 158,
+  "summary": "",
+  "created_at": 1782090105.9242787,
+  "updated_at": 1782090156.6257224,
+  "message_count": 2,
+  "pinned": false
+}

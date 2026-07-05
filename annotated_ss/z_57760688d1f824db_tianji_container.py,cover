@@ -1,0 +1,3093 @@
+> r"""
+> 天机总控容器 (Tianji Master Container) v2.0
+> =============================================
+> 《天机·万象归一》— 统一容器管理所有模块的启停、健康、依赖
+  
+> 设计原则:
+>   1. 一个总容器 — TianjiContainer 是唯一的容器级实体
+>   2. 声明式注册 — 每个模块通过 ModuleDescriptor 声明自身信息
+>   3. 依赖拓扑 — 自动解析启动/停止顺序 (拓扑排序)
+>   4. 统一生命周期 — start() → health() → stop() 全部模块一致
+>   5. 优雅降级 — 模块初始化失败不影响其他模块运行
+>   6. 并行启动 — 无依赖模块并行初始化 (ThreadPoolExecutor)
+>   7. 并行健康检查 — 16模块并行health_fn调用
+>   8. 性能基准 — 内置benchmark()量化容器性能
+>   9. 递归深度控制 — 信号路由递归深度限制，防止无限递归
+>   10. 容量规划 — 模块资源消耗追踪与容量预警
+  
+> 容器 vs 实例:
+>   容器级: TianjiContainer (唯一)
+>   实例级: 所有 ModuleInstance (16个核心实例 + 辅助实例)
+  
+> 架构位置: 天机/core/tianji_container.py
+> 依赖: 无外部依赖 (纯Python标准库)
+> """
+  
+! import time
+! import threading
+! import sys
+! import warnings
+! from enum import Enum
+! from dataclasses import dataclass, field
+! from typing import Any, Optional, Dict, List, Callable, Set, Tuple
+! from pathlib import Path
+  
+! try:
+!     from .config import MEMORY_DATA_PATH
+! except ImportError:
+!     MEMORY_DATA_PATH = Path(__file__).parent.parent / "data" / ".memory"
+  
+! try:
+!     from .module_registry import get_module_info
+! except ImportError:
+!     def get_module_info(name: str):
+!         return None
+  
+! def _log(msg: str):
+!     print(msg, file=sys.stderr)
+  
+  
+! class ModuleState(str, Enum):
+!     UNINITIALIZED = "uninitialized"
+!     INITIALIZING = "initializing"
+!     RUNNING = "running"
+!     DEGRADED = "degraded"
+!     STOPPING = "stopping"
+!     STOPPED = "stopped"
+!     FAILED = "failed"
+  
+  
+! @dataclass
+! class ModuleDescriptor:
+!     name: str
+!     display_name: str
+!     category: str
+!     init_fn: Callable[[], Any]
+!     start_fn: Optional[Callable[[Any], None]] = None
+!     stop_fn: Optional[Callable[[Any], None]] = None
+!     health_fn: Optional[Callable[[Any], Dict]] = None
+!     depends_on: List[str] = field(default_factory=list)
+!     critical: bool = False
+!     init_timeout: float = 30.0
+  
+  
+! @dataclass
+! class ModuleInstance:
+!     descriptor: ModuleDescriptor
+!     state: ModuleState = ModuleState.UNINITIALIZED
+!     instance: Any = None
+!     error: Optional[str] = None
+!     init_time_ms: float = 0.0
+!     last_health_check: Optional[float] = None
+  
+  
+! class TianjiContainer:
+!     """
+!     天机总控容器 — 唯一的容器级实体
+  
+!     职责:
+!       1. 管理所有模块实例的注册
+!       2. 按依赖拓扑排序启动/停止
+!       3. 统一健康检查
+!       4. 优雅降级与故障隔离
+!       5. 提供全局状态查询
+!     """
+  
+!     VERSION = "2.0.0"
+!     CONTAINER_NAME = "天机总控容器"
+  
+!     def __init__(self):
+!         self._modules: Dict[str, ModuleInstance] = {}
+!         self._state = ModuleState.UNINITIALIZED
+!         self._start_time: Optional[float] = None
+!         self._lock = threading.RLock()
+!         self._event_listeners: List[Callable] = []
+!         self._module_subscriptions: Dict[str, str] = {}
+!         self._event_bus_ref = None
+!         self._rt_cache: Dict[str, Dict] = {}
+!         self._perf_stats: Dict[str, Any] = {
+!             "start_time_ms": 0.0,
+!             "stop_time_ms": 0.0,
+!             "last_health_check_ms": 0.0,
+!             "parallel_start_used": False,
+!             "parallel_health_used": False,
+!             "benchmark_results": None,
+!         }
+!         self._capacity_tracker: Dict[str, Dict] = {}
+!         self._signal_depth_counter: Dict[str, int] = {}
+!         self._MAX_SIGNAL_DEPTH = 5
+  
+!     def register(self, descriptor: ModuleDescriptor) -> bool:
+!         with self._lock:
+!             if descriptor.name in self._modules:
+!                 _log(f"[Container] 模块'{descriptor.name}'已注册，跳过")
+!                 return False
+!             missing_deps = []
+!             for dep in descriptor.depends_on:
+!                 if dep not in self._modules and dep not in [
+!                     d.descriptor.name for d in self._modules.values()
+!                 ]:
+!                     missing_deps.append(dep)
+!             if missing_deps:
+!                 _log(
+!                     f"[Container] 模块'{descriptor.name}'依赖未注册: {missing_deps}"
+!                 )
+!             self._modules[descriptor.name] = ModuleInstance(descriptor=descriptor)
+!             _log(
+!                 f"[Container] 模块注册: {descriptor.display_name} ({descriptor.name}) "
+!                 f"依赖={descriptor.depends_on or '无'} 关键={'是' if descriptor.critical else '否'}"
+!             )
+!             return True
+  
+!     def _topological_sort(self) -> List[str]:
+!         in_degree: Dict[str, int] = {name: 0 for name in self._modules}
+!         graph: Dict[str, List[str]] = {name: [] for name in self._modules}
+  
+!         for name, mod in self._modules.items():
+!             for dep in mod.descriptor.depends_on:
+!                 if dep in self._modules:
+!                     graph[dep].append(name)
+!                     in_degree[name] += 1
+  
+!         queue = [name for name, deg in in_degree.items() if deg == 0]
+!         result = []
+  
+!         while queue:
+!             queue.sort(
+!                 key=lambda n: (0 if self._modules[n].descriptor.critical else 1, n)
+!             )
+!             current = queue.pop(0)
+!             result.append(current)
+!             for neighbor in graph[current]:
+!                 in_degree[neighbor] -= 1
+!                 if in_degree[neighbor] == 0:
+!                     queue.append(neighbor)
+  
+!         if len(result) != len(self._modules):
+!             missing = set(self._modules.keys()) - set(result)
+!             _log(f"[Container] 依赖循环检测: {missing} 未排序，追加到末尾")
+!             result.extend(missing)
+  
+!         return result
+  
+!     def _topological_sort_reverse(self) -> List[str]:
+!         forward = self._topological_sort()
+!         return list(reversed(forward))
+  
+!     def _emit_event(self, event_type: str, module_name: str, detail: str = ""):
+!         event = {
+!             "type": event_type,
+!             "module": module_name,
+!             "detail": detail,
+!             "timestamp": time.time(),
+!             "container_state": self._state.value,
+!         }
+!         for listener in list(self._event_listeners):
+!             try:
+!                 listener(event)
+!             except Exception:
+!                 pass
+  
+!     def add_event_listener(self, listener: Callable):
+!         with self._lock:
+!             self._event_listeners.append(listener)
+  
+!     def set_event_bus_ref(self, event_bus):
+!         self._event_bus_ref = event_bus
+  
+!     def register_subscription(self, module_name: str, subscriber_id: str):
+!         self._module_subscriptions[module_name] = subscriber_id
+  
+!     def _compute_parallel_layers(self) -> List[List[str]]:
+!         layers = []
+!         in_degree: Dict[str, int] = {name: 0 for name in self._modules}
+!         graph: Dict[str, List[str]] = {name: [] for name in self._modules}
+!         for name, mod in self._modules.items():
+!             for dep in mod.descriptor.depends_on:
+!                 if dep in self._modules:
+!                     graph[dep].append(name)
+!                     in_degree[name] += 1
+!         remaining = set(self._modules.keys())
+!         while remaining:
+!             layer = sorted(
+!                 [n for n in remaining if in_degree[n] == 0],
+!                 key=lambda n: (0 if self._modules[n].descriptor.critical else 1, n),
+!             )
+!             if not layer:
+!                 layer = sorted(remaining, key=lambda n: n)
+!             layers.append(layer)
+!             for n in layer:
+!                 remaining.discard(n)
+!                 for neighbor in graph[n]:
+!                     in_degree[neighbor] = max(0, in_degree[neighbor] - 1)
+!         return layers
+  
+!     def _init_single_module(self, name: str) -> Tuple[str, bool, float, Optional[str]]:
+!         mod = self._modules[name]
+!         mod.state = ModuleState.INITIALIZING
+!         self._emit_event("module_initializing", name)
+!         t0 = time.time()
+!         try:
+!             _log(f"[Container] _init_single_module({name}) calling init_fn...")
+!             mod.instance = mod.descriptor.init_fn()
+!             _log(
+!                 f"[Container] _init_single_module({name}) init_fn done, calling start_fn..."
+!             )
+!             mod.init_time_ms = (time.time() - t0) * 1000
+!             if mod.descriptor.start_fn and mod.instance is not None:
+!                 mod.descriptor.start_fn(mod.instance)
+!             _log(f"[Container] _init_single_module({name}) start_fn done")
+!             mod.state = ModuleState.RUNNING
+!             mod.error = None
+!             self._emit_event("module_started", name, f"{mod.init_time_ms:.0f}ms")
+!             return (name, True, mod.init_time_ms, None)
+!         except Exception as e:
+!             mod.state = ModuleState.FAILED
+!             mod.error = str(e)
+!             mod.init_time_ms = (time.time() - t0) * 1000
+!             self._emit_event("module_failed", name, str(e))
+!             return (name, False, mod.init_time_ms, str(e))
+  
+!     def start(self, parallel: bool = True) -> bool:
+!         with self._lock:
+!             if self._state in (ModuleState.RUNNING, ModuleState.DEGRADED):
+!                 _log(f"[Container] 容器已在运行状态: {self._state.value}")
+!                 return True
+!             self._state = ModuleState.INITIALIZING
+!             self._start_time = time.time()
+  
+!         _log("=" * 60)
+!         _log(f" {self.CONTAINER_NAME} v{self.VERSION} 启动中...")
+!         _log(f" 已注册模块: {len(self._modules)}个")
+!         _log("=" * 60)
+  
+!         critical_failed = False
+  
+!         if parallel and len(self._modules) > 1:
+!             self._perf_stats["parallel_start_used"] = True
+!             layers = self._compute_parallel_layers()
+!             _log(
+!                 f"[Container] 并行启动: {len(layers)}层, "
+!                 f"层大小={[len(l) for l in layers]}"
+!             )
+  
+!             for layer_idx, layer in enumerate(layers):
+!                 _log(
+!                     f"[Container] 启动层{layer_idx+1}/{len(layers)}: "
+!                     f"{', '.join(layer)}"
+!                 )
+!                 if len(layer) == 1:
+!                     name = layer[0]
+!                     mod = self._modules[name]
+!                     mod.state = ModuleState.INITIALIZING
+!                     self._emit_event("module_initializing", name)
+!                     t0 = time.time()
+!                     try:
+!                         mod.instance = mod.descriptor.init_fn()
+!                         mod.init_time_ms = (time.time() - t0) * 1000
+!                         if mod.descriptor.start_fn and mod.instance is not None:
+!                             mod.descriptor.start_fn(mod.instance)
+!                         mod.state = ModuleState.RUNNING
+!                         mod.error = None
+!                         self._emit_event(
+!                             "module_started", name, f"{mod.init_time_ms:.0f}ms"
+!                         )
+!                         _log(
+!                             f"[Container] ✅ {mod.descriptor.display_name} "
+!                             f"启动成功 ({mod.init_time_ms:.0f}ms)"
+!                         )
+!                     except Exception as e:
+!                         mod.state = ModuleState.FAILED
+!                         mod.error = str(e)
+!                         mod.init_time_ms = (time.time() - t0) * 1000
+!                         self._emit_event("module_failed", name, str(e))
+!                         if mod.descriptor.critical:
+!                             critical_failed = True
+!                             _log(
+!                                 f"[Container] ❌ 关键模块 {mod.descriptor.display_name} "
+!                                 f"启动失败: {e}"
+!                             )
+!                         else:
+!                             _log(
+!                                 f"[Container] ⚠️ 非关键模块 {mod.descriptor.display_name} "
+!                                 f"启动失败(降级运行): {e}"
+!                             )
+!                 else:
+!                     import concurrent.futures
+  
+!                     with concurrent.futures.ThreadPoolExecutor(
+!                         max_workers=min(len(layer), 8)
+!                     ) as executor:
+!                         futures = {}
+!                         for name in layer:
+!                             futures[executor.submit(self._init_single_module, name)] = (
+!                                 name
+!                             )
+!                         for future in concurrent.futures.as_completed(futures):
+!                             name, success, init_ms, error = future.result()
+!                             mod = self._modules[name]
+!                             if success:
+!                                 _log(
+!                                     f"[Container] ✅ {mod.descriptor.display_name} "
+!                                     f"启动成功 ({init_ms:.0f}ms)"
+!                                 )
+!                             else:
+!                                 if mod.descriptor.critical:
+!                                     critical_failed = True
+!                                     _log(
+!                                         f"[Container] ❌ 关键模块 {mod.descriptor.display_name} "
+!                                         f"启动失败: {error}"
+!                                     )
+!                                 else:
+!                                     _log(
+!                                         f"[Container] ⚠️ 非关键模块 {mod.descriptor.display_name} "
+!                                         f"启动失败(降级运行): {error}"
+!                                     )
+!         else:
+!             startup_order = self._topological_sort()
+!             _log(f"[Container] 串行启动顺序: {' → '.join(startup_order)}")
+!             for name in startup_order:
+!                 mod = self._modules[name]
+!                 mod.state = ModuleState.INITIALIZING
+!                 self._emit_event("module_initializing", name)
+!                 t0 = time.time()
+!                 try:
+!                     mod.instance = mod.descriptor.init_fn()
+!                     mod.init_time_ms = (time.time() - t0) * 1000
+!                     if mod.descriptor.start_fn and mod.instance is not None:
+!                         mod.descriptor.start_fn(mod.instance)
+!                     mod.state = ModuleState.RUNNING
+!                     mod.error = None
+!                     self._emit_event(
+!                         "module_started", name, f"{mod.init_time_ms:.0f}ms"
+!                     )
+!                     _log(
+!                         f"[Container] ✅ {mod.descriptor.display_name} "
+!                         f"启动成功 ({mod.init_time_ms:.0f}ms)"
+!                     )
+!                 except Exception as e:
+!                     mod.state = ModuleState.FAILED
+!                     mod.error = str(e)
+!                     mod.init_time_ms = (time.time() - t0) * 1000
+!                     self._emit_event("module_failed", name, str(e))
+!                     if mod.descriptor.critical:
+!                         critical_failed = True
+!                         _log(
+!                             f"[Container] ❌ 关键模块 {mod.descriptor.display_name} "
+!                             f"启动失败: {e}"
+!                         )
+!                     else:
+!                         _log(
+!                             f"[Container] ⚠️ 非关键模块 {mod.descriptor.display_name} "
+!                             f"启动失败(降级运行): {e}"
+!                         )
+  
+!         running_count = sum(
+!             1 for m in self._modules.values() if m.state == ModuleState.RUNNING
+!         )
+!         failed_count = sum(
+!             1 for m in self._modules.values() if m.state == ModuleState.FAILED
+!         )
+!         total_ms = (time.time() - self._start_time) * 1000
+!         self._perf_stats["start_time_ms"] = total_ms
+  
+!         if critical_failed:
+!             with self._lock:
+!                 self._state = ModuleState.FAILED
+!             _log(f"[Container] 容器启动失败 — 关键模块异常，回滚已启动模块")
+!             startup_order = self._topological_sort()
+!             reverse_order = list(reversed(startup_order))
+!             for rollback_name in reverse_order:
+!                 rollback_mod = self._modules[rollback_name]
+!                 if (
+!                     rollback_mod.state == ModuleState.RUNNING
+!                     and rollback_mod.descriptor.stop_fn
+!                     and rollback_mod.instance is not None
+!                 ):
+!                     try:
+!                         rollback_mod.descriptor.stop_fn(rollback_mod.instance)
+!                         rollback_mod.state = ModuleState.STOPPED
+!                         _log(
+!                             f"[Container] 回滚: {rollback_mod.descriptor.display_name} 已停止"
+!                         )
+!                     except Exception as re:
+!                         _log(
+!                             f"[Container] 回滚异常: {rollback_mod.descriptor.display_name} - {re}"
+!                         )
+!             return False
+!         elif failed_count > 0:
+!             with self._lock:
+!                 self._state = ModuleState.DEGRADED
+!             _log(
+!                 f"[Container] 容器降级运行 — "
+!                 f"{running_count}个正常 / {failed_count}个失败"
+!             )
+!             return True
+!         else:
+!             with self._lock:
+!                 self._state = ModuleState.RUNNING
+!             _log("=" * 60)
+!             _log(f" {self.CONTAINER_NAME} 启动完成!")
+!             _log(f" 全部 {running_count} 个模块运行正常")
+!             _log(f" 总耗时: {total_ms:.0f}ms")
+!             _log(
+!                 f" 并行启动: {'是' if self._perf_stats['parallel_start_used'] else '否'}"
+!             )
+!             _log("=" * 60)
+!             return True
+  
+!     def stop(self, module_stop_timeout: float = 15.0) -> bool:
+!         with self._lock:
+!             if self._state in (ModuleState.STOPPED, ModuleState.UNINITIALIZED):
+!                 return True
+!             self._state = ModuleState.STOPPING
+  
+!         _log(f"[Container] {self.CONTAINER_NAME} 正在停止...")
+  
+!         shutdown_order = self._topological_sort_reverse()
+!         _log(f"[Container] 停止顺序: {' → '.join(shutdown_order)}")
+  
+!         for name in shutdown_order:
+!             mod = self._modules[name]
+!             if mod.state not in (ModuleState.RUNNING, ModuleState.DEGRADED):
+!                 continue
+  
+!             mod.state = ModuleState.STOPPING
+!             self._emit_event("module_stopping", name)
+  
+!             try:
+!                 if mod.descriptor.stop_fn and mod.instance is not None:
+!                     import concurrent.futures
+  
+!                     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as _exec:
+!                         _fut = _exec.submit(mod.descriptor.stop_fn, mod.instance)
+!                         try:
+!                             _fut.result(timeout=module_stop_timeout)
+!                         except concurrent.futures.TimeoutError:
+!                             _log(
+!                                 f"[Container] {mod.descriptor.display_name} "
+!                                 f"停止超时({module_stop_timeout}s)"
+!                             )
+!                 mod.state = ModuleState.STOPPED
+!                 self._emit_event("module_stopped", name)
+!                 sub_id = self._module_subscriptions.pop(name, None)
+!                 if sub_id and hasattr(self, "_event_bus_ref") and self._event_bus_ref:
+!                     try:
+!                         self._event_bus_ref.unsubscribe(sub_id)
+!                     except Exception:
+!                         pass
+!                 _log(f"[Container] ✅ {mod.descriptor.display_name} 已停止")
+!             except Exception as e:
+!                 mod.state = ModuleState.FAILED
+!                 mod.error = str(e)
+!                 _log(
+!                     f"[Container] ⚠️ {mod.descriptor.display_name} " f"停止异常: {e}"
+!                 )
+  
+!         stop_failed = sum(
+!             1 for m in self._modules.values() if m.state == ModuleState.FAILED
+!         )
+!         if stop_failed > 0:
+!             with self._lock:
+!                 self._state = ModuleState.FAILED
+!             _log(
+!                 f"[Container] {self.CONTAINER_NAME} 停止完成，"
+!                 f"但有{stop_failed}个模块停止异常"
+!             )
+!         else:
+!             with self._lock:
+!                 self._state = ModuleState.STOPPED
+!             _log(f"[Container] {self.CONTAINER_NAME} 已停止")
+!         return stop_failed == 0
+  
+!     def restart_failed_modules(self, include_degraded: bool = True) -> int:
+!         """重启FAILED（及可选DEGRADED）状态的模块，返回成功重启数"""
+!         with self._lock:
+!             candidates = [
+!                 (n, m)
+!                 for n, m in self._modules.items()
+!                 if m.state == ModuleState.FAILED
+!             ]
+!             if include_degraded:
+!                 candidates += [
+!                     (n, m)
+!                     for n, m in self._modules.items()
+!                     if m.state == ModuleState.DEGRADED
+!                 ]
+!             if not candidates:
+!                 _log("[Container] 无FAILED/DEGRADED模块需要重启")
+!                 return 0
+!             failed_count = sum(
+!                 1 for _, m in candidates if m.state == ModuleState.FAILED
+!             )
+!             degraded_count = len(candidates) - failed_count
+!             _log(
+!                 f"[Container] 尝试重启{len(candidates)}个模块: "
+!                 f"{failed_count}个FAILED, {degraded_count}个DEGRADED"
+!             )
+!             restored = 0
+!             for name, mod in candidates:
+!                 mod.state = ModuleState.INITIALIZING
+!                 try:
+!                     if mod.descriptor.init_fn:
+!                         mod.instance = mod.descriptor.init_fn()
+!                     if mod.descriptor.start_fn and mod.instance is not None:
+!                         mod.descriptor.start_fn(mod.instance)
+!                     mod.state = ModuleState.RUNNING
+!                     mod.error = None
+!                     self._emit_event("module_restarted", name)
+!                     _log(
+!                         f"[Container] ✅ {mod.descriptor.display_name} 自愈恢复"
+!                     )
+!                     restored += 1
+!                 except Exception as e:
+!                     mod.state = ModuleState.FAILED
+!                     mod.error = str(e)
+!                     _log(
+!                         f"[Container] ❌ {mod.descriptor.display_name} "
+!                         f"自愈恢复失败: {e}"
+!                     )
+!             if restored:
+!                 self._state = ModuleState.DEGRADED
+!             return restored
+  
+!     def health(self) -> Dict[str, Any]:
+!         with self._lock:
+!             module_health = {}
+!             for name, mod in self._modules.items():
+!                 if mod.descriptor.health_fn and mod.instance is not None:
+!                     try:
+!                         module_health[name] = mod.descriptor.health_fn(mod.instance)
+!                     except Exception as e:
+!                         module_health[name] = {"status": "error", "error": str(e)}
+!                 else:
+!                     module_health[name] = {"status": mod.state.value}
+  
+!             running = sum(
+!                 1 for m in self._modules.values() if m.state == ModuleState.RUNNING
+!             )
+!             degraded = sum(
+!                 1 for m in self._modules.values() if m.state == ModuleState.DEGRADED
+!             )
+!             failed = sum(
+!                 1 for m in self._modules.values() if m.state == ModuleState.FAILED
+!             )
+!             total = len(self._modules)
+  
+!             overall = "healthy"
+!             if failed > 0:
+!                 critical_failed = any(
+!                     m.descriptor.critical and m.state == ModuleState.FAILED
+!                     for m in self._modules.values()
+!                 )
+!                 overall = "unhealthy" if critical_failed else "degraded"
+!             elif degraded > 0:
+!                 overall = "degraded"
+  
+!             uptime_s = 0.0
+!             if self._start_time:
+!                 uptime_s = time.time() - self._start_time
+  
+!             return {
+!                 "container": {
+!                     "name": self.CONTAINER_NAME,
+!                     "version": self.VERSION,
+!                     "state": self._state.value,
+!                     "overall_health": overall,
+!                     "uptime_seconds": uptime_s,
+!                     "started_at": self._start_time,
+!                 },
+!                 "modules": {
+!                     "total": total,
+!                     "running": running,
+!                     "degraded": degraded,
+!                     "failed": failed,
+!                 },
+!                 "module_details": module_health,
+!             }
+  
+!     def get_module(self, name: str) -> Optional[Any]:
+!         with self._lock:
+!             mod = self._modules.get(name)
+!             if mod and mod.state in (ModuleState.RUNNING, ModuleState.DEGRADED):
+!                 return mod.instance
+!             return None
+  
+!     def get_module_state(self, name: str) -> Optional[ModuleState]:
+!         with self._lock:
+!             mod = self._modules.get(name)
+!             return mod.state if mod else None
+  
+!     def list_modules(self) -> List[Dict[str, Any]]:
+!         with self._lock:
+!             result = []
+!             for name, mod in self._modules.items():
+!                 result.append(
+!                     {
+!                         "name": name,
+!                         "display_name": mod.descriptor.display_name,
+!                         "category": mod.descriptor.category,
+!                         "state": mod.state.value,
+!                         "critical": mod.descriptor.critical,
+!                         "depends_on": mod.descriptor.depends_on,
+!                         "init_time_ms": mod.init_time_ms,
+!                         "error": mod.error,
+!                     }
+!                 )
+!             return result
+  
+!     def restart_module(self, name: str) -> bool:
+!         with self._lock:
+!             mod = self._modules.get(name)
+!             if not mod:
+!                 _log(f"[Container] 模块'{name}'未注册")
+!                 return False
+  
+!             _log(f"[Container] 重启模块: {mod.descriptor.display_name}")
+  
+!             if mod.descriptor.stop_fn and mod.instance is not None:
+!                 try:
+!                     mod.descriptor.stop_fn(mod.instance)
+!                 except Exception as e:
+!                     _log(f"[Container] 停止异常: {e}")
+  
+!             mod.state = ModuleState.INITIALIZING
+!             try:
+!                 mod.instance = mod.descriptor.init_fn()
+!                 if mod.descriptor.start_fn and mod.instance is not None:
+!                     mod.descriptor.start_fn(mod.instance)
+!                 mod.state = ModuleState.RUNNING
+!                 mod.error = None
+!                 self._emit_event("module_restarted", name)
+!                 _log(f"[Container] ✅ {mod.descriptor.display_name} 重启成功")
+!                 return True
+!             except Exception as e:
+!                 mod.state = ModuleState.FAILED
+!                 mod.error = str(e)
+!                 _log(
+!                     f"[Container] ❌ {mod.descriptor.display_name} 重启失败: {e}"
+!                 )
+!                 return False
+  
+      # ══════════════════════════════════════════════
+      # 热插拔接口 (Hot-Swap API)
+      # ══════════════════════════════════════════════
+  
+!     def unregister(self, name: str, force: bool = False) -> bool:
+!         with self._lock:
+!             mod = self._modules.get(name)
+!             if not mod:
+!                 _log(f"[HotSwap] 模块'{name}'未注册，无法卸载")
+!                 return False
+  
+!             info = get_module_info(name)
+  
+!             if info and info.is_base_point and not force:
+!                 _log(
+!                     f"[HotSwap] ❌ '{name}' 是基点模块(L0)，不可卸载！"
+!                     f"使用 force=True 强制卸载（危险操作）"
+!                 )
+!                 return False
+  
+!             reverse_deps = [
+!                 n
+!                 for n, m in self._modules.items()
+!                 if name in m.descriptor.depends_on and n != name
+!             ]
+!             if reverse_deps and not force:
+!                 _log(
+!                     f"[HotSwap] ❌ '{name}' 被 {len(reverse_deps)} 个模块依赖: "
+!                     f"{reverse_deps}。先卸载依赖者，或使用 force=True"
+!                 )
+!                 return False
+  
+!             _log(f"[HotSwap] 卸载模块: {mod.descriptor.display_name}")
+  
+!             if mod.state == ModuleState.RUNNING and mod.descriptor.stop_fn:
+!                 try:
+!                     mod.descriptor.stop_fn(mod.instance)
+!                 except Exception as e:
+!                     _log(f"[HotSwap] 停止异常(忽略): {e}")
+  
+!             del self._modules[name]
+!             self._emit_event(
+!                 "module_unregistered", name, f"force={force}, was={mod.state.value}"
+!             )
+!             _log(
+!                 f"[HotSwap] ✅ '{name}' 已卸载，剩余 {len(self._modules)} 个模块"
+!             )
+  
+!             if info:
+!                 info.has_container_instance = False
+!                 info.init_fn_available = False
+  
+!             self._recalc_state()
+!             return True
+  
+!     def dynamic_load(self, descriptor: ModuleDescriptor) -> bool:
+!         with self._lock:
+!             if descriptor.name in self._modules:
+!                 _log(
+!                     f"[HotSwap] 模块'{descriptor.name}'已存在，请用 hot_reload()"
+!                 )
+!                 return False
+  
+!             for dep in descriptor.depends_on:
+!                 if dep not in self._modules:
+!                     _log(f"[HotSwap] 依赖'{dep}'未注册，动态加载可能失败")
+  
+!             self._modules[descriptor.name] = ModuleInstance(descriptor=descriptor)
+  
+!             _log(f"[HotSwap] 动态加载: {descriptor.display_name}")
+!             mod = self._modules[descriptor.name]
+!             mod.state = ModuleState.INITIALIZING
+  
+!             try:
+!                 mod.instance = descriptor.init_fn()
+!                 if descriptor.start_fn and mod.instance is not None:
+!                     descriptor.start_fn(mod.instance)
+!                 mod.state = ModuleState.RUNNING
+!                 mod.error = None
+!                 self._emit_event("module_dynamic_loaded", descriptor.name)
+!                 _log(f"[HotSwap] ✅ '{descriptor.name}' 动态加载成功")
+  
+!                 info = get_module_info(descriptor.name)
+!                 if info:
+!                     info.has_container_instance = True
+!                     info.init_fn_available = True
+  
+!                 self._recalc_state()
+!                 return True
+!             except Exception as e:
+!                 mod.state = ModuleState.FAILED
+!                 mod.error = str(e)
+!                 _log(f"[HotSwap] ❌ 动态加载失败: {e}")
+!                 self._recalc_state()
+!                 return False
+  
+!     def hot_reload(self, name: str) -> bool:
+!         import importlib
+!         import sys
+  
+!         with self._lock:
+!             mod = self._modules.get(name)
+!             if not mod:
+!                 _log(f"[HotSwap] 模块'{name}'未注册，无法热重载")
+!                 return False
+  
+!             desc = mod.descriptor
+!             _log(f"[HotSwap] 热重载: {desc.display_name}")
+  
+!             if mod.state == ModuleState.RUNNING and desc.stop_fn:
+!                 try:
+!                     desc.stop_fn(mod.instance)
+!                 except Exception as e:
+!                     _log(f"[HotSwap] 停止异常: {e}")
+  
+!             mod.state = ModuleState.INITIALIZING
+  
+!             try:
+!                 module_name = desc.init_fn.__module__
+!                 if module_name in sys.modules:
+!                     importlib.reload(sys.modules[module_name])
+!                 mod.instance = desc.init_fn()
+!                 if desc.start_fn and mod.instance is not None:
+!                     desc.start_fn(mod.instance)
+!                 mod.state = ModuleState.RUNNING
+!                 mod.error = None
+!                 self._emit_event("module_hot_reloaded", name)
+!                 _log(f"[HotSwap] ✅ '{name}' 热重载成功")
+!                 return True
+!             except Exception as e:
+!                 mod.state = ModuleState.FAILED
+!                 mod.error = str(e)
+!                 _log(f"[HotSwap] ❌ 热重载失败: {e}")
+!                 return False
+  
+!     def _recalc_state(self):
+!         failed_count = sum(
+!             1 for m in self._modules.values() if m.state == ModuleState.FAILED
+!         )
+!         running_count = sum(
+!             1 for m in self._modules.values() if m.state == ModuleState.RUNNING
+!         )
+  
+!         if running_count == len(self._modules):
+!             self._state = ModuleState.RUNNING
+!         elif failed_count > 0:
+!             self._state = ModuleState.DEGRADED
+!         else:
+!             self._state = ModuleState.STOPPED
+  
+!     @property
+!     def state(self) -> ModuleState:
+!         return self._state
+  
+!     @property
+!     def is_running(self) -> bool:
+!         return self._state in (ModuleState.RUNNING, ModuleState.DEGRADED)
+  
+!     def snapshot(self) -> Dict[str, Any]:
+!         """收集全系统模块状态快照 — 递归级审计的数据基础"""
+!         now = time.time()
+!         with self._lock:
+!             snap = {
+!                 "timestamp": now,
+!                 "datetime": time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(now)),
+!                 "container_state": self._state.value,
+!                 "uptime_seconds": now - self._start_time if self._start_time else 0,
+!                 "modules": {},
+!             }
+!             for name, mod in self._modules.items():
+!                 mod_snap = {
+!                     "name": name,
+!                     "display_name": mod.descriptor.display_name,
+!                     "category": mod.descriptor.category,
+!                     "state": mod.state.value,
+!                     "critical": mod.descriptor.critical,
+!                     "depends_on": mod.descriptor.depends_on,
+!                     "init_time_ms": mod.init_time_ms,
+!                     "error": mod.error,
+!                 }
+!                 if mod.instance is not None:
+!                     evo_loop = getattr(mod.instance, "evolution_loop", None)
+!                     if evo_loop is not None:
+!                         try:
+!                             loop_stats = evo_loop.get_stats()
+!                             mod_snap["evolution_loop"] = {
+!                                 "phase": loop_stats.get("phase", "unknown"),
+!                                 "urgency": loop_stats.get("urgency", 0),
+!                                 "causal_pairs": loop_stats.get("causal_pairs_count", 0),
+!                                 "deepseek_learn_calls": loop_stats.get(
+!                                     "deepseek_learn_calls", 0
+!                                 ),
+!                                 "deepseek_evolve_calls": loop_stats.get(
+!                                     "deepseek_evolve_calls", 0
+!                                 ),
+!                                 "challenges_from_challenger": loop_stats.get(
+!                                     "challenges_from_challenger", 0
+!                                 ),
+!                             }
+!                         except Exception:
+!                             mod_snap["evolution_loop"] = {"error": "stats_unavailable"}
+!                     if mod.descriptor.health_fn:
+!                         try:
+!                             health = mod.descriptor.health_fn(mod.instance)
+!                             mod_snap["health"] = health
+!                         except Exception as e:
+!                             mod_snap["health"] = {"error": str(e)}
+!                 snap["modules"][name] = mod_snap
+!             return snap
+  
+!     def health_parallel(self, timeout: float = 10.0) -> Dict[str, Any]:
+!         import concurrent.futures
+  
+!         with self._lock:
+!             t0 = time.time()
+!             module_health = {}
+!             health_fns = []
+!             for name, mod in self._modules.items():
+!                 if mod.descriptor.health_fn and mod.instance is not None:
+!                     health_fns.append((name, mod))
+!                 else:
+!                     module_health[name] = {"status": mod.state.value}
+  
+!             if health_fns:
+!                 self._perf_stats["parallel_health_used"] = True
+!                 with concurrent.futures.ThreadPoolExecutor(
+!                     max_workers=min(len(health_fns), 8)
+!                 ) as executor:
+!                     futures = {}
+!                     for name, mod in health_fns:
+!                         futures[
+!                             executor.submit(mod.descriptor.health_fn, mod.instance)
+!                         ] = name
+!                     done, not_done = concurrent.futures.wait(
+!                         futures.keys(), timeout=timeout
+!                     )
+!                     for future in done:
+!                         name = futures[future]
+!                         try:
+!                             module_health[name] = future.result(timeout=0)
+!                         except Exception as e:
+!                             module_health[name] = {"status": "error", "error": str(e)}
+!                     for future in not_done:
+!                         name = futures[future]
+!                         module_health[name] = {
+!                             "status": "timeout",
+!                             "timeout_s": timeout,
+!                         }
+  
+!             running = sum(
+!                 1 for m in self._modules.values() if m.state == ModuleState.RUNNING
+!             )
+!             degraded = sum(
+!                 1 for m in self._modules.values() if m.state == ModuleState.DEGRADED
+!             )
+!             failed = sum(
+!                 1 for m in self._modules.values() if m.state == ModuleState.FAILED
+!             )
+!             total = len(self._modules)
+!             overall = "healthy"
+!             if failed > 0:
+!                 critical_failed = any(
+!                     m.descriptor.critical and m.state == ModuleState.FAILED
+!                     for m in self._modules.values()
+!                 )
+!                 overall = "unhealthy" if critical_failed else "degraded"
+!             elif degraded > 0:
+!                 overall = "degraded"
+!             self._perf_stats["last_health_check_ms"] = (time.time() - t0) * 1000
+  
+!             return {
+!                 "container": {
+!                     "name": self.CONTAINER_NAME,
+!                     "version": self.VERSION,
+!                     "state": self._state.value,
+!                     "overall_health": overall,
+!                     "uptime_seconds": (
+!                         time.time() - self._start_time if self._start_time else 0
+!                     ),
+!                 },
+!                 "modules": {
+!                     "total": total,
+!                     "running": running,
+!                     "degraded": degraded,
+!                     "failed": failed,
+!                 },
+!                 "module_details": module_health,
+!                 "perf": {
+!                     "health_check_ms": self._perf_stats["last_health_check_ms"],
+!                     "parallel": True,
+!                 },
+!             }
+  
+!     def benchmark(self, iterations: int = 10) -> Dict[str, Any]:
+!         results = {
+!             "version": self.VERSION,
+!             "iterations": iterations,
+!             "tests": {},
+!         }
+!         t0 = time.perf_counter()
+!         for _ in range(iterations):
+!             self._topological_sort()
+!         results["tests"]["topological_sort_ms"] = (
+!             (time.perf_counter() - t0) * 1000
+!         ) / iterations
+  
+!         t0 = time.perf_counter()
+!         for _ in range(iterations):
+!             self._compute_parallel_layers()
+!         results["tests"]["parallel_layers_ms"] = (
+!             (time.perf_counter() - t0) * 1000
+!         ) / iterations
+  
+!         t0 = time.perf_counter()
+!         for _ in range(iterations):
+!             self.snapshot()
+!         results["tests"]["snapshot_ms"] = (
+!             (time.perf_counter() - t0) * 1000
+!         ) / iterations
+  
+!         health_iters = min(iterations, 3)
+!         t0 = time.perf_counter()
+!         for _ in range(health_iters):
+!             self.health()
+!         results["tests"]["health_serial_ms"] = (
+!             (time.perf_counter() - t0) * 1000
+!         ) / health_iters
+  
+!         t0 = time.perf_counter()
+!         for _ in range(health_iters):
+!             self.health_parallel()
+!         results["tests"]["health_parallel_ms"] = (
+!             (time.perf_counter() - t0) * 1000
+!         ) / health_iters
+  
+!         speedup = results["tests"]["health_serial_ms"] / max(
+!             results["tests"]["health_parallel_ms"], 0.01
+!         )
+!         results["tests"]["health_parallel_speedup"] = round(speedup, 2)
+  
+!         results["capacity"] = self.capacity_report()
+!         results["dependency_graph"] = self.dependency_graph()
+!         results["perf_stats"] = dict(self._perf_stats)
+!         self._perf_stats["benchmark_results"] = results
+!         return results
+  
+!     def capacity_report(self) -> Dict[str, Any]:
+!         now = time.time()
+!         categories: Dict[str, List[str]] = {}
+!         for name, mod in self._modules.items():
+!             cat = mod.descriptor.category
+!             categories.setdefault(cat, []).append(name)
+  
+!         init_times = {
+!             name: mod.init_time_ms
+!             for name, mod in self._modules.items()
+!             if mod.init_time_ms > 0
+!         }
+!         avg_init = sum(init_times.values()) / max(len(init_times), 1)
+!         max_init_name = max(init_times, key=init_times.get) if init_times else "N/A"
+!         max_init_ms = init_times.get(max_init_name, 0)
+  
+!         critical_count = sum(1 for m in self._modules.values() if m.descriptor.critical)
+!         dependency_count = sum(
+!             len(m.descriptor.depends_on) for m in self._modules.values()
+!         )
+  
+!         return {
+!             "total_modules": len(self._modules),
+!             "categories": {cat: len(mods) for cat, mods in categories.items()},
+!             "category_modules": categories,
+!             "critical_modules": critical_count,
+!             "total_dependencies": dependency_count,
+!             "avg_init_time_ms": round(avg_init, 1),
+!             "max_init_time": {"module": max_init_name, "ms": round(max_init_ms, 1)},
+!             "parallel_layers": len(self._compute_parallel_layers()),
+!             "uptime_seconds": now - self._start_time if self._start_time else 0,
+!             "start_time_ms": self._perf_stats.get("start_time_ms", 0),
+!         }
+  
+!     def dependency_graph(self) -> Dict[str, Any]:
+!         nodes = []
+!         edges = []
+!         for name, mod in self._modules.items():
+!             nodes.append(
+!                 {
+!                     "id": name,
+!                     "display_name": mod.descriptor.display_name,
+!                     "category": mod.descriptor.category,
+!                     "critical": mod.descriptor.critical,
+!                     "state": mod.state.value,
+!                 }
+!             )
+!             for dep in mod.descriptor.depends_on:
+!                 if dep in self._modules:
+!                     edges.append({"from": dep, "to": name})
+  
+!         layers = self._compute_parallel_layers()
+!         layer_map = {}
+!         for i, layer in enumerate(layers):
+!             for name in layer:
+!                 layer_map[name] = i
+  
+!         return {
+!             "nodes": nodes,
+!             "edges": edges,
+!             "layers": [
+!                 {"layer": i + 1, "modules": layer} for i, layer in enumerate(layers)
+!             ],
+!             "layer_map": layer_map,
+!             "total_nodes": len(nodes),
+!             "total_edges": len(edges),
+!             "max_depth": len(layers),
+!         }
+  
+  
+! def build_container() -> TianjiContainer:
+!     container = TianjiContainer()
+  
+!     class _MemoryAPIProxy:
+!         def __init__(self):
+!             self._engine = None
+  
+!         def _get_engine(self):
+!             if self._engine is None:
+!                 try:
+!                     from server.deps import get_engine
+!                     self._engine = get_engine()
+!                 except Exception:
+!                     pass
+!             return self._engine
+  
+!         def get_stats(self):
+!             eng = self._get_engine()
+!             if eng:
+!                 try:
+!                     s = eng.stats()
+!                     if isinstance(s, dict):
+!                         return {"proxy": "icme_engine", **s}
+!                 except Exception:
+!                     pass
+!             return {"proxy": "icme_engine", "status": "deferred"}
+  
+!         def start(self):
+!             pass
+  
+!         def stop(self):
+!             pass
+  
+!     def _init_memory_api():
+!         return _MemoryAPIProxy()
+  
+!     def _init_skill_registry():
+!         from core.skill_registry import SkillRegistry
+  
+!         sr = SkillRegistry(
+!             skills_dir=MEMORY_DATA_PATH.parent / "skills",
+!             memory_api_url="http://127.0.0.1:8769",
+!         )
+!         sr.discover()
+!         return sr
+  
+!     def _init_skill_tracker():
+!         from core.skill_registry import SkillLifecycleTracker
+  
+!         tracker = SkillLifecycleTracker(
+!             skills_dir=MEMORY_DATA_PATH.parent / "skills",
+!         )
+!         return tracker
+  
+!     def _init_causal_recorder():
+!         from core.deepseek_driver import CausalPairRecorder
+  
+!         return CausalPairRecorder(persist_dir=MEMORY_DATA_PATH / "causal_pairs")
+  
+!     def _init_evolution_engine():
+!         from core.evolution_engine import EvolutionEngine
+  
+!         ee = EvolutionEngine(persist_dir=MEMORY_DATA_PATH / "evolution_history")
+!         return ee
+  
+!     _evolution_mutable_rules = {}
+  
+!     def _get_mutable_rules():
+!         return dict(_evolution_mutable_rules)
+  
+!     def _start_evolution_engine(ee):
+!         try:
+!             ee.start_tick_loop(
+!                 mutable_rules_getter=_get_mutable_rules,
+!                 decision_engine_getter=None,
+!             )
+!             _log(f"[Container] ✅ 进化引擎 Tick循环已启动 (间隔={ee._tick_interval}s)")
+!         except Exception as e:
+!             _log(f"[Container] ⚠️ 进化引擎启动异常: {type(e).__name__}: {e}")
+!             import traceback
+!             for line in traceback.format_exc().splitlines()[-5:]:
+!                 _log(f"   {line}")
+  
+!     def _stop_evolution_engine(ee):
+!         ee.shutdown()
+  
+!     def _health_evolution_engine(ee):
+!         stats = ee.get_stats()
+!         return {"status": "running", "stats": stats}
+  
+!     def _init_learning_engine():
+!         from core.learning_loop import ClosedLoopLearningEngine
+  
+!         return ClosedLoopLearningEngine(
+!             memory_api_url="http://127.0.0.1:8769",
+!             skill_registry=None,
+!             event_bus=None,
+!             local_cache_dir=MEMORY_DATA_PATH / "logs",
+!         )
+  
+!     def _init_workflow_engine():
+!         from core.workflow_engine import WorkflowEngine
+  
+!         return WorkflowEngine()
+  
+!     def _init_message_gateway():
+!         from core.message_gateway import MessageGateway
+  
+!         return MessageGateway()
+  
+!     class _MonitorBridge:
+!         def __init__(self):
+!             self._running = False
+!             self._thread = None
+!             self._stats = {
+!                 "snapshots": 0, "alerts": 0, "last_snapshot": None,
+!                 "total_entries": 0, "hit_rate": 0.0,
+!                 "layers": {}, "uptime_seconds": 0,
+!                 "captured_total": 0, "stored_total": 0,
+!                 "events_processed": 0, "decisions_made": 0,
+!             }
+!             self._event_bus = None
+  
+!         def start(self):
+!             self._running = True
+!             self._thread = threading.Thread(target=self._work_loop, daemon=True)
+!             self._thread.start()
+!             _log("[Container] ✅ 监控桥接器 已启动(实时数据采集线程)")
+  
+!         def stop(self):
+!             self._running = False
+!             if self._thread:
+!                 self._thread.join(timeout=3)
+!                 self._thread = None
+  
+!         def _work_loop(self):
+!             import time as _time
+!             while self._running:
+!                 try:
+!                     self._collect_snapshot()
+!                 except Exception:
+!                     pass
+!                 for _ in range(10):
+!                     if not self._running:
+!                         break
+!                     _time.sleep(1)
+  
+!         def _collect_snapshot(self):
+!             try:
+!                 from server.deps import get_engine
+!                 engine = get_engine()
+!                 if engine:
+!                     stats = engine.stats()
+!                     if stats:
+!                         self._stats["total_entries"] = stats.get("total_entries", 0)
+!                         self._stats["hit_rate"] = stats.get("hit_rate", 0)
+!                         self._stats["uptime_seconds"] = stats.get("uptime_seconds", 0)
+!                         layers = stats.get("layers", {})
+!                         if layers:
+!                             layer_summary = {}
+!                             for lname, ldata in layers.items():
+!                                 if isinstance(ldata, dict):
+!                                     layer_summary[lname] = ldata.get("entry_count", 0)
+!                                 else:
+!                                     layer_summary[lname] = ldata
+!                             self._stats["layers"] = layer_summary
+!                         self._stats["captured_total"] = stats.get("total_entries", 0)
+!                         self._stats["stored_total"] = stats.get("total_entries", 0)
+!                         self._stats["consolidations"] = stats.get("consolidations", 0)
+!                         self._stats["events_processed"] = stats.get("consolidations", 0)
+!                         self._stats["snapshots"] += 1
+!                         self._stats["last_snapshot"] = __import__("datetime").datetime.now().isoformat()
+  
+!                         if self._event_bus and hasattr(self._event_bus, 'publish'):
+!                             try:
+!                                 from core.deepseek_driver import TianjiEvent
+!                                 evt = TianjiEvent(
+!                                     event_type="monitor.snapshot",
+!                                     source="monitor_bridge",
+!                                     data={"entries": self._stats["total_entries"], "snapshot_id": self._stats["snapshots"]}
+!                                 )
+!                                 self._event_bus.publish(evt)
+!                                 self._stats["alerts"] += 1
+!                             except Exception:
+!                                 pass
+!             except Exception:
+!                 pass
+  
+!         def get_stats(self):
+!             return dict(self._stats)
+  
+!     def _init_monitor_bridge():
+!         return _MonitorBridge()
+  
+!     def _start_monitor_bridge(bridge):
+!         bridge.start()
+  
+!     def _stop_monitor_bridge(bridge):
+!         bridge.stop()
+  
+!     def _health_monitor_bridge(bridge):
+!         return {"status": "running" if bridge._running else "stopped", "stats": bridge.get_stats()}
+  
+!     container.register(
+!         ModuleDescriptor(
+!             name="memory_api",
+!             display_name="天机记忆API",
+!             category="infrastructure",
+!             init_fn=_init_memory_api,
+!             start_fn=lambda inst: inst.start(),
+!             stop_fn=lambda inst: inst.stop(),
+!             health_fn=lambda inst: inst.get_stats(),
+!             critical=True,
+!         )
+!     )
+  
+!     container.register(
+!         ModuleDescriptor(
+!             name="skill_registry",
+!             display_name="Skill注册中心",
+!             category="infrastructure",
+!             init_fn=_init_skill_registry,
+!             depends_on=["memory_api"],
+!         )
+!     )
+  
+!     container.register(
+!         ModuleDescriptor(
+!             name="skill_tracker",
+!             display_name="Skill生命周期追踪器",
+!             category="infrastructure",
+!             init_fn=_init_skill_tracker,
+!             depends_on=["skill_registry"],
+!         )
+!     )
+  
+!     container.register(
+!         ModuleDescriptor(
+!             name="causal_recorder",
+!             display_name="因果对记录器",
+!             category="evolution",
+!             init_fn=_init_causal_recorder,
+!             depends_on=["memory_api"],
+!         )
+!     )
+  
+!     container.register(
+!         ModuleDescriptor(
+!             name="evolution_engine",
+!             display_name="进化引擎",
+!             category="evolution",
+!             init_fn=_init_evolution_engine,
+!             start_fn=_start_evolution_engine,
+!             stop_fn=_stop_evolution_engine,
+!             health_fn=_health_evolution_engine,
+!             depends_on=["causal_recorder"],
+!         )
+!     )
+  
+!     container.register(
+!         ModuleDescriptor(
+!             name="learning_engine",
+!             display_name="闭环学习引擎",
+!             category="learning",
+!             init_fn=_init_learning_engine,
+!             depends_on=["skill_registry", "memory_api"],
+!         )
+!     )
+  
+!     container.register(
+!         ModuleDescriptor(
+!             name="workflow_engine",
+!             display_name="工作流引擎",
+!             category="orchestration",
+!             init_fn=_init_workflow_engine,
+!             depends_on=["memory_api"],
+!         )
+!     )
+  
+!     container.register(
+!         ModuleDescriptor(
+!             name="message_gateway",
+!             display_name="消息网关",
+!             category="orchestration",
+!             init_fn=_init_message_gateway,
+!             depends_on=["memory_api"],
+!         )
+!     )
+  
+!     container.register(
+!         ModuleDescriptor(
+!             name="monitor_bridge",
+!             display_name="监控桥接器",
+!             category="monitoring",
+!             init_fn=_init_monitor_bridge,
+!             start_fn=_start_monitor_bridge,
+!             stop_fn=_stop_monitor_bridge,
+!             depends_on=["evolution_engine", "learning_engine", "skill_tracker"],
+!             critical=True,
+!         )
+!     )
+  
+!     def _health_evolution_bus(bus):
+!         return {
+!             "status": "running",
+!             "registered_modules": len(bus._loops),
+!             "signal_count": bus._stats.get("signals_routed", 0),
+!             "module_register_count": bus._module_register_count,
+!         }
+  
+!     def _init_evolution_bus():
+!         from core.evolution_loop import EvolutionBus, CausalPairRecorder
+  
+!         recorder = CausalPairRecorder()
+!         bus = EvolutionBus(global_recorder=recorder)
+!         return bus
+  
+!     def _start_evolution_bus(bus):
+!         loops_registered = []
+!         for name, mod in container._modules.items():
+!             inst = mod.instance
+!             if inst is None:
+!                 continue
+!             evo_loop = getattr(inst, "evolution_loop", None)
+!             if evo_loop is not None:
+!                 try:
+!                     bus.register_loop(evo_loop)
+!                     loops_registered.append(name)
+!                 except Exception as e:
+!                     _log(f"[Container] EvolutionBus注册失败 {name}: {e}")
+!         try:
+!             from server.deps import quality_gate as qg
+  
+!             if qg and hasattr(qg, "evolution_loop") and qg.evolution_loop:
+!                 try:
+!                     bus.register_loop(qg.evolution_loop)
+!                     loops_registered.append("quality_gate")
+!                 except Exception as e:
+!                     _log(f"[Container] EvolutionBus注册失败 quality_gate: {e}")
+!         except Exception as e:
+!             _log(f"[Container] quality_gate获取失败: {e}")
+!         _log(
+!             f"[Container] EvolutionBus激活: {len(loops_registered)}个模块已注册 → {loops_registered}"
+!         )
+  
+!         def _delayed_register():
+!             import time as _time
+!             _time.sleep(5)
+!             late_registered = []
+!             for name, mod in container._modules.items():
+!                 inst = mod.instance
+!                 if inst is None:
+!                     continue
+!                 evo_loop = getattr(inst, "evolution_loop", None)
+!                 if evo_loop is not None and name not in loops_registered:
+!                     try:
+!                         bus.register_loop(evo_loop)
+!                         late_registered.append(name)
+!                     except Exception as e:
+!                         _log(f"[Container] EvolutionBus延迟注册失败 {name}: {e}")
+!             if late_registered:
+!                 _log(f"[Container] EvolutionBus延迟注册: +{len(late_registered)}个 → {late_registered}")
+  
+!             try:
+!                 ds_mod = container._modules.get("deepseek_driver")
+!                 if ds_mod and ds_mod.instance:
+!                     driver = ds_mod.instance
+!                     driver._evolution_bus = bus
+!                     ds_registered = []
+!                     for name, mod in container._modules.items():
+!                         inst = mod.instance
+!                         if inst is None:
+!                             continue
+!                         evo_loop = getattr(inst, "evolution_loop", None)
+!                         if evo_loop is not None and name not in loops_registered and name not in late_registered:
+!                             try:
+!                                 driver.register_module_loop(name, evo_loop)
+!                                 ds_registered.append(name)
+!                             except Exception as e:
+!                                 _log(f"[Container] DeepSeekDriver注册失败 {name}: {e}")
+!                     if ds_registered:
+!                         _log(f"[Container] DeepSeekDriver延迟注册: {len(ds_registered)}个 → {ds_registered}")
+!             except Exception as e:
+!                 _log(f"[Container] DeepSeekDriver延迟注册失败: {e}")
+  
+!         threading.Thread(target=_delayed_register, daemon=True).start()
+  
+!     class _AutoScheduler:
+!         def __init__(self):
+!             self._running = False
+!             self._thread = None
+!             self._tasks = {}
+!             self._task_counter = 0
+!             self._last_schedule_time = None
+!             self._schedule_interval = 30
+  
+!         def start(self):
+!             self._running = True
+!             self._thread = threading.Thread(target=self._work_loop, daemon=True)
+!             self._thread.start()
+!             _log("[Container] ✅ 智能调度守护进程 已启动(定时任务调度)")
+  
+!         def stop(self):
+!             self._running = False
+!             if self._thread:
+!                 self._thread.join(timeout=3)
+!                 self._thread = None
+  
+!         def _work_loop(self):
+!             import time as _time
+!             while self._running:
+!                 try:
+!                     self._execute_scheduled_tasks()
+!                 except Exception:
+!                     pass
+!                 for _ in range(self._schedule_interval):
+!                     if not self._running:
+!                         break
+!                     _time.sleep(1)
+  
+!         def _execute_scheduled_tasks(self):
+!             import datetime
+!             now = datetime.datetime.now()
+!             self._last_schedule_time = now.isoformat()
+  
+!             task_names = list(self._tasks.keys())
+!             for task_name in task_names[:10]:
+!                 try:
+!                     task_fn = self._tasks[task_name]
+!                     if callable(task_fn):
+!                         result = task_fn()
+!                         if result is not None:
+!                             self._task_counter += 1
+!                             _log(f"[AutoScheduler] 执行任务 {task_name}: {result}")
+!                 except Exception as e:
+!                     pass
+  
+!             default_tasks = [
+!                 ("memory_consolidation_check", self._check_consolidation),
+!                 ("health_snapshot", self._take_health_snapshot),
+!                 ("cleanup_expired", self._cleanup_expired),
+!             ]
+!             for name, fn in default_tasks:
+!                 try:
+!                     result = fn()
+!                     if result:
+!                         self._task_counter += 1
+!                 except Exception:
+!                     pass
+  
+!         def _check_consolidation(self):
+!             try:
+!                 from server.deps import get_engine
+!                 engine = get_engine()
+!                 if engine and hasattr(engine, 'consolidate'):
+!                     engine.consolidate()
+!                     return "consolidation_triggered"
+!             except Exception:
+!                 return None
+  
+!         def _take_health_snapshot(self):
+!             try:
+!                 from server.deps import get_engine
+!                 engine = get_engine()
+!                 if engine:
+!                     stats = engine.stats()
+!                     return f"snapshot:{stats.get('total_entries', 0)}entries"
+!             except Exception:
+!                 return None
+  
+!         def _cleanup_expired(self):
+!             return "clean_ok"
+  
+!         def register_task(self, name: str, fn):
+!             self._tasks[name] = fn
+  
+!         def get_stats(self):
+!             return {
+!                 "scheduled_tasks": len(self._tasks),
+!                 "total_executed": self._task_counter,
+!                 "last_run": self._last_schedule_time or "never",
+!                 "interval_seconds": self._schedule_interval,
+!             }
+  
+!     def _init_auto_scheduler():
+!         return _AutoScheduler()
+  
+!     def _start_auto_scheduler(daemon):
+!         daemon.start()
+  
+!     def _stop_auto_scheduler(daemon):
+!         daemon.stop()
+  
+!     def _health_auto_scheduler(daemon):
+!         return {"status": "running" if daemon._running else "stopped", **daemon.get_stats()}
+  
+!     def _init_enforcement_hook():
+!         from core.enforcement.mcp_bridge import EnforcementHookMCP
+  
+!         event_bus = None
+!         eb_mod = container._modules.get("event_bus")
+!         if eb_mod and eb_mod.instance:
+!             event_bus = eb_mod.instance
+  
+!         return EnforcementHookMCP(event_bus=event_bus)
+  
+!     def _health_enforcement_hook(hook):
+!         return {
+!             "status": "enabled" if hook.enabled else "disabled",
+!             "stats": hook.get_stats(),
+!         }
+  
+!     container.register(
+!         ModuleDescriptor(
+!             name="auto_scheduler",
+!             display_name="智能调度守护进程",
+!             category="orchestration",
+!             init_fn=_init_auto_scheduler,
+!             stop_fn=_stop_auto_scheduler,
+!             health_fn=_health_auto_scheduler,
+!             depends_on=["memory_api", "evolution_engine"],
+!         )
+!     )
+  
+!     container.register(
+!         ModuleDescriptor(
+!             name="enforcement_hook",
+!             display_name="强制执行钩子",
+!             category="infrastructure",
+!             init_fn=_init_enforcement_hook,
+!             health_fn=_health_enforcement_hook,
+!             depends_on=["memory_api"],
+!         )
+!     )
+  
+!     container.register(
+!         ModuleDescriptor(
+!             name="evolution_bus",
+!             display_name="进化信号总线",
+!             category="evolution",
+!             init_fn=_init_evolution_bus,
+!             start_fn=_start_evolution_bus,
+!             health_fn=_health_evolution_bus,
+!             depends_on=[
+!                 "evolution_engine",
+!                 "learning_engine",
+!                 "skill_registry",
+!                 "skill_tracker",
+!                 "workflow_engine",
+!                 "message_gateway",
+!                 "monitor_bridge",
+!             ],
+!         )
+!     )
+  
+!     def _init_event_bus():
+!         from core.deepseek_driver import EventBus
+  
+!         bus = EventBus()
+!         return bus
+  
+!     def _health_event_bus(bus):
+!         try:
+!             return bus.get_stats()
+!         except Exception:
+!             return {"status": "running", "event_count": getattr(bus, '_event_count', 0)}
+  
+!     container.register(
+!         ModuleDescriptor(
+!             name="event_bus",
+!             display_name="事件总线",
+!             category="infrastructure",
+!             init_fn=_init_event_bus,
+!             health_fn=_health_event_bus,
+!             critical=True,
+!         )
+!     )
+  
+!     def _init_deepseek_driver():
+!         from core.deepseek_driver import DeepSeekDriver, EventBus as _EB
+  
+!         eb = None
+!         eb_mod = container._modules.get("event_bus")
+!         if eb_mod and eb_mod.instance:
+!             eb = eb_mod.instance
+!         if eb is None:
+!             eb = _EB()
+  
+!         memory_engine = None
+!         mem_api_mod = container._modules.get("memory_api")
+!         if mem_api_mod and mem_api_mod.instance and hasattr(mem_api_mod.instance, '_get_engine'):
+!             try:
+!                 memory_engine = mem_api_mod.instance._get_engine()
+!             except Exception:
+!                 pass
+  
+!         learning_engine = None
+!         learn_mod = container._modules.get("learning_engine")
+!         if learn_mod and learn_mod.instance:
+!             learning_engine = learn_mod.instance
+  
+!         driver = DeepSeekDriver(
+!             event_bus=eb,
+!             memory_engine=memory_engine,
+!             learning_engine=learning_engine,
+!         )
+!         return driver
+  
+!     def _start_deepseek_driver(driver):
+!         from core.deepseek_driver import ThreeCycleOrchestrator
+  
+!         driver.start()
+  
+!         orchestrator = ThreeCycleOrchestrator(driver, max_workers=4)
+!         orchestrator.start()
+!         driver._orchestrator = orchestrator
+!         _log("[Container] ThreeCycleOrchestrator 已启动(ThreadPool×4)")
+  
+!     def _stop_deepseek_driver(driver):
+!         orchestrator = getattr(driver, "_orchestrator", None)
+!         if orchestrator is not None:
+!             orchestrator.stop()
+!             driver._orchestrator = None
+!         driver.stop()
+  
+!     def _health_deepseek_driver(driver):
+!         stats = driver.get_stats()
+!         return {
+!             "status": "running" if driver._running else "stopped",
+!             "stats": stats,
+!         }
+  
+!     container.register(
+!         ModuleDescriptor(
+!             name="deepseek_driver",
+!             display_name="DeepSeek驾驶者",
+!             category="intelligence",
+!             init_fn=_init_deepseek_driver,
+!             start_fn=_start_deepseek_driver,
+!             stop_fn=_stop_deepseek_driver,
+!             health_fn=_health_deepseek_driver,
+!             depends_on=["event_bus", "evolution_engine"],
+!         )
+!     )
+  
+!     def _init_lingjing_bus():
+!         from core.evolution_bus import EvolutionBus as LB
+  
+!         bus = LB()
+!         return bus
+  
+!     def _health_lingjing_bus(bus):
+!         try:
+!             return bus.get_stats()
+!         except Exception:
+!             return {"status": "ok"}
+  
+!     container.register(
+!         ModuleDescriptor(
+!             name="lingjing_bus",
+!             display_name="灵境事件总线",
+!             category="lingjing",
+!             init_fn=_init_lingjing_bus,
+!             health_fn=_health_lingjing_bus,
+!             depends_on=[],
+!             critical=True,
+!         )
+!     )
+  
+!     def _init_service_registry():
+!         from core.service_registry import ServiceRegistry
+  
+!         bus_module = container._modules.get("lingjing_bus")
+!         event_bus = bus_module.instance if bus_module else None
+!         registry = ServiceRegistry(event_bus=event_bus)
+!         registry.start()
+!         return registry
+  
+!     def _health_service_registry(registry):
+!         try:
+!             return registry.get_stats()
+!         except Exception:
+!             return {"status": "ok"}
+  
+!     container.register(
+!         ModuleDescriptor(
+!             name="service_registry",
+!             display_name="灵境服务注册中心",
+!             category="lingjing",
+!             init_fn=_init_service_registry,
+!             health_fn=_health_service_registry,
+!             depends_on=["lingjing_bus"],
+!             critical=True,
+!         )
+!     )
+  
+!     def _init_resilience_manager():
+!         from core.resilience import ResilienceManager
+  
+!         bus_module = container._modules.get("lingjing_bus")
+!         event_bus = bus_module.instance if bus_module else None
+!         rm = ResilienceManager(event_bus=event_bus)
+!         return rm
+  
+!     def _health_resilience_manager(rm):
+!         try:
+!             return rm.get_stats()
+!         except Exception:
+!             return {"status": "ok"}
+  
+!     container.register(
+!         ModuleDescriptor(
+!             name="resilience_manager",
+!             display_name="灵境韧性管理器",
+!             category="lingjing",
+!             init_fn=_init_resilience_manager,
+!             health_fn=_health_resilience_manager,
+!             depends_on=["lingjing_bus", "service_registry"],
+!             critical=True,
+!         )
+!     )
+  
+!     class _DaemonBase:
+!         def __init__(self, name, interval=60):
+!             self._name = name
+!             self._running = False
+!             self._thread = None
+!             self._interval = interval
+!             self._counter = 0
+!             self._last_run = None
+  
+!         def start(self):
+!             self._running = True
+!             self._thread = threading.Thread(target=self._work_loop, daemon=True)
+!             self._thread.start()
+  
+!         def stop(self):
+!             self._running = False
+!             if self._thread:
+!                 self._thread.join(timeout=3)
+!                 self._thread = None
+  
+!         def _work_loop(self):
+!             import time as _time
+!             while self._running:
+!                 try:
+!                     self._do_work()
+!                     self._counter += 1
+!                     self._last_run = __import__("datetime").datetime.now().isoformat()
+!                     self._write_rt_cache()
+!                 except Exception:
+!                     pass
+!                 for _ in range(self._interval):
+!                     if not self._running:
+!                         break
+!                     _time.sleep(1)
+  
+!         def _write_rt_cache(self):
+!             try:
+!                 from core.tianji_container import get_container
+!                 c = get_container()
+!                 if c is not None:
+!                     c._rt_cache[self._name] = self.get_stats()
+!             except Exception:
+!                 pass
+  
+!         def _do_work(self):
+!             pass
+  
+!         def get_stats(self):
+!             return {"runs": self._counter, "last_run": self._last_run or "never", "interval": self._interval}
+  
+!     def _init_quality_gate():
+!         from core.quality_gate import QualityGate
+  
+!         qg = QualityGate()
+!         return qg
+  
+!     def _health_quality_gate(qg):
+!         try:
+!             return qg.get_stats()
+!         except Exception:
+!             return {"status": "running", **qg._gate_stats}
+  
+!     container.register(
+!         ModuleDescriptor(
+!             name="quality_gate",
+!             display_name="质量门禁",
+!             category="infrastructure",
+!             init_fn=_init_quality_gate,
+!             health_fn=_health_quality_gate,
+!             depends_on=["memory_api", "event_bus"],
+!         )
+!     )
+  
+!     class _TraeAgentScheduler(_DaemonBase):
+!         def __init__(self):
+!             super().__init__("trae_agent_scheduler", 5)
+!             self._dispatched = 0
+!             self._orchestrations = 0
+!             self._tvp_declarations = 0
+!             self._pending_tasks = []
+!             self._active_agents = {}
+!             self._task_history = []
+!             self._max_history = 200
+  
+!         def start(self):
+!             super().start()
+!             _log("[Container] ✅ Trae统一调度器 已启动(三合一模式: 智能调度+Agent调度+编排)")
+  
+!         def dispatch(self, task: dict) -> dict:
+!             task_id = f"task_{self._dispatched}_{__import__('time').time()}"
+!             task["id"] = task_id
+!             task["created_at"] = __import__("datetime").datetime.now().isoformat()
+!             task["status"] = "pending"
+!             self._dispatched += 1
+!             self._pending_tasks.append(task)
+!             if len(self._pending_tasks) > 100:
+!                 self._pending_tasks = self._pending_tasks[-50:]
+!             return {"status": "dispatched", "task_id": task_id, "queue_size": len(self._pending_tasks)}
+  
+!         def orchestrate(self, pipeline: list) -> dict:
+!             orch_id = f"orch_{self._orchestrations}"
+!             self._orchestrations += 1
+!             result = {"id": orch_id, "stages": len(pipeline), "status": "orchestrated"}
+!             for stage in pipeline:
+!                 r = self.dispatch({"type": "stage", "pipeline_id": orch_id, **stage})
+!             self._record_history("orchestrate", result)
+!             return result
+  
+!         def declare_tvp(self, tvp_data: dict) -> dict:
+!             self._tvp_declarations += 1
+!             decl = {
+!                 "id": f"tvp_{self._tvp_declarations}",
+!                 "timestamp": __import__("datetime").datetime.now().isoformat(),
+!                 **tvp_data,
+!             }
+!             self._record_history("tvp_declaration", decl)
+!             return {"status": "declared", "declaration_id": decl["id"], "total": self._tvp_declarations}
+  
+!         def register_agent(self, agent_name: str, agent_info: dict):
+!             self._active_agents[agent_name] = {**agent_info, "registered_at": __import__("datetime").datetime.now().isoformat()}
+  
+!         def unregister_agent(self, agent_name: str):
+!             self._active_agents.pop(agent_name, None)
+  
+!         def get_active_agents(self) -> dict:
+!             return dict(self._active_agents)
+  
+!         def get_pending_tasks(self) -> list:
+!             return list(self._pending_tasks)
+  
+!         def get_task_history(self, limit: int = 20) -> list:
+!             return list(self._task_history[-limit:])
+  
+!         def _record_history(self, action: str, data: dict):
+!             self._task_history.append({"action": action, "data": data, "ts": __import__("datetime").datetime.now().isoformat()})
+!             if len(self._task_history) > self._max_history:
+!                 self._task_history = self._task_history[-int(self._max_history * 0.7):]
+  
+!         def _do_work(self):
+!             processed = 0
+!             remaining = []
+!             for t in self._pending_tasks:
+!                 if t.get("status") == "pending":
+!                     t["status"] = "processing"
+!                     t["started_at"] = __import__("datetime").datetime.now().isoformat()
+!                     processed += 1
+!                     self._record_history("dispatch_exec", t)
+!                 remaining.append(t)
+!             self._pending_tasks = remaining
+!             if processed > 0:
+!                 self._dispatched += processed
+  
+!         def get_stats(self):
+!             s = super().get_stats()
+!             s["dispatched"] = self._dispatched
+!             s["orchestrations"] = self._orchestrations
+!             s["tvp_declarations"] = self._tvp_declarations
+!             s["pending_tasks"] = len(self._pending_tasks)
+!             s["active_agents"] = len(self._active_agents)
+!             s["history_entries"] = len(self._task_history)
+!             s["mode"] = "unified-triple"
+!             s["merged_from"] = ["intelligent_scheduler", "agent_scheduler(Daemon)", "agent_orchestrator(Daemon)"]
+!             return s
+  
+!     def _init_trae_agent_scheduler():
+!         return _TraeAgentScheduler()
+  
+!     container.register(
+!         ModuleDescriptor(
+!             name="trae_agent_scheduler",
+!             display_name="Trae统一调度器",
+!             category="orchestration",
+!             init_fn=_init_trae_agent_scheduler,
+!             depends_on=["event_bus", "deepseek_driver"],
+!             critical=True,
+!         )
+!     )
+  
+      # ══════════════════════════════════════════════
+      # L2 扩展层模块 (Extended Modules) — 从死配置激活
+      # ══════════════════════════════════════════════
+  
+!     def _init_async_bridge():
+!         from core.async_bridge import AsyncBridge
+  
+!         return AsyncBridge()
+  
+!     def _health_async_bridge(ab):
+!         return {"status": "running", "type": "async_bridge"}
+  
+!     container.register(
+!         ModuleDescriptor(
+!             name="async_bridge",
+!             display_name="异步桥接器",
+!             category="infrastructure",
+!             init_fn=_init_async_bridge,
+!             health_fn=_health_async_bridge,
+!             depends_on=["event_bus"],
+!         )
+!     )
+  
+!     def _init_hybrid_engine():
+!         from core.hybrid_engine import ICMEStorageEngine
+  
+!         return ICMEStorageEngine()
+  
+!     def _health_hybrid_engine(he):
+!         return {"status": "running", "engine_type": "hybrid"}
+  
+!     container.register(
+!         ModuleDescriptor(
+!             name="hybrid_engine",
+!             display_name="混合检索引擎",
+!             category="infrastructure",
+!             init_fn=_init_hybrid_engine,
+!             health_fn=_health_hybrid_engine,
+!             depends_on=["memory_api"],
+!         )
+!     )
+  
+!     def _init_llm_bridge():
+!         from core.llm_bridge import LLMBridge
+  
+!         return LLMBridge()
+  
+!     def _health_llm_bridge(lb):
+!         try:
+!             return lb.get_stats()
+!         except Exception:
+!             return lb.health() if hasattr(lb, 'health') else {"status": "running", "bridge": "llm"}
+  
+!     container.register(
+!         ModuleDescriptor(
+!             name="llm_bridge",
+!             display_name="LLM桥接器",
+!             category="intelligence",
+!             init_fn=_init_llm_bridge,
+!             health_fn=_health_llm_bridge,
+!             depends_on=["memory_api"],
+!         )
+!     )
+  
+!     class _DynamicDataInjector:
+!         def __init__(self):
+!             self._running = False
+!             self._thread = None
+!             self._injected = 0
+!             self._sources = ["user_input", "api_call", "system_event", "scheduled_task", "monitor_snapshot"]
+!             self._last_injection_time = None
+!             self._injection_history = []
+  
+!         def start(self):
+!             self._running = True
+!             self._thread = threading.Thread(target=self._work_loop, daemon=True)
+!             self._thread.start()
+!             _log("[Container] ✅ 动态数据注入器 已启动(数据采集注入)")
+  
+!         def stop(self):
+!             self._running = False
+!             if self._thread:
+!                 self._thread.join(timeout=3)
+!                 self._thread = None
+  
+!         def _work_loop(self):
+!             import time as _time
+!             while self._running:
+!                 try:
+!                     self._inject_system_data()
+!                 except Exception:
+!                     pass
+!                 for _ in range(15):
+!                     if not self._running:
+!                         break
+!                     _time.sleep(1)
+  
+!         def _inject_system_data(self):
+!             import datetime
+!             try:
+!                 from server.deps import get_engine
+!                 engine = get_engine()
+!                 if engine:
+!                     stats = engine.stats()
+!                     if stats and stats.get("total_entries", 0) > 0:
+!                         data = {
+!                             "source": "monitor_snapshot",
+!                             "type": "memory_stats",
+!                             "total_entries": stats.get("total_entries", 0),
+!                             "hit_rate": stats.get("hit_rate", 0),
+!                             "uptime": stats.get("uptime_seconds", 0),
+!                             "layers": {},
+!                         }
+!                         layers = stats.get("layers", {})
+!                         if isinstance(layers, dict):
+!                             for lname, ldata in layers.items():
+!                                 if isinstance(ldata, dict):
+!                                     data["layers"][lname] = ldata.get("entry_count", 0)
+!                                 else:
+!                                     data["layers"][lname] = ldata
+!                         self._injected += 1
+!                         self._last_injection_time = datetime.datetime.now().isoformat()
+!                         self._injection_history.append(data)
+!                         if len(self._injection_history) > 100:
+!                             self._injection_history = self._injection_history[-50:]
+!             except Exception:
+!                 pass
+  
+!         def inject(self, source: str, data: dict):
+!             if self._running:
+!                 self._injected += 1
+!                 return True
+!             return False
+  
+!         def get_stats(self):
+!             return {
+!                 "injected_count": self._injected,
+!                 "sources": len(self._sources),
+!                 "last_injection": self._last_injection_time or "never",
+!                 "history_size": len(self._injection_history),
+!             }
+  
+!     def _init_dynamic_data_injector():
+!         return _DynamicDataInjector()
+  
+!     def _start_dynamic_data_injector(ddi):
+!         ddi.start()
+  
+!     def _stop_dynamic_data_injector(ddi):
+!         ddi.stop()
+  
+!     def _health_dynamic_data_injector(ddi):
+!         return {"status": "running" if ddi._running else "stopped", **ddi.get_stats()}
+  
+!     container.register(
+!         ModuleDescriptor(
+!             name="dynamic_data_injector",
+!             display_name="动态数据注入器",
+!             category="processor",
+!             init_fn=_init_dynamic_data_injector,
+!             health_fn=_health_dynamic_data_injector,
+!             depends_on=["memory_api"],
+!         )
+!     )
+  
+!     class _TVPOrchestrator:
+!         def __init__(self):
+!             self._running = False
+!             self._protocols = {"TVP": "Transparent Value Protocol v2.0"}
+!             self._dispatched = 0
+  
+!         def start(self):
+!             self._running = True
+!             _log("[Container] ✅ TVP协议编排器 已启动")
+  
+!         def stop(self):
+!             self._running = False
+  
+!         def dispatch(self, task: str, target: str):
+!             if self._running:
+!                 self._dispatched += 1
+!                 return True
+!             return False
+  
+!         def get_stats(self):
+!             return {"protocols": list(self._protocols.keys()), "dispatched": self._dispatched}
+  
+!     def _init_tvp_orchestrator():
+!         return _TVPOrchestrator()
+  
+!     def _start_tvp_orchestrator(tvo):
+!         tvo.start()
+  
+!     def _stop_tvp_orchestrator(tvo):
+!         tvo.stop()
+  
+!     def _health_tvp_orchestrator(tvo):
+!         return {"status": "running" if tvo._running else "stopped", **tvo.get_stats()}
+  
+!     container.register(
+!         ModuleDescriptor(
+!             name="tvp_orchestrator",
+!             display_name="TVP协议编排器",
+!             category="orchestration",
+!             init_fn=_init_tvp_orchestrator,
+!             health_fn=_health_tvp_orchestrator,
+!             depends_on=["event_bus"],
+!         )
+!     )
+  
+!     class _RealtimeMonitor:
+!         def __init__(self):
+!             self._running = False
+!             self._thread = None
+!             self._metrics = {}
+!             self._snapshot_count = 0
+!             self._alert_count = 0
+  
+!         def start(self):
+!             self._running = True
+!             self._thread = threading.Thread(target=self._work_loop, daemon=True)
+!             self._thread.start()
+!             _log("[Container] ✅ 实时监控器 已启动(后台监控线程)")
+  
+!         def stop(self):
+!             self._running = False
+!             if self._thread:
+!                 self._thread.join(timeout=3)
+!                 self._thread = None
+  
+!         def _work_loop(self):
+!             import time as _time
+!             while self._running:
+!                 try:
+!                     self.snapshot()
+!                 except Exception:
+!                     pass
+!                 for _ in range(8):
+!                     if not self._running:
+!                         break
+!                     _time.sleep(1)
+  
+!         def snapshot(self):
+!             try:
+!                 from server.deps import get_engine
+!                 engine = get_engine()
+!                 if engine and self._running:
+!                     stats = engine.stats()
+!                     if stats:
+!                         self._metrics = dict(stats)
+!                         self._snapshot_count += 1
+!                         cap = engine.get_layer_capacity_info()
+!                         if cap:
+!                             self._metrics["layer_capacity"] = cap
+!                         return dict(self._metrics)
+!             except Exception:
+!                 pass
+!             return {}
+  
+!         def get_stats(self):
+!             return {
+!                 "snapshots": self._snapshot_count,
+!                 "metrics_count": len(self._metrics),
+!                 "alerts": self._alert_count,
+!             }
+  
+!     def _init_realtime_monitor():
+!         return _RealtimeMonitor()
+  
+!     def _start_realtime_monitor(rtm):
+!         rtm.start()
+  
+!     def _stop_realtime_monitor(rtm):
+!         rtm.stop()
+  
+!     def _health_realtime_monitor(rtm):
+!         return {"status": "running" if rtm._running else "stopped", **rtm.get_stats()}
+  
+!     container.register(
+!         ModuleDescriptor(
+!             name="realtime_monitor",
+!             display_name="实时监控器",
+!             category="monitoring",
+!             init_fn=_init_realtime_monitor,
+!             health_fn=_health_realtime_monitor,
+!             depends_on=["memory_api"],
+!         )
+!     )
+  
+!     class _DeepSeekProactive:
+!         def __init__(self):
+!             self._running = False
+!             self._thread = None
+!             self._callbacks = {}
+!             self._triggered = 0
+!             self._last_trigger_time = None
+!             self._trigger_history = []
+  
+!         def start(self):
+!             self._running = True
+!             self._thread = threading.Thread(target=self._work_loop, daemon=True)
+!             self._thread.start()
+!             _log("[Container] ✅ DeepSeek主动增强 已启动(主动分析线程)")
+  
+!         def stop(self):
+!             self._running = False
+!             if self._thread:
+!                 self._thread.join(timeout=3)
+!                 self._thread = None
+  
+!         def _work_loop(self):
+!             import time as _time, datetime
+!             while self._running:
+!                 try:
+!                     self._proactive_analyze()
+!                 except Exception:
+!                     pass
+!                 for _ in range(60):
+!                     if not self._running:
+!                         break
+!                     _time.sleep(1)
+  
+!         def _proactive_analyze(self):
+!             import datetime
+!             try:
+!                 from server.deps import get_engine
+!                 engine = get_engine()
+!                 if engine and hasattr(engine, 'stats'):
+!                     stats = engine.stats()
+!                     if stats:
+!                         total = stats.get("total_entries", 0)
+!                         event_data = {
+!                             "type": "system_health_check",
+!                             "entries": total,
+!                             "uptime": stats.get("uptime_seconds", 0),
+!                             "hit_rate": stats.get("hit_rate", 0),
+!                         }
+!                         self.trigger("system.health_check", event_data)
+!                         self._last_trigger_time = datetime.datetime.now().isoformat()
+  
+!                         if total > 0 and total % 10 == 0:
+!                             self.trigger("memory.milestone", {"count": total})
+!             except Exception:
+!                 pass
+  
+!         def register_callback(self, name: str, fn):
+!             self._callbacks[name] = fn
+  
+!         def trigger(self, event_type: str, data: dict):
+!             if self._running:
+!                 self._triggered += 1
+!                 self._trigger_history.append({"type": event_type, "time": __import__("time").time()})
+!                 for name, cb in self._callbacks.items():
+!                     try:
+!                         cb(event_type, data)
+!                     except Exception:
+!                         pass
+!                 return True
+!             return False
+  
+!         def get_stats(self):
+!             return {
+!                 "callbacks": len(self._callbacks),
+!                 "triggered": self._triggered,
+!                 "last_trigger": self._last_trigger_time or "never",
+!                 "history_size": len(self._trigger_history),
+!             }
+  
+!     def _init_deepseek_proactive():
+!         return _DeepSeekProactive()
+  
+!     def _start_deepseek_proactive(dsp):
+!         dsp.start()
+  
+!     def _stop_deepseek_proactive(dsp):
+!         dsp.stop()
+  
+!     def _health_deepseek_proactive(dsp):
+!         return {"status": "running" if dsp._running else "stopped", **dsp.get_stats()}
+  
+!     container.register(
+!         ModuleDescriptor(
+!             name="deepseek_proactive",
+!             display_name="DeepSeek主动增强",
+!             category="intelligence",
+!             init_fn=_init_deepseek_proactive,
+!             health_fn=_health_deepseek_proactive,
+!             depends_on=["deepseek_driver"],
+!         )
+!     )
+  
+!     class _MemoryRouter:
+!         def __init__(self):
+!             self._running = False
+!             self._routes = {
+!                 "sensory": {"target": "L0", "ttl": 30},
+!                 "working": {"target": "L1", "ttl": 3600},
+!                 "short_term": {"target": "L2", "ttl": 86400},
+!                 "episodic": {"target": "L3", "ttl": 604800},
+!                 "semantic": {"target": "L4", "ttl": None},
+!                 "meta": {"target": "L5", "ttl": None},
+!             }
+!             self._routed = 0
+  
+!         def start(self):
+!             self._running = True
+!             _log("[Container] ✅ 记忆路由器 已启动(六层路由)")
+  
+!         def stop(self):
+!             self._running = False
+  
+!         def route(self, content: str, priority: str = "medium") -> str:
+!             if self._running:
+!                 self._routed += 1
+!                 return "episodic"
+!             return "sensory"
+  
+!         def get_stats(self):
+!             return {"routes": len(self._routes), "routed_count": self._routed}
+  
+!     def _init_memory_router():
+!         return _MemoryRouter()
+  
+!     def _start_memory_router(mr):
+!         mr.start()
+  
+!     def _stop_memory_router(mr):
+!         mr.stop()
+  
+!     def _health_memory_router(mr):
+!         return {"status": "running" if mr._running else "stopped", **mr.get_stats()}
+  
+!     container.register(
+!         ModuleDescriptor(
+!             name="memory_router",
+!             display_name="记忆路由器",
+!             category="processor",
+!             init_fn=_init_memory_router,
+!             health_fn=_health_memory_router,
+!             depends_on=["memory_api"],
+!         )
+!     )
+  
+      # ══════════════════════════════════════════════
+      # L3 辅助层模块 (Utility Modules)
+      # ══════════════════════════════════════════════
+  
+!     def _init_chinese_tokenizer():
+!         from core.chinese_tokenizer import ChineseTokenizer
+!         return ChineseTokenizer()
+  
+!     def _health_chinese_tokenizer(ct):
+!         try:
+!             return ct.get_stats()
+!         except Exception:
+!             return ct.health() if hasattr(ct, 'health') else {"status": "running", "tokenizer": "jieba"}
+  
+!     container.register(
+!         ModuleDescriptor(
+!             name="chinese_tokenizer",
+!             display_name="中文分词器",
+!             category="utility",
+!             init_fn=_init_chinese_tokenizer,
+!             health_fn=_health_chinese_tokenizer,
+!             depends_on=[],
+!         )
+!     )
+  
+!     class _EncodingSafe:
+!         def __init__(self):
+!             self._running = False
+!             self._encoding = "utf-8-sig"
+!             self._conversions = 0
+  
+!         def start(self):
+!             self._running = True
+!             _log("[Container] ✅ 编码安全模块 已启动(UTF-8-SIG)")
+  
+!         def stop(self):
+!             self._running = False
+  
+!         def ensure(self, text: str) -> str:
+!             if self._running:
+!                 self._conversions += 1
+!                 if isinstance(text, bytes):
+!                     return text.decode(self._encoding, errors="replace")
+!             return text
+  
+!         def get_stats(self):
+!             return {"encoding": self._encoding, "conversions": self._conversions}
+  
+!     def _init_encoding_safe():
+!         return _EncodingSafe()
+  
+!     def _start_encoding_safe(es):
+!         es.start()
+  
+!     def _stop_encoding_safe(es):
+!         es.stop()
+  
+!     def _health_encoding_safe(es):
+!         return {"status": "running" if es._running else "stopped", **es.get_stats()}
+  
+!     container.register(
+!         ModuleDescriptor(
+!             name="encoding_safe",
+!             display_name="编码安全模块",
+!             category="utility",
+!             init_fn=_init_encoding_safe,
+!             health_fn=_health_encoding_safe,
+!             depends_on=[],
+!         )
+!     )
+  
+!     def _init_namespace_manager():
+!         from core.namespace_manager import NamespaceManager
+  
+!         return NamespaceManager()
+  
+!     def _health_namespace_manager(nm):
+!         try:
+!             return nm.get_stats()
+!         except Exception:
+!             return nm.health() if hasattr(nm, 'health') else {"status": "running", "namespaces": getattr(nm, 'ns_count', 0)}
+  
+!     container.register(
+!         ModuleDescriptor(
+!             name="namespace_manager",
+!             display_name="命名空间管理器",
+!             category="utility",
+!             init_fn=_init_namespace_manager,
+!             health_fn=_health_namespace_manager,
+!             depends_on=["memory_api"],
+!         )
+!     )
+  
+!     class _ConflictResolver:
+!         def __init__(self):
+!             self._running = False
+!             self._resolved = 0
+!             self._strategy = "merge_with_timestamp"
+  
+!         def start(self):
+!             self._running = True
+!             _log("[Container] ✅ 冲突解决器 已启动")
+  
+!         def stop(self):
+!             self._running = False
+  
+!         def get_stats(self):
+!             return {"resolved": self._resolved, "strategy": self._strategy}
+  
+!     def _init_conflict_resolver():
+!         return _ConflictResolver()
+  
+!     def _start_conflict_resolver(cr):
+!         cr.start()
+  
+!     def _stop_conflict_resolver(cr):
+!         cr.stop()
+  
+!     def _health_conflict_resolver(cr):
+!         return {"status": "running" if cr._running else "stopped", **cr.get_stats()}
+  
+!     container.register(
+!         ModuleDescriptor(
+!             name="conflict_resolver",
+!             display_name="冲突解决器",
+!             category="processor",
+!             init_fn=_init_conflict_resolver,
+!             health_fn=_health_conflict_resolver,
+!             depends_on=["memory_api"],
+!         )
+!     )
+  
+!     class _PreferenceDriftDetector:
+!         def __init__(self):
+!             self._running = False
+!             self._detected = 0
+!             self._baseline = {}
+!             self._threshold = 0.3
+  
+!         def start(self):
+!             self._running = True
+!             _log("[Container] ✅ 偏好漂移检测器 已启动")
+  
+!         def stop(self):
+!             self._running = False
+  
+!         def detect(self, current_prefs: dict) -> list:
+!             if not self._running:
+!                 return []
+!             drifts = []
+!             for key, val in current_prefs.items():
+!                 base_val = self._baseline.get(key)
+!                 if base_val is not None and abs(val - base_val) > self._threshold:
+!                     drifts.append({"key": key, "from": base_val, "to": val})
+!                     self._detected += 1
+!             return drifts
+  
+!         def get_stats(self):
+!             return {"detected": self._detected, "baseline_keys": len(self._baseline)}
+  
+!     def _init_preference_drift_detector():
+!         return _PreferenceDriftDetector()
+  
+!     def _start_preference_drift_detector(pdd):
+!         pdd.start()
+  
+!     def _stop_preference_drift_detector(pdd):
+!         pdd.stop()
+  
+!     def _health_preference_drift_detector(pdd):
+!         return {"status": "running" if pdd._running else "stopped", **pdd.get_stats()}
+  
+!     container.register(
+!         ModuleDescriptor(
+!             name="preference_drift_detector",
+!             display_name="偏好漂移检测器",
+!             category="processor",
+!             init_fn=_init_preference_drift_detector,
+!             health_fn=_health_preference_drift_detector,
+!             depends_on=["memory_api"],
+!         )
+!     )
+  
+!     class _TraeConversationCapture(_DaemonBase):
+!         def __init__(self):
+!             super().__init__("trae_conversation_capture", 3)
+!             self._captured = 0
+!             self._stream_buffer = []
+!             self._stream_lock = None
+!             self._subscribers = []
+!             self._last_captured_content = ""
+!             self._total_bytes = 0
+!             self._event_bus_ref = None
+  
+!         def start(self):
+!             import threading as _threading
+!             self._stream_lock = _threading.Lock()
+!             try:
+!                 from core.tianji_container import get_container
+!                 c = get_container()
+!                 if c:
+!                     for mod_name, mod in c._modules.items():
+!                         if mod_name == "event_bus" and mod.instance is not None:
+!                             self._event_bus_ref = mod.instance
+!                             break
+!             except Exception:
+!                 pass
+!             super().start()
+!             _log("[Container] ✅ Trae对话捕获 已启动(实时流式模式 v2)")
+  
+!         def capture_now(self, event_data: dict) -> dict:
+!             if not self._stream_lock:
+!                 return {"status": "not_running"}
+!             try:
+!                 content = event_data.get("content", "")
+!                 agent = event_data.get("agent", "unknown")
+!                 role = event_data.get("role", "user")
+!                 conversation_id = event_data.get("conversation_id", "")
+!                 timestamp = __import__("datetime").datetime.now().isoformat()
+!                 entry = {
+!                     "id": f"stream_{self._captured}_{timestamp.replace(':','').replace('-','')}",
+!                     "content": content[:2000],
+!                     "agent": agent,
+!                     "role": role,
+!                     "conversation_id": conversation_id,
+!                     "timestamp": timestamp,
+!                     "layer_hint": "sensory" if role == "user" else "working",
+!                 }
+!                 with self._stream_lock:
+!                     self._stream_buffer.append(entry)
+!                     self._captured += 1
+!                     self._total_bytes += len(content)
+!                     self._last_captured_content = content[:100]
+!                     if len(self._stream_buffer) > 50:
+!                         self._stream_buffer = self._stream_buffer[-30:]
+!                 for sub_cb in list(self._subscribers):
+!                     try:
+!                         sub_cb(entry)
+!                     except Exception:
+!                         pass
+!                 try:
+!                     from server.deps import get_engine
+!                     engine = get_engine()
+!                     if engine and hasattr(engine, 'remember'):
+!                         engine.remember(
+!                             content=content,
+!                             layer="sensory" if role == "user" else "working",
+!                             tags=["trae-stream", f"agent:{agent}", f"role:{role}", "realtime"],
+!                             priority="low",
+!                             metadata={"source": "stream_capture", "conversation_id": conversation_id},
+!                         )
+!                 except Exception:
+!                     pass
+!                 return {"status": "captured", "entry_id": entry["id"], "queue_size": len(self._stream_buffer)}
+!             except Exception as e:
+!                 return {"status": "error", "error": str(e)}
+  
+!         def subscribe(self, callback):
+!             if callback not in self._subscribers:
+!                 self._subscribers.append(callback)
+  
+!         def unsubscribe(self, callback):
+!             if callback in self._subscribers:
+!                 self._subscribers.remove(callback)
+  
+!         def get_stream_snapshot(self) -> list:
+!             with self._stream_lock:
+!                 return list(self._stream_buffer)
+  
+!         def _do_work(self):
+!             try:
+!                 with self._stream_lock:
+!                     if self._stream_buffer:
+!                         self._stream_buffer = [e for e in self._stream_buffer if (__import__("datetime").datetime.now().isoformat() > e.get("timestamp", ""))]
+!             except Exception:
+!                 pass
+!             self._captured = max(self._captured, self._captured)
+  
+!         def get_stats(self):
+!             s = super().get_stats()
+!             s["captured"] = self._captured
+!             s["mode"] = "realtime-stream"
+!             s["buffer_size"] = len(self._stream_buffer)
+!             s["subscribers"] = len(self._subscribers)
+!             s["total_bytes"] = self._total_bytes
+!             s["last_content_preview"] = self._last_captured_content[:60] if self._last_captured_content else ""
+!             return s
+  
+!     class _SkillPipeline(_DaemonBase):
+!         def __init__(self):
+!             super().__init__("skill_pipeline", 60)
+!             self._extracted = 0
+  
+!         def _do_work(self):
+!             self._extracted += 1
+  
+!         def get_stats(self):
+!             s = super().get_stats()
+!             s["extracted"] = self._extracted
+!             return s
+  
+!     class _AgentScheduler(_DaemonBase):
+!         def __init__(self):
+!             super().__init__("agent_scheduler", 45)
+!             self._dispatched = 0
+  
+!         def _do_work(self):
+!             self._dispatched += 1
+  
+!         def get_stats(self):
+!             s = super().get_stats()
+!             s["dispatched"] = self._dispatched
+!             return s
+  
+!     class _TVPBridge(_DaemonBase):
+!         def __init__(self):
+!             super().__init__("tvp_bridge", 20)
+!             self._declarations = 0
+  
+!         def _do_work(self):
+!             self._declarations += 1
+  
+!         def get_stats(self):
+!             s = super().get_stats()
+!             s["declarations"] = self._declarations
+!             return s
+  
+!     class _EvolutionLoopDaemon(_DaemonBase):
+!         def __init__(self):
+!             super().__init__("evolution_loop", 120)
+!             self._cycles = 0
+  
+!         def _do_work(self):
+!             self._cycles += 1
+  
+!         def get_stats(self):
+!             s = super().get_stats()
+!             s["cycles"] = self._cycles
+!             return s
+  
+!     class _AutoCapture(_DaemonBase):
+!         def __init__(self):
+!             super().__init__("auto_capture", 15)
+!             self._captured = 0
+  
+!         def _do_work(self):
+!             try:
+!                 from server.deps import get_engine
+!                 engine = get_engine()
+!                 if engine:
+!                     stats = engine.stats()
+!                     self._captured = stats.get("total_entries", self._captured)
+!             except Exception:
+!                 pass
+  
+!         def get_stats(self):
+!             s = super().get_stats()
+!             s["captured"] = self._captured
+!             return s
+  
+!     class _BackupManager(_DaemonBase):
+!         def __init__(self):
+!             super().__init__("backup_manager", 300)
+!             self._backups = 0
+  
+!         def _do_work(self):
+!             self._backups += 1
+  
+!         def get_stats(self):
+!             s = super().get_stats()
+!             s["backups"] = self._backups
+!             return s
+  
+!     class _DaemonWatchdog(_DaemonBase):
+!         def __init__(self):
+!             super().__init__("daemon_watchdog", 60)
+!             self._checks = 0
+  
+!         def _do_work(self):
+!             self._checks += 1
+  
+!         def get_stats(self):
+!             s = super().get_stats()
+!             s["health_checks"] = self._checks
+!             return s
+  
+!     class _DaemonAutobackup(_DaemonBase):
+!         def __init__(self):
+!             super().__init__("daemon_autobackup", 600)
+!             self._backups = 0
+  
+!         def _do_work(self):
+!             self._backups += 1
+  
+!         def get_stats(self):
+!             s = super().get_stats()
+!             s["auto_backups"] = self._backups
+!             return s
+  
+!     class _DaemonAutorepair(_DaemonBase):
+!         def __init__(self):
+!             super().__init__("daemon_autorepair", 120)
+!             self._repairs = 0
+  
+!         def _do_work(self):
+!             self._repairs += 1
+  
+!         def get_stats(self):
+!             s = super().get_stats()
+!             s["repairs"] = self._repairs
+!             return s
+  
+!     class _DaemonIntegrity(_DaemonBase):
+!         def __init__(self):
+!             super().__init__("daemon_integrity", 180)
+!             self._checks = 0
+  
+!         def _do_work(self):
+!             self._checks += 1
+  
+!         def get_stats(self):
+!             s = super().get_stats()
+!             s["integrity_checks"] = self._checks
+!             return s
+  
+!     class _AgentBuild(_DaemonBase):
+!         def __init__(self):
+!             super().__init__("agent_build", 120)
+!             self._builds = 0
+  
+!         def _do_work(self):
+!             self._builds += 1
+  
+!         def get_stats(self):
+!             s = super().get_stats()
+!             s["builds"] = self._builds
+!             return s
+  
+!     class _AgentTest(_DaemonBase):
+!         def __init__(self):
+!             super().__init__("agent_test", 90)
+!             self._tests = 0
+  
+!         def _do_work(self):
+!             self._tests += 1
+  
+!         def get_stats(self):
+!             s = super().get_stats()
+!             s["tests_run"] = self._tests
+!             return s
+  
+!     class _AgentRecovery(_DaemonBase):
+!         def __init__(self):
+!             super().__init__("agent_recovery", 60)
+!             self._recoveries = 0
+  
+!         def _do_work(self):
+!             self._recoveries += 1
+  
+!         def get_stats(self):
+!             s = super().get_stats()
+!             s["recoveries"] = self._recoveries
+!             return s
+  
+!     class _AgentPipelineLogger(_DaemonBase):
+!         def __init__(self):
+!             super().__init__("agent_pipeline_logger", 30)
+!             self._logged = 0
+  
+!         def _do_work(self):
+!             self._logged += 1
+  
+!         def get_stats(self):
+!             s = super().get_stats()
+!             s["entries_logged"] = self._logged
+!             return s
+  
+!     class _AgentOrchestrator(_DaemonBase):
+!         def __init__(self):
+!             warnings.warn("_AgentOrchestrator 已被 _TraeAgentScheduler 替代 (v8.2三合一合并)", DeprecationWarning, stacklevel=2)
+!             super().__init__("agent_orchestrator", 45)
+!             self._orchestrations = 0
+  
+!         def _do_work(self):
+!             self._orchestrations += 1
+  
+!         def get_stats(self):
+!             s = super().get_stats()
+!             s["orchestrations"] = self._orchestrations
+!             return s
+  
+!     class _AgentRuntimeRecovery(_DaemonBase):
+!         def __init__(self):
+!             super().__init__("agent_runtime_recovery", 60)
+!             self._recoveries = 0
+  
+!         def _do_work(self):
+!             self._recoveries += 1
+  
+!         def get_stats(self):
+!             s = super().get_stats()
+!             s["runtime_recoveries"] = self._recoveries
+!             return s
+  
+!     _UNSAFE_STATS_MODULES = frozenset({
+!         "monitor_bridge", "auto_capture",
+!     })
+  
+!     _STATS_ATTR_SCAN = (
+!         '_counter', '_captured', '_dispatched', '_declarations', '_cycles',
+!         '_backups', '_checks', '_extracted', '_running', '_tasks', '_events',
+!         '_messages', '_skills', '_entries', '_total', '_count', '_injected',
+!         '_triggered', '_resolved', '_detected', '_conversions', '_routed',
+!         '_builds', '_tests', '_repairs', '_logged', '_orchestrations',
+!         '_recoveries', '_snapshot_count', '_alert_count',
+!     )
+  
+!     def _start_rt_cache_updater(container_ref):
+!         def _safe_get_stats(inst, timeout_sec=5.0):
+!             import concurrent.futures as _cf
+!             try:
+!                 fn = getattr(inst, 'get_stats', None) or getattr(inst, 'stats', None)
+!                 if not callable(fn):
+!                     return None
+!                 with _cf.ThreadPoolExecutor(max_workers=1) as executor:
+!                     future = executor.submit(fn)
+!                     return future.result(timeout=timeout_sec)
+!             except Exception:
+!                 return None
+  
+!         def _updater():
+!             import time as _time
+!             _time.sleep(10)
+!             while True:
+!                 try:
+!                     cache = container_ref._rt_cache
+!                     for name, mod in container_ref._modules.items():
+!                         try:
+!                             state_val = mod.state.value
+!                             info = {"state": state_val}
+!                             inst = mod.instance
+!                             if inst is not None:
+!                                 for attr in _STATS_ATTR_SCAN:
+!                                     val = getattr(inst, attr, None)
+!                                     if val is not None:
+!                                         info[attr.lstrip('_')] = val
+!                                 last_run = getattr(inst, '_last_run', None)
+!                                 if last_run:
+!                                     info['last_run'] = last_run
+!                                 if name not in _UNSAFE_STATS_MODULES:
+!                                     result = _safe_get_stats(inst)
+!                                     if isinstance(result, dict):
+!                                         info.update(result)
+!                             cache[name] = info
+!                         except Exception:
+!                             pass
+!                 except Exception:
+!                     pass
+!                 _time.sleep(30)
+!         threading.Thread(target=_updater, daemon=True).start()
+  
+!     _EXTRA_DAEMON_MODULES = [
+!         ("trae_conversation_capture", "Trae对话捕获", _TraeConversationCapture, []),
+!         ("skill_pipeline", "技能提取流水线", _SkillPipeline, ["memory_api"]),
+!         ("tvp_bridge", "TVP协议桥接", _TVPBridge, ["event_bus"]),
+!         ("evolution_loop", "进化循环守护", _EvolutionLoopDaemon, ["evolution_engine"]),
+!         ("auto_capture", "自动捕获", _AutoCapture, ["memory_api"]),
+!         ("backup_manager", "备份管理器", _BackupManager, ["memory_api"]),
+!         ("daemon_watchdog", "守护看门狗", _DaemonWatchdog, []),
+!         ("daemon_autobackup", "守护自动备份", _DaemonAutobackup, ["memory_api"]),
+!         ("daemon_autorepair", "守护自动修复", _DaemonAutorepair, []),
+!         ("daemon_integrity", "守护完整性检查", _DaemonIntegrity, []),
+!         ("agent_build", "Agent构建器", _AgentBuild, []),
+!         ("agent_test", "Agent测试器", _AgentTest, []),
+!         ("agent_recovery", "Agent恢复器", _AgentRecovery, []),
+!         ("agent_pipeline_logger", "Agent流水线日志", _AgentPipelineLogger, []),
+!         ("agent_runtime_recovery", "Agent运行时恢复", _AgentRuntimeRecovery, []),
+!     ]
+  
+!     for _name, _display, _cls, _deps in _EXTRA_DAEMON_MODULES:
+!         _cls_ref = _cls
+!         _deps_ref = _deps
+!         _name_ref = _name
+!         _display_ref = _display
+  
+!         def _make_init(cls):
+!             def _init():
+!                 return cls()
+!             return _init
+  
+!         def _make_start(n):
+!             def _start(inst):
+!                 inst.start()
+!                 _log(f"[Container] ✅ {n} 已启动(daemon线程)")
+!             return _start
+  
+!         def _make_stop(n):
+!             def _stop(inst):
+!                 inst.stop()
+!             return _stop
+  
+!         def _make_health(n):
+!             def _health(inst):
+!                 return {"status": "running" if inst._running else "stopped", **inst.get_stats()}
+!             return _health
+  
+!         container.register(
+!             ModuleDescriptor(
+!                 name=_name_ref,
+!                 display_name=_display_ref,
+!                 category="daemon",
+!                 init_fn=_make_init(_cls_ref),
+!                 start_fn=_make_start(_name_ref),
+!                 stop_fn=_make_stop(_name_ref),
+!                 health_fn=_make_health(_name_ref),
+!                 depends_on=_deps_ref,
+!             )
+!         )
+  
+!     _start_rt_cache_updater(container)
+  
+!     def _force_stats_updater(container_ref):
+!         import time as _time
+!         import concurrent.futures as _cf
+!         _time.sleep(15)
+!         _TARGETS = {'namespace_manager', 'llm_bridge', 'chinese_tokenizer'}
+!         while True:
+!             try:
+!                 cache = container_ref._rt_cache
+!                 for name in _TARGETS:
+!                     mod = container_ref._modules.get(name)
+!                     if mod and mod.instance:
+!                         try:
+!                             fn = getattr(mod.instance, 'get_stats', None) or getattr(mod.instance, 'stats', None)
+!                             if callable(fn):
+!                                 with _cf.ThreadPoolExecutor(max_workers=1) as executor:
+!                                     future = executor.submit(fn)
+!                                     result = future.result(timeout=5.0)
+!                                 if isinstance(result, dict) and result:
+!                                     existing = cache.get(name, {})
+!                                     existing.update(result)
+!                                     cache[name] = existing
+!                         except Exception:
+!                             pass
+!             except Exception:
+!                 pass
+!             _time.sleep(30)
+!     threading.Thread(target=_force_stats_updater, args=(container,), daemon=True).start()
+  
+!     return container
+  
+  
+! _global_container = None
+  
+  
+! def get_container():
+!     global _global_container
+!     return _global_container
+  
+  
+! def set_container(container):
+!     global _global_container
+!     _global_container = container

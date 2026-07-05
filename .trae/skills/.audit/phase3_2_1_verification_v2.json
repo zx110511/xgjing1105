@@ -1,0 +1,32 @@
+﻿{
+  "phase": "3.2.1 v2",
+  "total": 5,
+  "passed": 4,
+  "results": [
+    {
+      "name": "tool_help (工具列表)",
+      "pass": true,
+      "detail": "total=71 tools"
+    },
+    {
+      "name": "tool_schema (工具Schema)",
+      "pass": true,
+      "detail": "keys=['status', 'schema']"
+    },
+    {
+      "name": "context_extract (上下文提取)",
+      "pass": true,
+      "detail": "status=success, intents=0"
+    },
+    {
+      "name": "list_memories (记忆列举)",
+      "pass": false,
+      "detail": "all retries failed"
+    },
+    {
+      "name": "get_session_digest (会话摘要)",
+      "pass": true,
+      "detail": "['status', 'digests']"
+    }
+  ]
+}

@@ -1,0 +1,105 @@
+> """
+> 天机系统版本管理中心 v9.0
+> ===========================
+> 单一真相源 (Single Source of Truth) - 全局版本号统一管理
+  
+> 使用方式:
+>   from core.version import __version__, VERSION_INFO, get_version_string()
+  
+> 变更记录:
+>   2026-05-30 v9.0.0-beta1 — v9.0商业版启动: 环境独立化+代码清洁+版本基线
+>   2026-05-30 v8.7.0-fusion — P15-P17 国际标准3项100%达标 (OWASP AOS+MS Agent+OTel Eval)
+>   2026-05-30 v8.6.0-fusion — P13-P14 7链Dashboard+API暴露链全栈交付
+>   2026-05-30 v8.5.0-fusion — P01-P12全栈12任务交付完成
+>   2026-05-30 v8.3.0-fusion — P01-P06优先级任务全栈交付
+> """
+  
+> __version__ = "9.0.0-beta1"
+> __version_codename__ = "beta1"
+> __edition__ = "commercial-beta"
+> VERSION_INFO = {
+>     "major": 9,
+>     "minor": 0,
+>     "patch": 0,
+>     "prerelease": "beta1",
+>     "build": "beta1",
+>     "full": f"9.0.0-beta1",
+> }
+  
+> SYSTEM_IDENTITY = {
+>     "name": "天机",
+>     "name_en": "TIANJI",
+>     "codename": "天枢",
+>     "codename_en": "TIANSHU",
+>     "tag": "【天机·智能v9.0】",
+>     "description": "ICME六层记忆架构 + SSS三链并行 + TVP透明调度 + 商业专业版",
+>     "source": "《天机·星枢运转》— 智能驱动，AI自主运行",
+> }
+  
+> ARCHITECTURE = {
+>     "type": "fusion",
+>     "components": ["memory-engine-global", "trae-ide", "multi-agent"],
+>     "memory_architecture": "ICME-v5.3",
+>     "layers": ["sensory", "working", "short_term", "episodic", "semantic", "meta"],
+>     "port": 8771,
+>     "api_endpoints": 71,
+>     "mcp_servers": 6,
+>     "mcp_tools": 70,
+>     "agents": 18,
+> }
+  
+> BUILD_METADATA = {
+>     "packaging_method": "source",
+>     "python_runtime": "3.12+",
+>     "node_runtime": "24+",
+>     "typescript_version": "5.7+",
+>     "last_updated": "2026-06-01",
+> }
+  
+  
+> def get_version_string(short: bool = False) -> str:
+>     if short:
+>         return f"{VERSION_INFO['major']}.{VERSION_INFO['minor']}.{VERSION_INFO['patch']}"
+!     return VERSION_INFO["full"]
+  
+  
+> def get_system_identity() -> dict:
+!     return {
+!         **SYSTEM_IDENTITY,
+!         "version": get_version_string(),
+!         "architecture": ARCHITECTURE,
+!     }
+  
+  
+> def get_health_version() -> dict:
+!     return {
+!         "status": "healthy",
+!         "version": get_version_string(),
+!         "edition": f"{__edition__}-v{get_version_string(short=True)}",
+!         "engine_ready": True,
+!         "system_identity": SYSTEM_IDENTITY,
+!         "architecture": ARCHITECTURE,
+!     }
+  
+  
+> def check_compatibility(required_version: str) -> bool:
+!     current_parts = [VERSION_INFO["major"], VERSION_INFO["minor"], VERSION_INFO["patch"]]
+!     required_parts = [int(x) for x in required_version.split(".")]
+  
+!     for i in range(min(len(current_parts), len(required_parts))):
+!         if current_parts[i] > required_parts[i]:
+!             return True
+!         if current_parts[i] < required_parts[i]:
+!             return False
+  
+!     return len(current_parts) >= len(required_parts)
+  
+  
+> if __name__ == "__main__":
+!     print(f"天机 v{get_version_string(short=True)}")
+!     print(f"Edition: {SYSTEM_IDENTITY['tag']}")
+!     print(f"Architecture: {ARCHITECTURE['type']}")
+!     print(f"Memory Layers: {len(ARCHITECTURE['layers'])} (ICME-{ARCHITECTURE['memory_architecture']})")
+!     print(f"API Endpoints: {ARCHITECTURE['api_endpoints']}")
+!     print(f"MCP Tools: {ARCHITECTURE['mcp_tools']}")
+!     print(f"Agents: {ARCHITECTURE['agents']}")

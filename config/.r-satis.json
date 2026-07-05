@@ -1,0 +1,17 @@
+﻿{
+  "root": ".",
+  "exclude": [
+    ".git",
+    "node_modules",
+    "__pycache__",
+    ".venv",
+    "*.pyc",
+    "*.tmp",
+    ".DS_Store",
+    "Thumbs.db"
+  ],
+  "summary_method": "hash",
+  "watchdog": true,
+  "interval_seconds": 300,
+  "version": "9.0"
+}

@@ -1,0 +1,20 @@
+{
+  "id": "5d04939d-8256-4de9-8413-00b143fae24f",
+  "title": "新对话",
+  "messages": [
+    {
+      "id": "msg-a4c853d1",
+      "role": "user",
+      "content": "你好",
+      "timestamp": 1781780943.283866,
+      "token_count": 2,
+      "fidelity": "full"
+    }
+  ],
+  "total_tokens": 0,
+  "summary": "",
+  "created_at": 1781780943.2828472,
+  "updated_at": 1781780943.283866,
+  "message_count": 1,
+  "pinned": false
+}

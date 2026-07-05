@@ -1,0 +1,379 @@
+﻿{
+  "domain_name": "小说工业化生产",
+  "owner_agent": "wenzong/miaobi/mingjing",
+  "domain": "novel_creation",
+  "skills": [
+    {
+      "skill_id": "novel-chapter-create",
+      "purpose": "基于世界观设定和前文内容，创作指定章节的完整正文。",
+      "triggers": [
+        "用户要求\"创作第X章\"、\"写章节正文\"、\"生成章节内容\"",
+        "@writer Agent被调度执行创作任务时",
+        "进入工业化生产流水线的\"创作\"阶段"
+      ],
+      "steps": [
+        {
+          "step": "Step 1: 准备工作 (必须完成)",
+          "item": "`{chapter_number}章相关内容`"
+        },
+        {
+          "step": "Step 1: 准备工作 (必须完成)",
+          "item": "`前文章节摘要`"
+        },
+        {
+          "step": "Step 1: 准备工作 (必须完成)",
+          "item": "`最近创作记录`"
+        },
+        {
+          "step": "Step 1: 准备工作 (必须完成)",
+          "item": "`世界观设定` + `力量体系`"
+        },
+        {
+          "step": "Step 1: 准备工作 (必须完成)",
+          "item": "`{character_names} 人物设定`"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "chapter_number",
+          "type": "integer",
+          "required": "✅",
+          "default": "-",
+          "description": "章节编号"
+        },
+        {
+          "name": "chapter_title",
+          "type": "string",
+          "required": "❌",
+          "default": "自动生成",
+          "description": "章节标题"
+        },
+        {
+          "name": "word_count",
+          "type": "integer",
+          "required": "❌",
+          "default": "5000",
+          "description": "目标字数"
+        },
+        {
+          "name": "style",
+          "type": "enum",
+          "required": "❌",
+          "default": "科幻悬疑",
+          "description": "写作风格"
+        },
+        {
+          "name": "pov",
+          "type": "enum",
+          "required": "❌",
+          "default": "第三人称有限",
+          "description": "叙事视角"
+        },
+        {
+          "name": "characters",
+          "type": "array",
+          "required": "❌",
+          "default": "自动检测",
+          "description": "出场人物列表"
+        }
+      ],
+      "output_format": "",
+      "best_practices": [],
+      "bound_agents": [
+        "@writer (写手)"
+      ],
+      "partners": [
+        "@planner (大纲参考) | @reviewer (审校) | @memory-architect (存储)"
+      ],
+      "rules": [],
+      "full_content": "# 章节创作 (novel/chapter-create)\n\n## 目的\n基于世界观设定和前文内容，创作指定章节的完整正文。\n\n## 触发场景\n- 用户要求\"创作第X章\"、\"写章节正文\"、\"生成章节内容\"\n- @writer Agent被调度执行创作任务时\n- 进入工业化生产流水线的\"创作\"阶段\n\n## 执行步骤\n\n### Step 1: 准备工作 (必须完成)\n1. 调用 `memory_recall` 查询:\n   - `{chapter_number}章相关内容`\n   - `前文章节摘要`\n   - `最近创作记录`\n2. 调用 `memory_recall` 加载:\n   - `世界观设定` + `力量体系`\n   - `{character_names} 人物设定`\n\n### Step 2: 内容创作\n1. 确认章节编号和标题（如未提供则自动生成）\n2. 遵循写作风格指南（默认: 科幻悬疑）\n3. 应用叙事视角（默认: 第三人称有限）\n4. 控制字数在目标范围内（默认: 5000字）\n\n### Step 3: 质量检查\n1. 自检: 与前文衔接是否自然\n2. 自检: 人物行为是否符合角色卡设定\n3. 自检: 世界观元素是否一致\n\n### Step 4: 记忆存储\n1. 调用 `memory_remember` 存储新章节到 episodic 层\n2. 更新章节摘要到 semantic 层\n3. 标记版本信息\n\n## 参数说明\n| 参数 | 类型 | 必填 | 默认值 | 说明 |\n|------|------|------|--------|------|\n| chapter_number | integer | ✅ | - | 章节编号 |\n| chapter_title | string | ❌ | 自动生成 | 章节标题 |\n| word_count | integer | ❌ | 5000 | 目标字数 |\n| style | enum | ❌ | 科幻悬疑 | 写作风格 |\n| pov | enum | ❌ | 第三人称有限 | 叙事视角 |\n| characters | array | ❌ | 自动检测 | 出场人物列表 |\n\n## 输出格式\n```markdown\n# 第{chapter_number}章 {chapter_title}\n\n[正文内容...]\n\n---\n*本章字数: {actual_word_count} | 版本: v{version} | 创作时间: {timestamp}*\n```\n\n## 绑定Agent\n@writer (写手)\n\n## 协作伙伴\n@planner (大纲参考) | @reviewer (审校) | @memory-architect (存储)\n"
+    },
+    {
+      "skill_id": "novel-consistency-check",
+      "purpose": "检查小说内容的内部一致性，包括设定冲突、人物行为逻辑、时间线错误等。",
+      "triggers": [
+        "用户要求\"检查一致性\"、\"校验错误\"、\"审校\"",
+        "@reviewer Agent执行质量审校任务时",
+        "创作完成后进入审校阶段时"
+      ],
+      "steps": [
+        {
+          "step": "Step 1: 加载基线数据",
+          "item": "世界观设定基线"
+        },
+        {
+          "step": "Step 1: 加载基线数据",
+          "item": "人物角色卡(所有出场人物)"
+        },
+        {
+          "step": "Step 1: 加载基线数据",
+          "item": "力量体系规则"
+        },
+        {
+          "step": "Step 1: 加载基线数据",
+          "item": "前文章节摘要"
+        },
+        {
+          "step": "Step 1: 加载基线数据",
+          "item": "版本追踪记录"
+        },
+        {
+          "step": "Step 2: 多维度检查",
+          "item": "[ ] 力量体系使用是否符合规则"
+        },
+        {
+          "step": "Step 2: 多维度检查",
+          "item": "[ ] 设定元素是否前后矛盾"
+        },
+        {
+          "step": "Step 2: 多维度检查",
+          "item": "[ ] 科技/魔法水平是否统一"
+        },
+        {
+          "step": "Step 2: 多维度检查",
+          "item": "[ ] 社会/政治结构是否一致"
+        },
+        {
+          "step": "Step 2: 多维度检查",
+          "item": "[ ] 人物性格是否符合角色卡"
+        },
+        {
+          "step": "Step 2: 多维度检查",
+          "item": "[ ] 行为动机是否合理"
+        },
+        {
+          "step": "Step 2: 多维度检查",
+          "item": "[ ] 能力范围是否超出设定"
+        },
+        {
+          "step": "Step 2: 多维度检查",
+          "item": "[ ] 人际关系是否连贯"
+        },
+        {
+          "step": "Step 2: 多维度检查",
+          "item": "[ ] 成长轨迹是否自然"
+        },
+        {
+          "step": "Step 2: 多维度检查",
+          "item": "[ ] 时间顺序是否正确"
+        },
+        {
+          "step": "Step 2: 多维度检查",
+          "item": "[ ] 事件因果关系是否合理"
+        },
+        {
+          "step": "Step 2: 多维度检查",
+          "item": "[ ] 年龄/时间跨度是否准确"
+        },
+        {
+          "step": "Step 2: 多维度检查",
+          "item": "[ ] 季节/天气是否连续"
+        },
+        {
+          "step": "Step 2: 多维度检查",
+          "item": "[ ] 人物称呼是否统一"
+        },
+        {
+          "step": "Step 2: 多维度检查",
+          "item": "[ ] 地名/物品名拼写一致"
+        },
+        {
+          "step": "Step 2: 多维度检查",
+          "item": "[ ] 数值/数据前后吻合"
+        },
+        {
+          "step": "Step 2: 多维度检查",
+          "item": "[ ] 标点符号规范使用"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "target_chapters",
+          "type": "array",
+          "required": "✅",
+          "default": "-",
+          "description": "待检查的章节列表"
+        },
+        {
+          "name": "check_depth",
+          "type": "enum",
+          "required": "❌",
+          "default": "standard",
+          "description": "quick/standard/deep"
+        },
+        {
+          "name": "baseline_version",
+          "type": "string",
+          "required": "❌",
+          "default": "latest",
+          "description": "设定基线版本"
+        }
+      ],
+      "output_format": "",
+      "best_practices": [],
+      "bound_agents": [
+        "@reviewer (主要) | @version-keeper (版本对比)"
+      ],
+      "partners": [
+        "@writer (接收修改建议) | @planner (设定咨询) | @memory-architect (基线查询)"
+      ],
+      "rules": [],
+      "full_content": "# 一致性检查 (novel/consistency-check)\n\n## 目的\n检查小说内容的内部一致性，包括设定冲突、人物行为逻辑、时间线错误等。\n\n## 触发场景\n- 用户要求\"检查一致性\"、\"校验错误\"、\"审校\"\n- @reviewer Agent执行质量审校任务时\n- 创作完成后进入审校阶段时\n\n## 执行步骤\n\n### Step 1: 加载基线数据\n1. 调用 `memory_recall` 查询:\n   - 世界观设定基线\n   - 人物角色卡(所有出场人物)\n   - 力量体系规则\n   - 前文章节摘要\n   - 版本追踪记录\n\n### Step 2: 多维度检查\n\n#### 2.1 世界观一致性\n- [ ] 力量体系使用是否符合规则\n- [ ] 设定元素是否前后矛盾\n- [ ] 科技/魔法水平是否统一\n- [ ] 社会/政治结构是否一致\n\n#### 2.2 人物一致性\n- [ ] 人物性格是否符合角色卡\n- [ ] 行为动机是否合理\n- [ ] 能力范围是否超出设定\n- [ ] 人际关系是否连贯\n- [ ] 成长轨迹是否自然\n\n#### 2.3 时间线一致性\n- [ ] 时间顺序是否正确\n- [ ] 事件因果关系是否合理\n- [ ] 年龄/时间跨度是否准确\n- [ ] 季节/天气是否连续\n\n#### 2.4 文字一致性\n- [ ] 人物称呼是否统一\n- [ ] 地名/物品名拼写一致\n- [ ] 数值/数据前后吻合\n- [ ] 标点符号规范使用\n\n### Step 3: 问题分级报告\n```json\n{\n  \"check_id\": \"cc-{timestamp}\",\n  \"scope\": \"{chapter_range}\",\n  \"summary\": {\n    \"total_issues\": N,\n    \"critical\": 0,\n    \"major\": 2,\n    \"minor\": 5,\n    \"suggestion\": 3\n  },\n  \"issues\": [\n    {\n      \"id\": \"ISSUE-001\",\n      \"severity\": \"major\",\n      \"category\": \"worldbuilding\",\n      \"location\": \"第15章 第3段\",\n      \"description\": \"力量体系使用不符合设定\",\n      \"baseline_ref\": \"规则v2.0-第3条\",\n      \"suggestion\": \"修改为符合L3级能力描述\"\n    }\n  ],\n  \"pass_rate\": 0.85\n}\n```\n\n## 参数说明\n| 参数 | 类型 | 必填 | 默认值 | 说明 |\n|------|------|------|--------|------|\n| target_chapters | array | ✅ | - | 待检查的章节列表 |\n| check_depth | enum | ❌ | standard | quick/standard/deep |\n| baseline_version | string | ❌ | latest | 设定基线版本 |\n\n## 输出格式\n- JSON结构化报告 (详细版)\n- Markdown摘要 (快速版)\n\n## 严重度定义\n| 级别 | 定义 | 示例 |\n|------|------|------|\n| 🔴 critical | 导致剧情无法自洽 | 主角死亡后又出现 |\n| 🟠 major | 明显矛盾需修正 | 能力突然提升无解释 |\n| 🟡 minor | 小瑕疵可后续处理 | 称呼不统一 |\n| 🔵 suggestion | 优化建议非错误 | 表达可更精炼 |\n\n## 绑定Agent\n@reviewer (主要) | @version-keeper (版本对比)\n\n## 协作伙伴\n@writer (接收修改建议) | @planner (设定咨询) | @memory-architect (基线查询)\n\n## 质量标准\n- **通过标准**: critical=0, major≤2, pass_rate≥90%\n- **优秀标准**: critical=0, major=0, pass_rate≥95%\n- **不通过**: 需返回@writer修改后重新提交\n"
+    },
+    {
+      "skill_id": "novel-format-export",
+      "purpose": "将创作文本转化为出版级成品，支持多格式导出。",
+      "triggers": [
+        "用户要求\"排版\"、\"导出\"、\"生成EPUB/DOCX\"",
+        "@novel-formatter Agent被调度时",
+        "工业化生产流水线的最后阶段(第⑩步)"
+      ],
+      "steps": [],
+      "parameters": [
+        {
+          "name": "input_source",
+          "type": "string/path",
+          "required": "✅",
+          "default": "-",
+          "description": "输入文件或目录"
+        },
+        {
+          "name": "output_format",
+          "type": "enum",
+          "required": "❌",
+          "default": "TXT",
+          "description": "TXT/MD/EPUB/DOCX"
+        },
+        {
+          "name": "output_path",
+          "type": "string",
+          "required": "❌",
+          "default": "./output/",
+          "description": "输出目录"
+        },
+        {
+          "name": "generate_toc",
+          "type": "boolean",
+          "required": "❌",
+          "default": "true",
+          "description": "是否生成目录"
+        },
+        {
+          "name": "generate_index",
+          "type": "boolean",
+          "required": "❌",
+          "default": "true",
+          "description": "是否生成索引"
+        }
+      ],
+      "output_format": "",
+      "best_practices": [],
+      "bound_agents": [
+        "@novel-formatter (成品匠)"
+      ],
+      "partners": [
+        "@writer (原始文本) | @reviewer (格式审校) | @version-keeper (版本对齐) | @editor (交付确认)"
+      ],
+      "rules": [],
+      "full_content": "# 成品格式化导出 (novel/format-export)\n\n## 目的\n将创作文本转化为出版级成品，支持多格式导出。\n\n## 触发场景\n- 用户要求\"排版\"、\"导出\"、\"生成EPUB/DOCX\"\n- @novel-formatter Agent被调度时\n- 工业化生产流水线的最后阶段(第⑩步)\n\n## 支持的输出格式\n\n### 1. TXT (纯文本)\n- 换行规范统一\n- 段落缩进2个全角字符\n- 对话独立段落，双引号包裹\n\n### 2. Markdown\n- 标题层级语法 (# ## ###)\n- 列表、引用、代码块\n- 保持原始结构清晰\n\n### 3. EPUB (电子书)\n- 章节自动分割\n- 目录(TOC)生成\n- 元数据嵌入(书名/作者/ISBN占位)\n- CSS样式美化\n\n### 4. DOCX (Word文档)\n- 样式应用(标题/正文/对话)\n- 页眉页脚设置\n- 自动页码\n- 打印优化排版\n\n## 执行流程\n\n### Phase 1: 标准化预处理\n1. **标题规范化**\n   - 居中对齐\n   - 「第X章」格式统一\n2. **段落格式化**\n   - 首行缩进2个全角字符\n   - 段间距统一\n3. **对话格式统一**\n   - 独立段落\n   - 双引号包裹\n   - 说话人标签可选\n\n### Phase 2: 注释与强调处理\n1. 注释格式: `[注X]` 上标\n2. 专有名词: 《》包裹\n3. 场景切换: 空行 + 分隔符(※或---)\n\n### Phase 3: 质量检查\n1. ✅ 页码连续性验证\n2. ✅ 断行规范检查\n3. ✅ 标点符号一致性\n4. ✅ 编码正确性确认(UTF-8 BOM)\n\n### Phase 4: 导出生成\n1. 选择目标格式\n2. 应用对应模板\n3. 生成索引文件:\n   - 人物索引\n   - 地名索引\n   - 设定术语索引\n4. 输出到指定路径\n\n## 参数说明\n| 参数 | 类型 | 必填 | 默认值 | 说明 |\n|------|------|------|--------|------|\n| input_source | string/path | ✅ | - | 输入文件或目录 |\n| output_format | enum | ❌ | TXT | TXT/MD/EPUB/DOCX |\n| output_path | string | ❌ | ./output/ | 输出目录 |\n| generate_toc | boolean | ❌ | true | 是否生成目录 |\n| generate_index | boolean | ❌ | true | 是否生成索引 |\n\n## 输出结构示例\n```\noutput/\n├── novel_title.epub        # 电子书\n├── novel_title.docx         # Word文档\n├── novel_title.txt          # 纯文本\n├── TOC.md                   # 目录\n├── index_characters.md      # 人物索引\n├── index_locations.md       # 地名索引\n└── quality_report.md        # 质量报告\n```\n\n## 绑定Agent\n@novel-formatter (成品匠)\n\n## 协作伙伴\n@writer (原始文本) | @reviewer (格式审校) | @version-keeper (版本对齐) | @editor (交付确认)\n\n## 出版级质量标准\n- 标点错误率 < 0.1%\n- 格式一致性 > 99%\n- 编码正确性 100%\n- 可直接提交出版社/平台\n"
+    },
+    {
+      "skill_id": "novel-multi-schedule",
+      "purpose": "协调多个小说项目的并行创作进度，管理资源分配与优先级冲突。",
+      "triggers": [
+        "用户同时推进多部小说作品",
+        "需要跨项目统一世界观或角色设定",
+        "资源（时间、Agent算力）冲突需要仲裁"
+      ],
+      "steps": [],
+      "parameters": [],
+      "output_format": "",
+      "best_practices": [],
+      "bound_agents": [
+        "@tianshu (主要) | @wenzong (进度统筹)"
+      ],
+      "partners": [
+        "@jingwei (架构) | @miaobi (创作) | @shiguan (版本)"
+      ],
+      "rules": [],
+      "full_content": "# 多小说并行调度 (novel/multi-schedule)\n\n## 目的\n协调多个小说项目的并行创作进度，管理资源分配与优先级冲突。\n\n## 触发场景\n- 用户同时推进多部小说作品\n- 需要跨项目统一世界观或角色设定\n- 资源（时间、Agent算力）冲突需要仲裁\n\n## 执行步骤\n\n### Step 1: 项目扫描\n1. 检索天机 L4 中所有 `novel:project:*` 标签的记忆\n2. 汇总各项目当前进度、最近更新、阻塞项\n\n### Step 2: 优先级评估\n1. 根据用户设定的截止日期计算紧急度\n2. 根据项目规模计算所需Agent资源\n3. 识别跨项目依赖（共享世界观、角色联动）\n\n### Step 3: 调度编排\n1. 为每个项目分配创作时间窗口\n2. 协调共享资源（如世界观设定需先由@jingwei完成）\n3. 生成周/日级别的创作计划\n\n## 输出格式\n```json\n{\n  \"schedule_id\": \"sch-{timestamp}\",\n  \"projects\": [\n    {\n      \"project_id\": \"proj-001\",\n      \"name\": \"小说A\",\n      \"priority\": 1,\n      \"assigned_slots\": [\"周一上午\", \"周三全天\"],\n      \"next_milestone\": \"第15章完稿\",\n      \"blocking\": null\n    }\n  ],\n  \"shared_resources\": [\n    {\"resource\": \"世界观设定V3\", \"owner\": \"proj-001\", \"consumers\": [\"proj-002\"]}\n  ]\n}\n```\n\n## 绑定Agent\n@tianshu (主要) | @wenzong (进度统筹)\n\n## 协作伙伴\n@jingwei (架构) | @miaobi (创作) | @shiguan (版本)\n"
+    },
+    {
+      "skill_id": "novel-setting-consistency-deep",
+      "purpose": "对小说世界观、角色、时间线进行深度跨卷一致性检查，识别隐形矛盾。",
+      "triggers": [
+        "长篇小说跨越50章以上",
+        "世界观设定复杂（多势力、多时间线）",
+        "发现疑似矛盾需要根因定位"
+      ],
+      "steps": [],
+      "parameters": [],
+      "output_format": "",
+      "best_practices": [],
+      "bound_agents": [
+        "@mingjing (主要) | @dongcha (上下文分析)"
+      ],
+      "partners": [
+        "@yiku (记忆检索) | @tiansuan (数据统计)"
+      ],
+      "rules": [],
+      "full_content": "# 深度设定一致性检查 (novel/setting-consistency-deep)\n\n## 目的\n对小说世界观、角色、时间线进行深度跨卷一致性检查，识别隐形矛盾。\n\n## 触发场景\n- 长篇小说跨越50章以上\n- 世界观设定复杂（多势力、多时间线）\n- 发现疑似矛盾需要根因定位\n\n## 执行步骤\n\n### Step 1: 设定萃取\n1. 从天机 L4 Semantic 层提取所有 `worldbuilding:*` 和 `character:*` 标签\n2. 按类别归类：地理、历史、势力、角色能力、时间线\n\n### Step 2: 关系图谱构建\n1. 构建设定项之间的依赖关系图\n2. 标记\"高影响设定\"（修改会连锁影响多处）\n\n### Step 3: 矛盾检测\n1. 时间线冲突：同一角色在同一时间出现在两个地点\n2. 能力冲突：角色能力描述前后不一致\n3. 规则冲突：世界观规则被违反\n4. 情感冲突：角色关系跳跃缺乏过渡\n\n### Step 4: 影响评估\n1. 对每个矛盾标记修复难度\n2. 生成最小化修改建议（改一处解决多处）\n\n## 输出报告\n```json\n{\n  \"check_id\": \"csd-{timestamp}\",\n  \"novel_id\": \"novel-001\",\n  \"consistency_score\": 87,\n  \"issues\": [\n    {\n      \"severity\": \"high\",\n      \"type\": \"timeline_conflict\",\n      \"location\": \"第32章 vs 第45章\",\n      \"description\": \"角色林远同时在京城和江南\",\n      \"suggested_fix\": \"将第45章事件延后3天\"\n    }\n  ]\n}\n```\n\n## 绑定Agent\n@mingjing (主要) | @dongcha (上下文分析)\n\n## 协作伙伴\n@yiku (记忆检索) | @tiansuan (数据统计)\n"
+    },
+    {
+      "skill_id": "novel-version-track",
+      "purpose": "追踪和管理小说设定的版本变更，确保设定一致性和可追溯性。",
+      "triggers": [
+        "设定发生修改/扩展时",
+        "@version-keeper Agent被调度时",
+        "需要回溯某个时间点的设定状态时"
+      ],
+      "steps": [],
+      "parameters": [],
+      "output_format": "",
+      "best_practices": [],
+      "bound_agents": [
+        "@version-keeper (主要) | @memory-architect (存储)"
+      ],
+      "partners": [
+        "@planner (发起变更) | @reviewer (一致性检查) | @writer (应用新设定)"
+      ],
+      "rules": [],
+      "full_content": "# 版本追踪 (novel/version-track)\n\n## 目的\n追踪和管理小说设定的版本变更，确保设定一致性和可追溯性。\n\n## 触发场景\n- 设定发生修改/扩展时\n- @version-keeper Agent被调度时\n- 需要回溯某个时间点的设定状态时\n\n## 追踪对象\n\n### 1. 世界观设定基线\n- 力量体系规则变更\n- 世界架构调整\n- 历史/传说修订\n\n### 2. 人物角色卡\n- 新增人物\n- 人物属性修改\n- 人物关系变化\n\n### 3. 力量体系细节\n- 能力等级定义更新\n- 技能/招式增删\n- 限制条件调整\n\n### 4. 章节内容变更\n- 正文修改记录\n- 情节走向调整\n- 删除/重写标记\n\n## 执行流程\n\n### Step 1: 变更检测\n1. 对比当前版本与上一版本\n2. 识别差异点 (diff)\n3. 分类变更类型:\n   - 🆕 **新增** (Addition)\n   - ✏️ **修改** (Modification)\n   - ❌ **删除** (Deletion)\n   - 🔀 **重构** (Restructure)\n\n### Step 2: 变更记录\n```json\n{\n  \"version_id\": \"v{major}.{minor}.{patch}\",\n  \"timestamp\": \"ISO8601\",\n  \"author_agent\": \"@{agent_name}\",\n  \"change_category\": \"worldbuilding|character|power_system|chapter\",\n  \"changes\": [\n    {\n      \"type\": \"modification\",\n      \"target\": \"{具体设定项}\",\n      \"old_value\": \"...\",\n      \"new_value\": \"...\",\n      \"reason\": \"{变更原因}\",\n      \"impact_assessment\": {\n        \"affected_chapters\": [\"第X章\", \"第Y章\"],\n        \"affected_agents\": [\"@writer\", \"@reviewer\"],\n        \"consistency_risk\": \"low|medium|high\"\n      }\n    }\n  ],\n  \"baseline_checksum\": \"hash_value\"\n}\n```\n\n### Step 3: 影响分析\n1. 识别受影响的章节和情节\n2. 评估一致性风险等级\n3. 生成需通知的Agent列表\n4. 标记需要回溯修改的内容\n\n### Step 4: 存储与通知\n1. 调用 `memory_remember` 存储到 episodic 层\n2. 更新semantic层的基线引用\n3. 向相关Agent发送变更通知\n4. 更新版本索引\n\n## 版本号规范\n- **主版本 (Major)**: 重大架构变更/推翻重写\n- **次版本 (Minor)**: 重要功能新增/重要设定修改\n- **修订版 (Patch)**: 小修正/错别字/表述优化\n\n示例: v2.1.3 → 第2大版, 第1次重要更新, 第3次小修复\n\n## 回溯能力\n支持查询任意历史版本的设定状态:\n```\nmemory_recall(query=\"设定基线 version:v2.0.0\")\n→ 返回v2.0.0时刻的完整快照\n```\n\n## 绑定Agent\n@version-keeper (主要) | @memory-architect (存储)\n\n## 协作伙伴\n@planner (发起变更) | @reviewer (一致性检查) | @writer (应用新设定)\n\n## 安全机制\n- ⚠️ 高风险变更(high consistency_risk)需@editor确认\n- ⚠️ 已被多章节引用的设定修改需特别谨慎\n- ✅ 所有变更可回溯，支持rollback到任意版本\n- ✅ 自动生成变更日志供审计\n"
+    },
+    {
+      "skill_id": "novel-worldbuilding-expand",
+      "purpose": "基于现有世界观设定进行深度扩展，完善力量体系、社会结构、历史背景等。",
+      "triggers": [
+        "用户要求\"扩展设定\"、\"丰富世界\"、\"增加细节\"",
+        "@planner Agent执行架构设计任务时",
+        "发现设定空白或不完整时"
+      ],
+      "steps": [],
+      "parameters": [],
+      "output_format": "",
+      "best_practices": [],
+      "bound_agents": [
+        "@planner (主要) | @version-keeper (版本管理)"
+      ],
+      "partners": [
+        "@writer (使用新设定) | @reviewer (审核一致性) | @editor (规划整合)"
+      ],
+      "rules": [],
+      "full_content": "# 世界观扩展 (novel/worldbuilding-expand)\n\n## 目的\n基于现有世界观设定进行深度扩展，完善力量体系、社会结构、历史背景等。\n\n## 触发场景\n- 用户要求\"扩展设定\"、\"丰富世界\"、\"增加细节\"\n- @planner Agent执行架构设计任务时\n- 发现设定空白或不完整时\n\n## 扩展维度框架\n\n### 维度1: 力量体系深化\n- [ ] 能力等级划分细化\n- [ ] 获取/修炼方式补充\n- [ ] 限制与代价机制\n- [ ] 特殊能力变体设计\n- [ ] 战斗/应用场景示例\n\n### 维度2: 世界架构扩展\n- [ ] 地理环境详图 (地形/气候/资源)\n- [ ] 政治/势力格局\n- [ ] 经济体系运作\n- [ ] 历史/传说背景\n- [ ] 文化/宗教习俗\n\n### 维度3: 社会生态构建\n- [ ] 种族/族群分类\n- [ ] 社会阶层结构\n- [ ] 教育/培养体系\n- [ ] 法律/道德规范\n- [ ] 日常生活方式\n\n### 维度4: 技术水平设定\n- [ ] 科技树发展程度\n- [ ] 特殊技术/发明\n- [ ] 物品/装备体系\n- [ ] 交通/通讯方式\n- [ ] 医疗/生命科学\n\n## 执行流程\n\n### Phase 1: 现状分析\n1. 加载现有设定 (`memory_recall` → \"世界观设定\")\n2. 识别已完善的领域\n3. 定位空白/模糊区域\n4. 优先级排序\n\n### Phase 2: 扩展设计\n1. 选择目标扩展维度\n2. 设计具体内容 (遵循内部一致性)\n3. 多方案对比选优\n4. 与现有设定的融合验证\n\n### Phase 3: 质量验证\n1. 自检: 是否引入矛盾\n2. 自检: 是否过于复杂\n3. 自检: 是否有足够的故事潜力\n4. 标记版本号\n\n### Phase 4: 入库存储\n1. 调用 `memory_remember` 存储到 semantic 层\n2. 更新版本追踪记录\n3. 通知相关Agent (@writer/@reviewer)\n\n## 输出格式\n```markdown\n## {扩展维度} v{version}\n\n### 核心设定\n[详细描述...]\n\n### 子项目清单\n1. **{子项1}**: [说明]\n2. **{子项2}**: [说明]\n...\n\n### 与现有设定的关系\n- 关联: {已有设定ID}\n- 冲突: 无 ✓\n- 影响范围: {受影响的章节/情节}\n\n### 故事潜力点\n- 可用于: {潜在情节}\n- 冲突种子: {可能的矛盾点}\n---\n\n*创建时间: {timestamp} | 版本: v{version} | 状态: 待审核*\n```\n\n## 设计原则\n1. **一致性优先**: 新设定不能与已有设定矛盾\n2. **适度留白**: 不必一次性完善所有细节\n3. **故事驱动**: 设定应为情节服务，而非堆砌\n4. **可演进性**: 预留未来扩展空间\n\n## 绑定Agent\n@planner (主要) | @version-keeper (版本管理)\n\n## 协作伙伴\n@writer (使用新设定) | @reviewer (审核一致性) | @editor (规划整合)\n\n## 注意事项\n- ⚠️ 重大设定变更需先通知@editor和@version-keeper\n- ⚠️ 已被引用的历史设定修改需特别谨慎\n- ✅ 建议采用\"增量迭代\"而非\"推倒重来\"\n"
+    },
+    {
+      "skill_id": "dialogue-quality",
+      "purpose": "",
+      "triggers": [],
+      "steps": [],
+      "parameters": [],
+      "output_format": "",
+      "best_practices": [],
+      "bound_agents": [],
+      "partners": [],
+      "rules": [],
+      "full_content": "# 对话质量检查 (Dialogue Quality) — @lingxi\n\n## 触发条件\n\n- 每次用户对话后\n- 对话历史审计\n- Agent输出质量评估\n\n## 执行流程\n\n1. **对话捕获**：trae_capture → 完整对话上下文\n2. **质量评分**：多维度量化评估\n3. **问题标记**：幻觉、遗漏、歧义、冗余\n4. **反馈闭环**：质量低 → L5元认知调整策略\n5. **改进建议**：给对应Agent的优化方向\n\n## MCP 工具\n\n- `memory-engine-global`: memory_query\n- `knowledge-graph-global`: kg_query, kg_validate\n- `agent-framework-global`: agent_capability\n\n## 评估维度\n\n```yaml\naccuracy: # 准确性\n  - 事实正确率\n  - 代码可运行率\n  - MCP调用正确率\ncompleteness: # 完整性\n  - 任务覆盖率\n  - 边界条件考虑\nefficiency: # 效率\n  - 工具调用次数\n  - 对话轮次\nsafety: # 安全性\n  - 无敏感信息泄露\n  - 无危险操作\n```\n\n## 联动 Agent\n\n- @wenzong (文宗) — 内容审查协同\n- @inshu (因树) — 知识验证\n- @evolver (进化) — 质量反馈输入\n"
+    }
+  ],
+  "skill_count": 8
+}

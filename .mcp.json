@@ -1,0 +1,66 @@
+{
+    "mcpServers": {
+        "memory-engine-global": {
+            "command": "D:\\元初系统\\天机v9.1\\python\\python.exe",
+            "args": [
+                "D:\\元初系统\\天机v9.1\\mcp\\tianji_mcp_server.py"
+            ],
+            "env": {
+                "AI_MEMORY_ROOT": "D:\\元初系统\\天机v9.1",
+                "TIANJI_API_URL": "http://127.0.0.1:8771",
+                "PYTHONIOENCODING": "utf-8-sig"
+            }
+        },
+        "agent-framework-global": {
+            "command": "D:\\元初系统\\天机v9.1\\python\\python.exe",
+            "args": [
+                "D:\\元初系统\\天机v9.1\\mcp\\server\\agent_framework.py"
+            ],
+            "env": {
+                "PROJECT_ROOT": "D:\\元初系统\\天机v9.1",
+                "PYTHONIOENCODING": "utf-8-sig"
+            }
+        },
+        "command-executor": {
+            "command": "D:\\元初系统\\天机v9.1\\python\\python.exe",
+            "args": [
+                "D:\\元初系统\\天机v9.1\\mcp\\server\\command_executor.py"
+            ],
+            "env": {
+                "PROJECT_ROOT": "D:\\元初系统\\天机v9.1",
+                "PYTHONIOENCODING": "utf-8-sig"
+            }
+        },
+        "ops-engine": {
+            "command": "D:\\元初系统\\天机v9.1\\python\\python.exe",
+            "args": [
+                "D:\\元初系统\\天机v9.1\\mcp\\server\\ops_engine.py"
+            ],
+            "env": {
+                "PROJECT_ROOT": "D:\\元初系统\\天机v9.1",
+                "TIANJI_API_URL": "http://127.0.0.1:8771",
+                "PYTHONIOENCODING": "utf-8-sig"
+            }
+        },
+        "performance-profiler": {
+            "command": "D:\\元初系统\\天机v9.1\\python\\python.exe",
+            "args": [
+                "D:\\元初系统\\天机v9.1\\mcp\\server\\performance_profiler.py"
+            ],
+            "env": {
+                "PROJECT_ROOT": "D:\\元初系统\\天机v9.1",
+                "PYTHONIOENCODING": "utf-8-sig"
+            }
+        },
+        "security-scanner": {
+            "command": "D:\\元初系统\\天机v9.1\\python\\python.exe",
+            "args": [
+                "D:\\元初系统\\天机v9.1\\mcp\\server\\security_scanner.py"
+            ],
+            "env": {
+                "PROJECT_ROOT": "D:\\元初系统\\天机v9.1",
+                "PYTHONIOENCODING": "utf-8-sig"
+            }
+        }
+    }
+}

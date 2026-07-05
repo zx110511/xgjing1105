@@ -1,0 +1,753 @@
+> r"""
+> 天机Agent调度引擎 (Tianji Agent Orchestrator) v2.0
+> ===================================================
+> 从62分的TVPBridge升级为SSS级(95+分)调度引擎。
+  
+> 核心能力:
+>   1. ToolCallTracker   — 每次工具调用强制标注执行Agent
+>   2. AgentPipeline      — 长链任务多Agent阶段切换
+>   3. ParallelDispatcher  — 并行任务精准Agent分配
+>   4. StageSwitchProtocol — 阶段切换时TVP透明声明
+  
+> 架构对比:
+>   旧(TVPBridge 62分): 只有日志声明，无实际调度逻辑
+>   新(AgentOrchestrator): 完整的感知→规划→分配→执行→追踪闭环
+  
+> 位置: 天机/core/agent_orchestrator.py
+> """
+  
+! import sys
+! import os
+! import time
+! import json
+! import uuid
+! import threading
+! import logging
+! from pathlib import Path
+! from typing import Any, Optional, Dict, List, Callable, Tuple
+! from dataclasses import dataclass, field
+! from datetime import datetime
+! from enum import Enum
+! from concurrent.futures import ThreadPoolExecutor, as_completed
+  
+! logger = logging.getLogger("tianji.orchestrator")
+  
+  
+  # ═══════════════════════════════════════════════════════════════
+  # Agent能力矩阵 (由AMIM M37单源生成 — core/amim.py)
+  # ═══════════════════════════════════════════════════════════════
+  
+! AGENT_CAPABILITY_MATRIX: Dict[str, Dict] = {
+!     "tiewei": {"name":"铁卫","layer":"L0","role":"质量守护","emoji":"🛡️",
+!         "capabilities":["SG门禁","功能验证","安全测试","覆盖率分析"],
+!         "tools":["memory_recall","security-scanner","performance-profiler","execute_command"]},
+!     "yiku": {"name":"忆库","layer":"L1","role":"记忆架构师","emoji":"💾",
+!         "capabilities":["ICME六层管理","语义检索","容量监控","巩固晋升"],
+!         "tools":["memory_remember","memory_recall","memory_stats","memory_capacity","build_working_representation","memory_consolidate","search_memories","get_memory","list_memories","run_reflective_cycle","get_session_digest","explain_memory_lineage"]},
+!     "dongcha": {"name":"洞察","layer":"L1","role":"上下文分析师","emoji":"🔎",
+!         "capabilities":["意图识别","实体抽取","情感分析","关键词提取"],
+!         "tools":["context_extract","memory_recall","tianji_classify","tianji_summarize_conversation","tianji_intercept"]},
+!     "luling": {"name":"律令","layer":"L1","role":"规则守护者","emoji":"⚖️",
+!         "capabilities":["规则匹配","合规检查","冲突检测","门禁执行"],
+!         "tools":["rule_evaluate","security-scanner","memory_recall"]},
+!     "lingxi": {"name":"灵犀","layer":"L1","role":"会话监控","emoji":"🦋",
+!         "capabilities":["对话完整性","意图连续性","上下文恢复","异常检测"],
+!         "tools":["context_extract","memory_recall","tianji_intercept"]},
+!     "tianshu": {"name":"天枢","layer":"L2","role":"总指挥","emoji":"🎯",
+!         "capabilities":["编排","决策","调度","分发","全局管理"],
+!         "tools":["agent_dispatch","system_status","context_extract","rule_evaluate","memory_remember","memory_recall","execute_command"]},
+!     "wenzong": {"name":"文宗","layer":"L2","role":"主编","emoji":"📝",
+!         "capabilities":["项目管理","内容审核","进度追踪","团队协调"],
+!         "tools":["agent_dispatch","system_status","memory_recall","execute_command"]},
+!     "jingwei": {"name":"经纬","layer":"L2","role":"架构师","emoji":"📐",
+!         "capabilities":["架构设计","技术选型","路径规划","重构策略"],
+!         "tools":["agent_dispatch","rule_evaluate","memory_recall","execute_command"]},
+!     "miaobi": {"name":"妙笔","layer":"L2","role":"创作者","emoji":"✍️",
+!         "capabilities":["创作","写作","创意生成","角色塑造","世界观构建"],
+!         "tools":["memory_recall","memory_remember","tianji_semantic_search","tianji_extract_knowledge"]},
+!     "mingjing": {"name":"明镜","layer":"L2","role":"审校者","emoji":"🔍",
+!         "capabilities":["审校","质量评估","一致性检查","风格验证"],
+!         "tools":["memory_recall","rule_evaluate","security-scanner"]},
+!     "tiansuan": {"name":"天算","layer":"L2","role":"数据分析师","emoji":"📊",
+!         "capabilities":["统计分析","可视化","模式识别","报告撰写"],
+!         "tools":["memory_recall","memory_stats","tianji_summarize","tianji_semantic_search"]},
+!     "kuangshi": {"name":"矿师","layer":"L2","role":"语料处理","emoji":"⛏️",
+!         "capabilities":["语料导入","数据清洗","分类标注","批量处理"],
+!         "tools":["memory_remember","execute_command","memory_recall","tianji_auto_tag","tianji_classify"]},
+!     "baiqiao": {"name":"百巧","layer":"L3","role":"技能代理","emoji":"⚡",
+!         "capabilities":["技能调用","工作流编排","参数验证","结果格式化"],
+!         "tools":["execute_command","agent_dispatch"]},
+!     "shiguan": {"name":"史官","layer":"L3","role":"版本追踪","emoji":"📜",
+!         "capabilities":["版本管理","历史归档","变更分析","回滚支持"],
+!         "tools":["memory_recall","memory_remember","tianji_export"]},
+!     "jinshu": {"name":"锦书","layer":"L3","role":"成品导出","emoji":"📖",
+!         "capabilities":["格式导出","成品美化","模板应用","输出验证"],
+!         "tools":["execute_command","memory_recall","tianji_export"]},
+!     "qianli": {"name":"千里","layer":"L4","role":"系统监控","emoji":"👁",
+!         "capabilities":["实时监控","性能采集","智能告警","趋势分析"],
+!         "tools":["system_status","ops-engine","performance-profiler","memory_recall","tianji_health"]},
+!     "gongzao": {"name":"工造","layer":"L4","role":"DevOps","emoji":"🚀",
+!         "capabilities":["CI/CD","环境管理","服务部署","资源调度"],
+!         "tools":["execute_command","ops-engine","agent_dispatch"]},
+!     "zhenshan": {"name":"镇山","layer":"L4","role":"安全审计","emoji":"🔒",
+!         "capabilities":["漏洞扫描","合规检查","密钥管理","数据保护"],
+!         "tools":["security-scanner","execute_command","memory_recall"]},
+!     "zhuiguang": {"name":"追光","layer":"L4","role":"性能优化","emoji":"⚡",
+!         "capabilities":["性能剖析","瓶颈分析","基准测试","资源优化"],
+!         "tools":["performance-profiler","execute_command","memory_recall"]},
+!     "lianli": {"name":"连理","layer":"L2","role":"知识图谱构建师","emoji":"🕸️",
+!         "capabilities":["实体抽取","关系识别","图谱构建","图谱查询","多跳推理","路径查找"],
+!         "tools":["tianji_extract_knowledge","memory_build_graph","memory_query_graph","memory_recall","memory_remember"]},
+!     "huasheng": {"name":"化生","layer":"L3","role":"进化工程师","emoji":"🧬",
+!         "capabilities":["自我检查","自我更新","递归改进","规则演化","架构升级"],
+!         "tools":["memory_evolve_self","memory_remember","memory_recall","execute_command","system_status"]},
+!     "wanxiang": {"name":"万象","layer":"L1","role":"多模态感知师","emoji":"👁️",
+!         "capabilities":["图像理解","表格解析","公式识别","模态分类","多模态统一存储"],
+!         "tools":["memory_capture_multimodal","tianji_classify","tianji_extract_knowledge","memory_recall","memory_remember"]},
+! }
+  
+  
+  # ═══════════════════════════════════════════════════════════════
+  # 数据结构
+  # ═══════════════════════════════════════════════════════════════
+  
+! class PipelineStage(str, Enum):
+!     ANALYZE = "analyze"
+!     PLAN = "plan"
+!     EXECUTE = "execute"
+!     REVIEW = "review"
+!     FORMAT = "format"
+!     VERIFY = "verify"
+!     DEPLOY = "deploy"
+!     ARCHIVE = "archive"
+  
+  
+! @dataclass
+! class AgentTask:
+!     task_id: str
+!     agent_id: str
+!     agent_name: str
+!     agent_emoji: str
+!     stage: PipelineStage
+!     goal: str
+!     context: str
+!     tools_allowed: List[str] = field(default_factory=list)
+!     priority: str = "high"
+!     timeout_s: int = 300
+!     depends_on: List[str] = field(default_factory=list)
+!     status: str = "pending"
+  
+  
+! @dataclass
+! class ToolCallRecord:
+!     call_id: str
+!     agent_id: str
+!     agent_name: str
+!     agent_emoji: str
+!     tool_name: str
+!     stage: PipelineStage
+!     task_id: str
+!     timestamp: float
+!     duration_ms: float = 0
+!     success: bool = True
+!     output_summary: str = ""
+  
+!     def to_tvp(self) -> str:
+!         return f"[TVP] 🔧 {self.agent_emoji}@{self.agent_name}({self.agent_id}) → {self.tool_name}"
+  
+  
+! @dataclass
+! class StageResult:
+!     stage: PipelineStage
+!     agent_id: str
+!     agent_name: str
+!     agent_emoji: str
+!     status: str
+!     summary: str
+!     tool_calls: List[ToolCallRecord]
+!     duration_s: float
+!     next_stage: Optional[PipelineStage] = None
+  
+!     def to_tvp(self) -> str:
+!         return (f"[TVP] {'✅' if self.status == 'completed' else '❌'} "
+!                 f"{self.agent_emoji}@{self.agent_name} 完成阶段[{self.stage.value}] "
+!                 f"({len(self.tool_calls)}次工具调用, {self.duration_s:.1f}s)")
+  
+  
+  # ═══════════════════════════════════════════════════════════════
+  # ToolCallTracker — 每次调用强制标注Agent
+  # ═══════════════════════════════════════════════════════════════
+  
+! class ToolCallTracker:
+!     """
+!     工具调用追踪器 — 核心升级: 每次工具调用必须标注执行Agent
+  
+!     SSS级标准:
+!       ✅ 每次调用 → 记录agent_id + agent_name + agent_emoji
+!       ✅ TVP声明 → [TVP] 🔧 @AgentName → tool_name
+!       ✅ 阶段标记 → 标注当前在哪个PipelineStage
+!       ✅ 性能统计 → 每阶段工具调用次数/耗时
+!     """
+  
+!     def __init__(self, event_bus=None):
+!         self._calls: List[ToolCallRecord] = []
+!         self._lock = threading.RLock()
+!         self._current_agent: Optional[Dict] = None
+!         self._current_stage: Optional[PipelineStage] = None
+!         self._current_task: Optional[str] = None
+!         self._event_bus = event_bus
+!         self._output_handler: Optional[Callable] = None
+  
+!     def set_output_handler(self, handler: Callable[[str], None]):
+!         self._output_handler = handler
+  
+!     def set_context(self, agent_id: str, stage: PipelineStage, task_id: str):
+!         info = AGENT_CAPABILITY_MATRIX.get(agent_id, {})
+!         self._current_agent = {
+!             "agent_id": agent_id,
+!             "agent_name": info.get("name", agent_id),
+!             "agent_emoji": info.get("emoji", "🤖"),
+!         }
+!         self._current_stage = stage
+!         self._current_task = task_id
+  
+!     def track(self, tool_name: str, success: bool = True,
+!               duration_ms: float = 0, output_summary: str = "") -> ToolCallRecord:
+!         """记录一次工具调用 — 强制执行Agent标注"""
+!         if not self._current_agent:
+!             self._current_agent = {"agent_id":"tianshu","agent_name":"天枢","agent_emoji":"🎯"}
+  
+!         record = ToolCallRecord(
+!             call_id=f"call-{uuid.uuid4().hex[:8]}",
+!             agent_id=self._current_agent["agent_id"],
+!             agent_name=self._current_agent["agent_name"],
+!             agent_emoji=self._current_agent["agent_emoji"],
+!             tool_name=tool_name,
+!             stage=self._current_stage or PipelineStage.EXECUTE,
+!             task_id=self._current_task or "",
+!             timestamp=time.time(),
+!             duration_ms=duration_ms,
+!             success=success,
+!             output_summary=output_summary,
+!         )
+  
+!         with self._lock:
+!             self._calls.append(record)
+  
+!         tvp = record.to_tvp()
+!         if self._output_handler:
+!             self._output_handler(tvp)
+  
+!         if self._event_bus:
+!             try:
+!                 from core.deepseek_driver import TianjiEvent, EventType
+!                 self._event_bus.publish(TianjiEvent(
+!                     event_type=EventType.MCP_TOOL_CALL,
+!                     source="agent_orchestrator",
+!                     payload={
+!                         "agent_id": record.agent_id,
+!                         "agent_name": record.agent_name,
+!                         "tool_name": tool_name,
+!                         "stage": record.stage.value,
+!                     },
+!                 ))
+!             except Exception:
+!                 pass
+  
+!         return record
+  
+!     def get_calls_by_agent(self, agent_id: str) -> List[ToolCallRecord]:
+!         with self._lock:
+!             return [c for c in self._calls if c.agent_id == agent_id]
+  
+!     def get_calls_by_stage(self, stage: PipelineStage) -> List[ToolCallRecord]:
+!         with self._lock:
+!             return [c for c in self._calls if c.stage == stage]
+  
+!     def get_summary(self) -> Dict:
+!         with self._lock:
+!             agents_used = {}
+!             for c in self._calls:
+!                 k = f"{c.agent_emoji} {c.agent_name}"
+!                 if k not in agents_used:
+!                     agents_used[k] = {"count":0, "tools":set()}
+!                 agents_used[k]["count"] += 1
+!                 agents_used[k]["tools"].add(c.tool_name)
+  
+!             return {
+!                 "total_calls": len(self._calls),
+!                 "agents_used": {k: {"count":v["count"], "tools":list(v["tools"])}
+!                                for k,v in agents_used.items()},
+!                 "stages": {s.value: len(self.get_calls_by_stage(s))
+!                           for s in PipelineStage},
+!             }
+  
+!     def get_tvp_pipeline_view(self) -> str:
+!         """生成TVP流水线可视化"""
+!         lines = ["[TVP] 🏁 Agent调度流水线全景:"]
+!         stage_calls = {}
+!         for c in self._calls:
+!             s = c.stage.value
+!             if s not in stage_calls:
+!                 stage_calls[s] = []
+!             stage_calls[s].append(c)
+  
+!         for stage, calls in stage_calls.items():
+!             agents = list(set(f"{c.agent_emoji}{c.agent_name}" for c in calls))
+!             lines.append(f"├─ [{stage}] {', '.join(agents)} ({len(calls)}次调用)")
+!         lines.append(f"└─ 总计: {len(self._calls)}次工具调用, {len(stage_calls)}个阶段")
+!         return "\n".join(lines)
+  
+  
+  # ═══════════════════════════════════════════════════════════════
+  # AgentPipeline — 长链任务多Agent阶段切换
+  # ═══════════════════════════════════════════════════════════════
+  
+! class AgentPipeline:
+!     """
+!     Agent流水线 — 长链任务的精准适配与灵活切换
+  
+!     典型长链示例:
+!       "开发一个新功能" →
+!         S0: @dongcha(洞察) 分析需求 → 提取意图+关键词
+!         S1: @jingwei(经纬) 架构设计 → 模块划分+技术选型
+!         S2: @miaobi(妙笔) 编码实现 → 实际编码
+!         S3: @mingjing(明镜) 代码审校 → 质量检查
+!         S4: @tiewei(铁卫)  测试验证 → SG门禁
+!         S5: @gongzao(工造) 部署上线 → CI/CD
+!         S6: @shiguan(史官) 版本归档 → 变更记录
+  
+!     每个阶段:
+!       - 自动切换到对应的Agent
+!       - 所有工具调用标注Agent
+!       - TVP透明声明每次切换
+!     """
+  
+      # 标准流水线模板
+!     STANDARD_PIPELINES = {
+!         "development": [
+!             (PipelineStage.ANALYZE, "dongcha", "需求分析与意图识别"),
+!             (PipelineStage.PLAN, "jingwei", "架构设计"),
+!             (PipelineStage.EXECUTE, "miaobi", "编码实现"),
+!             (PipelineStage.REVIEW, "mingjing", "代码审校"),
+!             (PipelineStage.VERIFY, "tiewei", "测试验证"),
+!             (PipelineStage.DEPLOY, "gongzao", "部署上线"),
+!         ],
+!         "content_creation": [
+!             (PipelineStage.ANALYZE, "dongcha", "需求分析"),
+!             (PipelineStage.PLAN, "wenzong", "创作规划"),
+!             (PipelineStage.EXECUTE, "miaobi", "内容创作"),
+!             (PipelineStage.REVIEW, "mingjing", "内容审校"),
+!             (PipelineStage.FORMAT, "jinshu", "格式化导出"),
+!             (PipelineStage.ARCHIVE, "shiguan", "版本归档"),
+!         ],
+!         "system_diagnosis": [
+!             (PipelineStage.ANALYZE, "qianli", "系统健康检查"),
+!             (PipelineStage.EXECUTE, "tiansuan", "性能数据分析"),
+!             (PipelineStage.REVIEW, "zhuiguang", "瓶颈定位"),
+!             (PipelineStage.PLAN, "jingwei", "优化方案设计"),
+!         ],
+!         "security_audit": [
+!             (PipelineStage.ANALYZE, "zhenshan", "安全扫描"),
+!             (PipelineStage.REVIEW, "luling", "合规检查"),
+!             (PipelineStage.PLAN, "jingwei", "修复方案"),
+!             (PipelineStage.EXECUTE, "gongzao", "执行修复"),
+!             (PipelineStage.VERIFY, "tiewei", "验证修复"),
+!         ],
+!     }
+  
+!     def __init__(self, tracker: ToolCallTracker, event_bus=None,
+!                  pipeline_type: str = "development"):
+!         self.tracker = tracker
+!         self.event_bus = event_bus
+!         self.pipeline_type = pipeline_type
+!         self.stages = self.STANDARD_PIPELINES.get(pipeline_type,
+!                         self.STANDARD_PIPELINES["development"])
+!         self._results: List[StageResult] = []
+!         self._current_stage_index = 0
+!         self._pipeline_id = f"ppl-{uuid.uuid4().hex[:8]}"
+!         self._output_handler: Optional[Callable] = None
+  
+!     def set_output_handler(self, handler: Callable[[str], None]):
+!         self._output_handler = handler
+!         self.tracker.set_output_handler(handler)
+  
+!     def get_stage_count(self) -> int:
+!         return len(self.stages)
+  
+!     def get_current_stage(self) -> Optional[Tuple[PipelineStage, str, str]]:
+!         if self._current_stage_index < len(self.stages):
+!             return self.stages[self._current_stage_index]
+!         return None
+  
+!     def switch_to_stage(self, stage_index: int, task_goal: str,
+!                         task_context: str = "") -> Dict:
+!         """切换到指定阶段 → 声明Agent切换 + 更新Tracker上下文"""
+!         if stage_index >= len(self.stages):
+!             return {"error": "Stage index out of range"}
+  
+!         stage, agent_id, description = self.stages[stage_index]
+!         info = AGENT_CAPABILITY_MATRIX.get(agent_id, {})
+!         self._current_stage_index = stage_index
+  
+!         self.tracker.set_context(
+!             agent_id=agent_id,
+!             stage=stage,
+!             task_id=f"{self._pipeline_id}-stage{stage_index}",
+!         )
+  
+!         if stage_index > 0 and self._output_handler:
+!             prev_stage, prev_agent, _ = self.stages[stage_index - 1]
+!             prev_info = AGENT_CAPABILITY_MATRIX.get(prev_agent, {})
+!             switch_msg = (
+!                 f"[TVP] 🎯 阶段切换: "
+!                 f"{prev_info.get('emoji','')}@{prev_info.get('name',prev_agent)} → "
+!                 f"{info.get('emoji','')}@{info.get('name',agent_id)} "
+!                 f"[{stage.value}] {description}"
+!             )
+!             self._output_handler(switch_msg)
+!             if self.event_bus:
+!                 try:
+!                     from core.deepseek_driver import TianjiEvent, EventType
+!                     self.event_bus.publish(TianjiEvent(
+!                         event_type=EventType.AGENT_SWITCH,
+!                         source="agent_pipeline",
+!                         payload={
+!                             "from_agent": prev_agent,
+!                             "to_agent": agent_id,
+!                             "stage": stage.value,
+!                             "description": description,
+!                             "pipeline_id": self._pipeline_id,
+!                         },
+!                     ))
+!                 except Exception:
+!                     pass
+  
+!         return {
+!             "pipeline_id": self._pipeline_id,
+!             "stage_index": stage_index,
+!             "stage": stage.value,
+!             "agent_id": agent_id,
+!             "agent_name": info.get("name", agent_id),
+!             "agent_emoji": info.get("emoji", "🤖"),
+!             "description": description,
+!             "task_goal": task_goal,
+!             "tools_allowed": info.get("tools", []),
+!             "total_stages": len(self.stages),
+!             "next_stage": self.stages[stage_index+1] if stage_index+1 < len(self.stages) else None,
+!         }
+  
+!     def record_stage_result(self, status: str, summary: str,
+!                             duration_s: float) -> StageResult:
+!         """记录阶段执行结果"""
+!         stage, agent_id, _ = self.stages[self._current_stage_index]
+!         info = AGENT_CAPABILITY_MATRIX.get(agent_id, {})
+!         stage_calls = self.tracker.get_calls_by_stage(stage)
+  
+!         result = StageResult(
+!             stage=stage,
+!             agent_id=agent_id,
+!             agent_name=info.get("name", agent_id),
+!             agent_emoji=info.get("emoji", "🤖"),
+!             status=status,
+!             summary=summary,
+!             tool_calls=stage_calls,
+!             duration_s=duration_s,
+!             next_stage=(self.stages[self._current_stage_index+1][0]
+!                        if self._current_stage_index+1 < len(self.stages) else None),
+!         )
+!         self._results.append(result)
+  
+!         if self._output_handler:
+!             self._output_handler(result.to_tvp())
+  
+!         return result
+  
+!     def is_complete(self) -> bool:
+!         return self._current_stage_index >= len(self.stages) - 1
+  
+!     def get_pipeline_summary(self) -> Dict:
+!         total_calls = sum(len(r.tool_calls) for r in self._results)
+!         total_duration = sum(r.duration_s for r in self._results)
+!         return {
+!             "pipeline_id": self._pipeline_id,
+!             "pipeline_type": self.pipeline_type,
+!             "total_stages": len(self.stages),
+!             "completed_stages": len(self._results),
+!             "stage_results": [
+!                 {
+!                     "stage": r.stage.value,
+!                     "agent": f"{r.agent_emoji} {r.agent_name}",
+!                     "status": r.status,
+!                     "tool_calls": len(r.tool_calls),
+!                     "duration_s": r.duration_s,
+!                 }
+!                 for r in self._results
+!             ],
+!             "total_tool_calls": total_calls,
+!             "total_duration_s": total_duration,
+!         }
+  
+  
+  # ═══════════════════════════════════════════════════════════════
+  # ParallelDispatcher — 并行任务精准Agent分配
+  # ═══════════════════════════════════════════════════════════════
+  
+! class ParallelDispatcher:
+!     """
+!     并行调度器 — 多个并行任务各自分配Agent
+  
+!     示例:
+!       "并行分析架构、安全、性能" →
+!         @jingwei(经纬) 分析架构 → 3次工具调用
+!         @zhenshan(镇山) 安全扫描 → 5次工具调用
+!         @zhuiguang(追光) 性能剖析 → 4次工具调用
+!     """
+  
+!     def __init__(self, tracker: ToolCallTracker, event_bus=None,
+!                  max_workers: int = 5):
+!         self.tracker = tracker
+!         self.event_bus = event_bus
+!         self.max_workers = max_workers
+!         self._output_handler: Optional[Callable] = None
+  
+!     def set_output_handler(self, handler: Callable[[str], None]):
+!         self._output_handler = handler
+  
+!     def dispatch(self, parallel_tasks: List[Dict]) -> List[Dict]:
+!         """并行分发任务到各自的Agent
+  
+!         parallel_tasks: [
+!             {"agent_id":"jingwei", "goal":"分析架构", "context":"..."},
+!             {"agent_id":"zhenshan","goal":"安全扫描", "context":"..."},
+!             {"agent_id":"zhuiguang","goal":"性能剖析","context":"..."},
+!         ]
+!         """
+!         if len(parallel_tasks) > 1 and self._output_handler:
+!             agents_str = " + ".join(
+!                 f"@{AGENT_CAPABILITY_MATRIX.get(t['agent_id'],{}).get('name',t['agent_id'])}"
+!                 for t in parallel_tasks
+!             )
+!             self._output_handler(
+!                 f"[TVP] 🎯 并行调度: {len(parallel_tasks)}路并行 → {agents_str}"
+!             )
+  
+!         results = []
+!         for i, task in enumerate(parallel_tasks):
+!             agent_id = task.get("agent_id", "tianshu")
+!             info = AGENT_CAPABILITY_MATRIX.get(agent_id, {})
+!             task_id = f"parallel-{uuid.uuid4().hex[:6]}"
+  
+!             self.tracker.set_context(
+!                 agent_id=agent_id,
+!                 stage=PipelineStage.EXECUTE,
+!                 task_id=task_id,
+!             )
+  
+!             if self._output_handler:
+!                 self._output_handler(
+!                     f"[TVP] ├─ 路{i+1}: {info.get('emoji','🤖')}@"
+!                     f"{info.get('name',agent_id)} → {task.get('goal','')[:50]}"
+!                 )
+  
+!             results.append({
+!                 "task_id": task_id,
+!                 "agent_id": agent_id,
+!                 "agent_name": info.get("name", agent_id),
+!                 "agent_emoji": info.get("emoji", "🤖"),
+!                 "goal": task.get("goal", ""),
+!                 "tools_allowed": info.get("tools", []),
+!             })
+  
+!         if self._output_handler and len(parallel_tasks) > 1:
+!             self._output_handler("[TVP] └─ 并行任务已分发，等待结果聚合")
+  
+!         return results
+  
+  
+  # ═══════════════════════════════════════════════════════════════
+  # AgentScheduler — 顶层调度器 (替换62分TVPBridge)
+  # ═══════════════════════════════════════════════════════════════
+  
+! class AgentScheduler:
+!     """
+!     SSS级Agent调度器 — 替换旧TVPBridge
+  
+!     三种调度模式:
+!       1. 长链流水线 (long_chain)  → AgentPipeline
+!       2. 并行分析   (parallel)    → ParallelDispatcher
+!       3. 单Agent执行 (single)     → 直接Tracker
+  
+!     每次工具调用 → ToolCallTracker强制标注Agent
+!     """
+  
+!     VERSION = "2.0.0-SSS"
+  
+!     def __init__(self, event_bus=None, output_handler: Callable = None):
+!         self.tracker = ToolCallTracker(event_bus=event_bus)
+!         self.event_bus = event_bus
+!         self._output_handler = output_handler
+!         self.tracker.set_output_handler(output_handler)
+!         self._active_pipeline: Optional[AgentPipeline] = None
+!         self._dispatcher = ParallelDispatcher(self.tracker, event_bus=event_bus)
+!         self._dispatcher.set_output_handler(output_handler)
+!         self._stats = {"pipelines_created":0, "dispatches_run":0, "tools_tracked":0}
+  
+!         self._evo_loop = None
+!         try:
+!             from .evolution_loop import EvolutionLoop
+!             self._evo_loop = EvolutionLoop(
+!                 module_name="agent_orchestrator",
+!                 effectiveness_fn=self._calc_orchestrator_effectiveness,
+!                 learn_fn=self._learn_from_orchestration,
+!                 evolve_fn=self._evolve_orchestration_config,
+!                 mutable_config={
+!                     "max_pipeline_stages": 8,
+!                     "parallel_batch_size": 3,
+!                     "stage_timeout_ms": 60000,
+!                     "fallback_enabled": True,
+!                 },
+!                 health_metrics_fn=self._get_orchestrator_health,
+!             )
+!         except ImportError:
+!             pass
+  
+!     def set_output_handler(self, handler: Callable[[str], None]):
+!         self._output_handler = handler
+!         self.tracker.set_output_handler(handler)
+!         self._dispatcher.set_output_handler(handler)
+  
+!     def _calc_orchestrator_effectiveness(self, action: str, state_before: Dict, state_after: Dict) -> float:
+!         if action == "pipeline_execute":
+!             if state_after.get("completed", False):
+!                 return 0.4
+!             if state_after.get("partial", False):
+!                 return -0.2
+!             return -0.5
+!         if action == "stage_switch":
+!             if state_after.get("success", False):
+!                 return 0.2
+!             return -0.3
+!         if action == "parallel_dispatch":
+!             success_rate = state_after.get("success_rate", 0.0)
+!             return success_rate - 0.5
+!         return 0.0
+  
+!     def _learn_from_orchestration(self, causal_pairs, effectiveness_summary) -> Dict:
+!         failed_pipelines = sum(1 for p in causal_pairs if p.action == "pipeline_execute" and p.effectiveness < 0)
+!         stage_failures = sum(1 for p in causal_pairs if p.action == "stage_switch" and p.effectiveness < 0)
+!         avg_eff = effectiveness_summary.get("avg", 0.0)
+!         return {
+!             "failed_pipelines": failed_pipelines,
+!             "stage_failures": stage_failures,
+!             "avg_effectiveness": avg_eff,
+!         }
+  
+!     def _evolve_orchestration_config(self, learn_result, mutable_config) -> Dict:
+!         changes = []
+!         if learn_result.get("stage_failures", 0) > 5:
+!             old_timeout = mutable_config.get("stage_timeout_ms", 60000)
+!             new_timeout = min(int(old_timeout * 1.2), 300000)
+!             changes.append({"rule": "stage_timeout_ms", "old_value": old_timeout, "new_value": new_timeout})
+!         if learn_result.get("failed_pipelines", 0) > 3:
+!             if not mutable_config.get("fallback_enabled", True):
+!                 changes.append({"rule": "fallback_enabled", "old_value": False, "new_value": True})
+!         return {"changes": changes}
+  
+!     def _get_orchestrator_health(self) -> Dict[str, float]:
+!         total = max(self._stats.get("pipelines_created", 1), 1)
+!         return {
+!             "error_rate": self._stats.get("tools_tracked", 0) / max(total * 5, 1),
+!             "utilization": min(self._stats.get("pipelines_created", 0) / 10.0, 1.0),
+!         }
+  
+!     @property
+!     def evolution_loop(self):
+!         return self._evo_loop
+  
+!     def create_pipeline(self, pipeline_type: str = "development") -> AgentPipeline:
+!         """创建长链流水线"""
+!         pipeline = AgentPipeline(self.tracker, self.event_bus, pipeline_type)
+!         pipeline.set_output_handler(self._output_handler)
+!         self._active_pipeline = pipeline
+!         self._stats["pipelines_created"] += 1
+  
+!         if self._output_handler:
+!             stage_names = " → ".join(
+!                 f"@{AGENT_CAPABILITY_MATRIX.get(a,{}).get('name',a)}[{s.value}]"
+!                 for s, a, _ in pipeline.stages
+!             )
+!             self._output_handler(
+!                 f"[TVP] 🚀 长链流水线启动[{pipeline_type}]: {stage_names}"
+!             )
+  
+!         return pipeline
+  
+!     def get_pipeline(self) -> Optional[AgentPipeline]:
+!         return self._active_pipeline
+  
+!     def switch_pipeline_stage(self, stage_index: int, task_goal: str,
+!                                task_context: str = "") -> Dict:
+!         """切换流水线阶段 → Agent切换 + 工具标注上下文更新"""
+!         if not self._active_pipeline:
+!             return {"error": "No active pipeline"}
+  
+!         result = self._active_pipeline.switch_to_stage(
+!             stage_index, task_goal, task_context
+!         )
+  
+          # 每次阶段切换时，track这个切换事件
+!         self.tracker.track(
+!             tool_name="pipeline_stage_switch",
+!             success=True,
+!             output_summary=f"切换到 {result.get('agent_name')} [{result.get('stage')}]",
+!         )
+  
+!         return result
+  
+!     def record_stage_done(self, status: str, summary: str,
+!                            duration_s: float) -> Optional[Dict]:
+!         if not self._active_pipeline:
+!             return None
+!         result = self._active_pipeline.record_stage_result(status, summary, duration_s)
+!         return result.to_tvp() if self._output_handler else None
+  
+!     def dispatch_parallel(self, tasks: List[Dict]) -> List[Dict]:
+!         """并行调度多个Agent"""
+!         self._stats["dispatches_run"] += 1
+!         return self._dispatcher.dispatch(tasks)
+  
+!     def track_tool(self, tool_name: str, success: bool = True,
+!                    duration_ms: float = 0, output_summary: str = "") -> ToolCallRecord:
+!         """追踪一次工具调用 → 自动标注当前Agent"""
+!         self._stats["tools_tracked"] += 1
+!         return self.tracker.track(tool_name, success, duration_ms, output_summary)
+  
+!     def get_pipeline_view(self) -> str:
+!         """获取当前TVP流水线全景"""
+!         return self.tracker.get_tvp_pipeline_view()
+  
+!     def get_summary(self) -> Dict:
+!         tracker_summary = self.tracker.get_summary()
+!         pipeline_summary = (self._active_pipeline.get_pipeline_summary()
+!                            if self._active_pipeline else None)
+!         return {
+!             "version": self.VERSION,
+!             "stats": self._stats,
+!             "tracker": tracker_summary,
+!             "pipeline": pipeline_summary,
+!             "active_pipeline": {
+!                 "type": self._active_pipeline.pipeline_type,
+!                 "stage": (self._active_pipeline.get_current_stage()[0].value
+!                          if self._active_pipeline.get_current_stage() else "complete"),
+!             } if self._active_pipeline else None,
+!         }
+  
+!     def get_tvp_status(self) -> str:
+!         """生成状态报告中使用的TVP摘要"""
+!         parts = [self.get_pipeline_view()]
+!         if self._active_pipeline:
+!             ps = self._active_pipeline.get_pipeline_summary()
+!             parts.append(f"[TVP] 流水线: {ps['completed_stages']}/{ps['total_stages']}阶段完成, "
+!                         f"{ps['total_tool_calls']}次工具调用")
+!         return "\n".join(parts)

@@ -1,0 +1,12 @@
+ICME 1000 n
+MCP 1000 n
+FTS5 1000 n
+SQLite 1000 n
+FastAPI 1000 n
+WebSocket 1000 n
+TVP 1000 n
+JSON-RPC 1000 n
+WAL 1000 n
+B-tree 1000 n
+MiniLM 1000 n
+TF-IDF 1000 n

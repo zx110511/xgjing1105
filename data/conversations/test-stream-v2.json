@@ -1,0 +1,28 @@
+{
+  "id": "test-stream-v2",
+  "title": "新对话",
+  "messages": [
+    {
+      "id": "msg-6810ba98",
+      "role": "user",
+      "content": "测试修复后的完整功能",
+      "timestamp": 1782100634.6217875,
+      "token_count": 10,
+      "fidelity": "full"
+    },
+    {
+      "id": "msg-b90ac858",
+      "role": "assistant",
+      "content": "好的，我来开始全面的功能测试。首先进行系统健康自检（常识5）和修复记录查询。\n\n**步骤1：系统健康自检 & 查询修复记录**路径需要调整，让我查找正确的系统位置和历史修复记忆。\n\n<｜｜DSML｜｜tool_calls>\n<｜｜DSML｜｜invoke name=\"execute_command\">\n<｜｜DSML｜｜parameter name=\"command\" string=\"true\">find / -maxdepth 4 -type d -name \"天机系统*\" 2>/dev/null | head -10</｜｜DSML｜｜parameter>\n<｜｜DSML｜｜parameter name=\"timeout\" string=\"false\">15</｜｜DSML｜｜parameter>\n</｜｜DSML｜｜invoke>\n<｜｜DSML｜｜invoke name=\"tianji_semantic_search\">\n<｜｜DSML｜｜parameter name=\"query\" string=\"true\">天机系统修复测试验证功能闭环</｜｜DSML｜｜parameter>\n<｜｜DSML｜｜parameter name=\"limit\" string=\"false\">10</｜｜DSML｜｜parameter>\n</｜｜DSML｜｜invoke>\n</｜｜DSML｜｜tool_calls>",
+      "timestamp": 1782100676.5294075,
+      "token_count": 193,
+      "fidelity": "full"
+    }
+  ],
+  "total_tokens": 193,
+  "summary": "",
+  "created_at": 1782100634.619044,
+  "updated_at": 1782100676.5294075,
+  "message_count": 2,
+  "pinned": false
+}

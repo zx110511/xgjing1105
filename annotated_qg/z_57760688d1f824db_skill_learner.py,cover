@@ -1,0 +1,378 @@
+> r"""
+> 天机技能学习器 (Tianji Skill Learner) v1.0
+> ========================================================
+> 从演示中学习技能，从反馈中优化规则
+  
+> 设计哲学:
+>   观察→提取→验证→存储 闭环
+>   支持代码级和模式级两种学习方式
+  
+> 架构位置: 天机/core/skill_learner.py
+> 依赖: core/procedural_memory, core/deepseek_driver
+  
+> 灵境道谱溯源: D3-5【技能学习煞】· 道三·进化体道 · 四地煞之化之术
+> """
+  
+! import json
+! import re
+! import time
+! import logging
+! from typing import Any, Optional, Dict, List, Tuple
+! from pathlib import Path
+  
+! from .procedural_memory import (
+!     ProceduralMemoryStore,
+!     ProceduralSkill,
+!     EvolvableRule,
+!     LearnedPattern,
+!     SkillStatus,
+!     RuleType
+! )
+  
+! logger = logging.getLogger(__name__)
+  
+  
+! class SkillLearner:
+!     """技能学习引擎"""
+  
+!     def __init__(
+!         self,
+!         procedural_store: Optional[ProceduralMemoryStore] = None,
+!         llm_driver=None
+!     ):
+!         self.store = procedural_store or ProceduralMemoryStore()
+!         self.llm_driver = llm_driver
+  
+!     def learn_from_demonstration(
+!         self,
+!         name: str,
+!         demonstration: str,
+!         category: str = "general",
+!         auto_verify: bool = True
+!     ) -> Tuple[ProceduralSkill, Dict[str, Any]]:
+!         """
+!         从演示中学习技能
+  
+!         Args:
+!             name: 技能名称
+!             demonstration: 技能演示描述
+!             category: 技能分类
+!             auto_verify: 是否自动验证
+  
+!         Returns:
+!             (技能对象, 学习报告)
+!         """
+!         start_time = time.time()
+  
+!         preconditions = self._extract_preconditions(demonstration)
+!         postconditions = self._extract_postconditions(demonstration)
+  
+!         params = self._extract_parameters(demonstration)
+  
+!         code = self._generate_code(name, demonstration, params)
+  
+!         skill = ProceduralSkill(
+!             name=name,
+!             description=demonstration[:200],
+!             category=category,
+!             code=code,
+!             parameters=params,
+!             preconditions=preconditions,
+!             postconditions=postconditions,
+!             learned_from="demonstration",
+!             tags=[category, "learned"],
+!             status=SkillStatus.DRAFT
+!         )
+  
+!         report = {
+!             "preconditions_count": len(preconditions),
+!             "postconditions_count": len(postconditions),
+!             "parameters_count": len(params),
+!             "code_length": len(code),
+!             "learning_time": time.time() - start_time
+!         }
+  
+!         if auto_verify:
+!             verified, verify_report = self.verify_skill(skill)
+!             report["verified"] = verified
+!             report["verify_report"] = verify_report
+!             if verified:
+!                 skill.status = SkillStatus.VERIFIED
+  
+!         skill_id = self.store.add_skill(skill)
+!         report["skill_id"] = skill_id
+  
+!         logger.info(f"技能学习完成: {name} (状态: {skill.status.value})")
+!         return skill, report
+  
+!     def learn_from_code(
+!         self,
+!         name: str,
+!         code: str,
+!         description: str = "",
+!         category: str = "general"
+!     ) -> ProceduralSkill:
+!         """从直接代码学习技能"""
+!         skill = ProceduralSkill(
+!             name=name,
+!             description=description or f"技能: {name}",
+!             category=category,
+!             code=code,
+!             learned_from="code",
+!             tags=[category, "code-implemented"],
+!             status=SkillStatus.VERIFIED
+!         )
+  
+!         self.store.add_skill(skill)
+!         logger.info(f"代码技能学习: {name}")
+!         return skill
+  
+!     def learn_rule(
+!         self,
+!         name: str,
+!         condition: str,
+!         action: str,
+!         rule_type: RuleType = RuleType.HEURISTIC,
+!         initial_weight: float = 1.0,
+!         description: str = ""
+!     ) -> EvolvableRule:
+!         """学习规则"""
+!         rule = EvolvableRule(
+!             name=name,
+!             description=description or f"规则: {name}",
+!             rule_type=rule_type,
+!             condition=condition,
+!             action=action,
+!             weight=initial_weight
+!         )
+  
+!         self.store.add_rule(rule)
+!         logger.info(f"规则学习: {name} (类型: {rule_type.value}, 权重: {initial_weight})")
+!         return rule
+  
+!     def learn_pattern(
+!         self,
+!         trigger: str,
+!         response: str,
+!         context: Optional[Dict[str, Any]] = None
+!     ) -> LearnedPattern:
+!         """学习模式"""
+!         pattern = LearnedPattern(
+!             trigger=trigger,
+!             response=response,
+!             context=context or {}
+!         )
+  
+!         self.store.add_pattern(pattern)
+!         return pattern
+  
+!     def verify_skill(
+!         self,
+!         skill: ProceduralSkill
+!     ) -> Tuple[bool, Dict[str, Any]]:
+!         """验证技能"""
+!         report = {"checks": []}
+  
+!         checks = [
+!             ("code_present", len(skill.code) > 0),
+!             ("name_valid", len(skill.name) >= 2),
+!             ("category_valid", len(skill.category) >= 2),
+!             ("preconditions_defined", len(skill.preconditions) > 0),
+!             ("parameters_reasonable", len(skill.parameters) <= 20),
+!             ("code_not_empty", bool(skill.code.strip()))
+!         ]
+  
+!         all_passed = True
+!         for check_name, passed in checks:
+!             report["checks"].append({"check": check_name, "passed": passed})
+!             if not passed:
+!                 all_passed = False
+  
+!         return all_passed, report
+  
+!     def evolve_skill_from_feedback(
+!         self,
+!         skill_id: str,
+!         feedback: str,
+!         improvement: str
+!     ) -> Optional[ProceduralSkill]:
+!         """基于反馈演化技能"""
+!         skill = self.store.get_skill(skill_id)
+!         if not skill:
+!             return None
+  
+!         enhanced_code = self._enhance_code(skill.code, feedback, improvement)
+  
+!         return self.store.evolve_skill(skill_id, enhanced_code, feedback)
+  
+!     def _extract_preconditions(self, text: str) -> List[str]:
+!         """提取前置条件"""
+!         preconditions = []
+!         patterns = [
+!             r"当(.+?)时",
+!             r"如果(.+?)则",
+!             r"需要(.+?)才能",
+!             r"前提[：:]\s*(.+)",
+!             r"条件[：:]\s*(.+)",
+!             r"precondition[s]?[：:]\s*(.+)"
+!         ]
+!         for pattern in patterns:
+!             matches = re.finditer(pattern, text, re.IGNORECASE)
+!             for match in matches:
+!                 cond = match.group(1).strip()
+!                 if len(cond) > 4:
+!                     preconditions.append(cond)
+!         return preconditions[:5]
+  
+!     def _extract_postconditions(self, text: str) -> List[str]:
+!         """提取后置条件"""
+!         postconditions = []
+!         patterns = [
+!             r"结果[：:]\s*(.+)",
+!             r"返回[：:]\s*(.+)",
+!             r"输出[：:]\s*(.+)",
+!             r"生成(.+?)(?:。|\n)"
+!         ]
+!         for pattern in patterns:
+!             matches = re.finditer(pattern, text)
+!             for match in matches:
+!                 cond = match.group(1).strip()
+!                 if len(cond) > 4:
+!                     postconditions.append(cond)
+!         return postconditions[:5]
+  
+!     def _extract_parameters(self, text: str) -> Dict[str, Any]:
+!         """提取参数"""
+!         params = {}
+  
+!         param_patterns = [
+!             r"参数\s*(\w+)\s*[：:]\s*(\w+)",
+!             r"参数\s*(\w+)\s*=\s*([^\s,]+)",
+!             r"(\w+)\s*参数\s*[：:]\s*(.+)",
+!             r"param\s+(\w+)\s*[：:=]\s*(\w+)",
+!         ]
+!         for pattern in param_patterns:
+!             matches = re.finditer(pattern, text, re.IGNORECASE)
+!             for match in matches:
+!                 name = match.group(1).strip()
+!                 value = match.group(2).strip() if len(match.groups()) >= 2 else "any"
+!                 if name.lower() not in ["的", "和", "或", "与", "是"]:
+!                     params[name] = value
+  
+!         return params
+  
+!     def _generate_code(self, name: str, description: str, params: Dict[str, Any]) -> str:
+!         """生成可执行代码"""
+!         if self.llm_driver:
+!             return self._llm_generate_code(name, description, params)
+  
+!         return self._template_generate_code(name, description, params)
+  
+!     def _llm_generate_code(self, name: str, description: str, params: Dict[str, Any]) -> str:
+!         """LLM生成代码"""
+!         prompt = f"""基于以下技能描述，生成Python函数代码：
+  
+! 技能名称: {name}
+! 技能描述: {description}
+! 参数: {json.dumps(params, ensure_ascii=False)}
+  
+! 要求：
+! 1. 函数名使用snake_case
+! 2. 包含完整的docstring
+! 3. 参数来自上述列表
+! 4. 返回Dict[str, Any]类型
+! 5. 包含try/except错误处理
+! 6. 只返回Python代码，不要解释"""
+  
+!         try:
+!             response = self.llm_driver.generate(prompt, temperature=0.3)
+!             code_match = re.search(r'```python\n(.*?)```', response, re.DOTALL)
+!             if code_match:
+!                 return code_match.group(1).strip()
+!             return response.strip()
+!         except Exception as e:
+!             logger.warning(f"LLM代码生成失败: {e}")
+!             return self._template_generate_code(name, description, params)
+  
+!     def _template_generate_code(self, name: str, description: str, params: Dict[str, Any]) -> str:
+!         """模板生成代码"""
+!         func_name = re.sub(r'[\s\-]', '_', name.lower())
+!         func_name = re.sub(r'[^\w_]', '', func_name)
+  
+!         param_str = ", ".join(f"{k}={repr(v)}" for k, v in params.items())
+  
+!         code = f'''def {func_name}({param_str}):\n    """{description[:150]}"""\n    try:\n        result = {{}}\n        return {{"status": "success", "result": result}}\n    except Exception as e:\n        return {{"status": "error", "message": str(e)}}\n'''
+  
+!         return code
+  
+!     def _enhance_code(self, original_code: str, feedback: str, improvement: str) -> str:
+!         """增强代码"""
+!         if self.llm_driver:
+!             prompt = f"""优化以下Python代码：
+  
+! 原始代码:
+! ```python
+! {original_code}
+! ```
+  
+! 用户反馈: {feedback}
+! 改进方向: {improvement}
+  
+! 要求：只返回优化后的完整Python代码，不要解释。"""
+  
+!             try:
+!                 response = self.llm_driver.generate(prompt, temperature=0.3)
+!                 code_match = re.search(r'```python\n(.*?)```', response, re.DOTALL)
+!                 if code_match:
+!                     return code_match.group(1).strip()
+!                 return response.strip()
+!             except Exception:
+!                 pass
+  
+!         return original_code
+  
+!     def get_stats(self) -> Dict[str, Any]:
+!         return self.store.get_stats()
+  
+  
+! def memory_learn_skill(
+!     name: str,
+!     demonstration: str,
+!     category: str = "general",
+!     store_path: str = "data/procedural_memory"
+! ) -> Dict[str, Any]:
+!     """
+!     天机技能学习MCP工具
+  
+!     Args:
+!         name: 技能名称
+!         demonstration: 技能演示描述
+!         category: 技能分类
+!         store_path: 存储路径
+  
+!     Returns:
+!         学习结果
+!     """
+!     try:
+!         store = ProceduralMemoryStore(store_path)
+!         learner = SkillLearner(store)
+  
+!         skill, report = learner.learn_from_demonstration(
+!             name=name,
+!             demonstration=demonstration,
+!             category=category
+!         )
+  
+!         return {
+!             "status": "success",
+!             "skill_id": skill.id,
+!             "skill_name": skill.name,
+!             "skill_status": skill.status.value,
+!             "report": report
+!         }
+!     except Exception as e:
+!         logger.error(f"技能学习失败: {e}")
+!         return {
+!             "status": "error",
+!             "message": str(e)
+!         }

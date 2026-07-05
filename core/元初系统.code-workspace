@@ -1,0 +1,14 @@
+{
+    "folders": [
+        {
+            "path": "../.."
+        },
+        {
+            "path": ".."
+        }
+    ],
+    "settings": {
+        "git.ignoreLimitWarning": true,
+        "terminal.integrated.defaultProfile.windows": "PowerShell"
+    }
+}

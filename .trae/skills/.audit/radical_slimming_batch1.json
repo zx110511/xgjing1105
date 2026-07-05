@@ -1,0 +1,26 @@
+﻿{
+  "batch": 1,
+  "description": "删除MCP直接映射型技能",
+  "timestamp": "2026-07-03T10:01:54.386933",
+  "total": 15,
+  "success": 15,
+  "failed": [],
+  "deleted_skills": [
+    "agent-dispatch",
+    "auto-memory-capture",
+    "context-extract",
+    "data-analyze",
+    "memory-file-capture",
+    "memory-recall",
+    "memory-remember",
+    "memory-smart-dispatch",
+    "ops-deploy",
+    "perf-profile",
+    "rule-check",
+    "security-audit",
+    "skill-route",
+    "system-diagnose",
+    "test-gate"
+  ],
+  "archive_path": "d:\\元初系统\\天机v9.1\\.trae\\skills\\.audit\\archive\\batch1_mcp_mapped_20260703_100154"
+}

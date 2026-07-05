@@ -1,0 +1,46 @@
+﻿{
+  "batch": 2,
+  "description": "删除高潜力技能（已归位到法则系统）",
+  "timestamp": "2026-07-03T12:03:27.442697",
+  "total": 4,
+  "success": 4,
+  "failed": [],
+  "deleted_skills": [
+    "agent-transparent-dispatch",
+    "dialogue-quality",
+    "editor-review",
+    "tianji-orchestrate"
+  ],
+  "migrate_map": {
+    "agent-transparent-dispatch": "智能体法则 - TVP透明调度协议 → 调度可视化与可追溯",
+    "dialogue-quality": "质量法则 - 第五章 对话质量检查 (@lingxi主责)",
+    "editor-review": "质量法则 - 第六章 内容审查规范 (@mingjing主责)",
+    "tianji-orchestrate": "智能体法则 - 第九章 天机总控调度 (L0层)"
+  },
+  "archive_path": "d:\\元初系统\\天机v9.1\\.trae\\skills\\.audit\\archive\\batch2_high_potential_20260703_120327",
+  "remaining_skills": [
+    "corpus-batch-import",
+    "corpus-extract",
+    "corpus-quality-score",
+    "corpus-retrieve",
+    "lingjing-14questions",
+    "lingjing-9dao-orchestrate",
+    "lingjing-dao-compliance",
+    "lingjing-memory",
+    "lingjing-triple-chain",
+    "memory-audit",
+    "memory-test",
+    "novel-chapter-create",
+    "novel-consistency-check",
+    "novel-format-export",
+    "novel-multi-schedule",
+    "novel-setting-consistency-deep",
+    "novel-version-track",
+    "novel-worldbuilding-expand",
+    "system-audit"
+  ],
+  "remaining_count": 19,
+  "total_original": 38,
+  "total_deleted": 19,
+  "slimming_rate": 0.5
+}

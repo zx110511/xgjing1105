@@ -1,0 +1,757 @@
+> r"""
+> 天机v9.0 通用统计采集引擎 (StatCollector v1.0)
+> ==============================================
+> 基于98分通用监控统计架构:
+> - 指标注册中心 (MetricRegistry)
+> - 可插拔采集适配器 (SourceAdapter)
+> - 锚定信息生成 (事实来源可重放)
+> - 混合存储 (SQLite时序 + 锚定快照)
+> - 验证与重放
+  
+> 设计原则: 每个统计必须锚定到一个可重放的事实来源
+> """
+  
+! from __future__ import annotations
+  
+! import ast
+! import hashlib
+! import json
+! import logging
+! import operator
+! import os
+! import sqlite3
+! import threading
+! import time
+! from abc import ABC, abstractmethod
+! from collections import defaultdict
+! from dataclasses import dataclass, field
+! from enum import Enum
+! from pathlib import Path
+! from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+  
+! logger = logging.getLogger("tianji.stat_collector")
+  
+! _SAFE_BIN_OPS = {
+!     ast.Add: operator.add,
+!     ast.Sub: operator.sub,
+!     ast.Mult: operator.mul,
+!     ast.Div: operator.truediv,
+!     ast.FloorDiv: operator.floordiv,
+!     ast.Mod: operator.mod,
+!     ast.Pow: operator.pow,
+! }
+! _SAFE_UNARY_OPS = {
+!     ast.UAdd: operator.pos,
+!     ast.USub: operator.neg,
+! }
+  
+  
+! def _safe_eval_expr(formula: str, variables: Dict[str, Any]) -> Any:
+!     if not formula:
+!         return sum(variables.values()) if variables else 0
+!     tree = ast.parse(formula, mode="eval")
+  
+!     def _eval_node(node):
+!         if isinstance(node, ast.Expression):
+!             return _eval_node(node.body)
+!         if isinstance(node, ast.Constant):
+!             return node.value
+!         if isinstance(node, ast.Name):
+!             if node.id in variables:
+!                 return variables[node.id]
+!             raise NameError(node.id)
+!         if isinstance(node, ast.BinOp):
+!             op_type = type(node.op)
+!             if op_type not in _SAFE_BIN_OPS:
+!                 raise TypeError(f"Unsupported op: {op_type.__name__}")
+!             return _SAFE_BIN_OPS[op_type](_eval_node(node.left), _eval_node(node.right))
+!         if isinstance(node, ast.UnaryOp):
+!             op_type = type(node.op)
+!             if op_type not in _SAFE_UNARY_OPS:
+!                 raise TypeError(f"Unsupported unary op: {op_type.__name__}")
+!             return _SAFE_UNARY_OPS[op_type](_eval_node(node.operand))
+!         if isinstance(node, ast.Call):
+!             func_name = ""
+!             if isinstance(node.func, ast.Name):
+!                 func_name = node.func.id
+!             elif isinstance(node.func, ast.Attribute):
+!                 func_name = node.func.attr
+!             allowed = {"sum": sum, "max": max, "min": min, "abs": abs, "len": len, "round": round}
+!             if func_name in allowed:
+!                 args = [_eval_node(a) for a in node.args]
+!                 return allowed[func_name](*args)
+!             raise TypeError(f"Unsupported function: {func_name}")
+!         raise TypeError(f"Unsupported node: {type(node).__name__}")
+  
+!     return _eval_node(tree)
+  
+! PROJECT_ROOT = Path(os.environ.get("AI_MEMORY_ROOT", os.getcwd()))
+! DATA_DIR = PROJECT_ROOT / "data" / "metrics"
+! ANCHOR_DIR = DATA_DIR / "anchors"
+  
+  
+! class MetricType(str, Enum):
+!     COUNTER = "counter"
+!     GAUGE = "gauge"
+!     HISTOGRAM = "histogram"
+!     SUMMARY = "summary"
+  
+  
+! class SourceType(str, Enum):
+!     ENGINE_API = "engine_api"
+!     CONTAINER_MODULE = "container_module"
+!     FILE = "file"
+!     DERIVED = "derived"
+!     MEMORY = "memory"
+  
+  
+! class AnchorPolicy(str, Enum):
+!     FULL = "full"
+!     SAMPLE = "sample"
+!     NONE = "none"
+  
+  
+! @dataclass
+! class MetricDef:
+!     name: str
+!     display_name: str
+!     metric_type: MetricType = MetricType.GAUGE
+!     source_type: SourceType = SourceType.ENGINE_API
+!     source_config: Dict[str, Any] = field(default_factory=dict)
+!     aggregation: str = "last"
+!     anchor_policy: AnchorPolicy = AnchorPolicy.NONE
+!     interval_seconds: int = 10
+!     retention_hours: int = 24
+!     validation_enabled: bool = True
+!     unit: str = ""
+!     category: str = "system"
+!     description: str = ""
+!     tags: Dict[str, str] = field(default_factory=dict)
+  
+  
+! @dataclass
+! class MetricSnapshot:
+!     name: str
+!     timestamp: float
+!     value: Any
+!     anchor_id: Optional[str] = None
+!     anchor_info: Optional[Dict[str, Any]] = None
+!     metric_type: MetricType = MetricType.GAUGE
+!     unit: str = ""
+  
+  
+! class SourceAdapter(ABC):
+!     @abstractmethod
+!     def collect(self, metric_def: MetricDef) -> Tuple[Any, Optional[Dict[str, Any]]]:
+!         pass
+  
+!     @abstractmethod
+!     def replay(self, anchor_info: Dict[str, Any]) -> Any:
+!         pass
+  
+  
+! class EngineAPIAdapter(SourceAdapter):
+!     def __init__(self):
+!         self._engine_provider: Optional[Callable[[], Any]] = None
+  
+!     def set_engine_provider(self, provider: Callable[[], Any]):
+!         self._engine_provider = provider
+  
+!     def collect(self, metric_def: MetricDef) -> Tuple[Any, Optional[Dict[str, Any]]]:
+!         if not self._engine_provider:
+!             return 0, None
+!         engine = self._engine_provider()
+!         if engine is None:
+!             return 0, None
+!         key = metric_def.source_config.get("key", metric_def.name.rsplit(".", 1)[-1])
+!         try:
+!             stats = engine.stats() if hasattr(engine, "stats") else {}
+!             value = stats.get(key, 0)
+!         except Exception:
+!             value = 0
+!         anchor = {
+!             "source_type": "engine_api",
+!             "source_id": "ICMEEngine.stats()",
+!             "key": key,
+!             "record_time": time.time(),
+!         }
+!         return value, anchor
+  
+!     def replay(self, anchor_info: Dict[str, Any]) -> Any:
+!         return None
+  
+  
+! class ContainerModuleAdapter(SourceAdapter):
+!     def __init__(self):
+!         self._container_provider: Optional[Callable[[], Any]] = None
+  
+!     def set_container_provider(self, provider: Callable[[], Any]):
+!         self._container_provider = provider
+  
+!     def collect(self, metric_def: MetricDef) -> Tuple[Any, Optional[Dict[str, Any]]]:
+!         if not self._container_provider:
+!             return {}, None
+!         container = self._container_provider()
+!         if container is None:
+!             return {}, None
+  
+!         module_name = metric_def.source_config.get("module")
+!         key_path = metric_def.source_config.get("key_path", "")
+  
+!         try:
+!             if module_name and module_name in container._modules:
+!                 mod = container._modules[module_name]
+!                 if key_path:
+!                     parts = key_path.split(".")
+!                     val = mod
+!                     for p in parts:
+!                         if hasattr(val, p):
+!                             val = getattr(val, p)
+!                         elif isinstance(val, dict):
+!                             val = val.get(p, 0)
+!                         else:
+!                             val = 0
+!                             break
+!                 else:
+!                     val = {
+!                         "state": mod.state.value if hasattr(mod, "state") else "unknown",
+!                     }
+!             else:
+!                 val = 0
+!         except Exception:
+!             val = 0
+  
+!         anchor = {
+!             "source_type": "container_module",
+!             "module": module_name or metric_def.name,
+!             "key_path": key_path,
+!             "record_time": time.time(),
+!         }
+!         return val, anchor
+  
+!     def replay(self, anchor_info: Dict[str, Any]) -> Any:
+!         return self.collect(
+!             MetricDef(name=anchor_info.get("module", ""), source_type=SourceType.CONTAINER_MODULE,
+!                       source_config={"module": anchor_info.get("module"), "key_path": anchor_info.get("key_path", "")})
+!         )[0]
+  
+  
+! class DerivedMetricAdapter(SourceAdapter):
+!     def __init__(self):
+!         self._registry: Optional[MetricRegistry] = None
+  
+!     def set_registry(self, registry: Any):
+!         self._registry = registry
+  
+!     def collect(self, metric_def: MetricDef) -> Tuple[Any, Optional[Dict[str, Any]]]:
+!         formula = metric_def.source_config.get("formula", "")
+!         dependencies = metric_def.source_config.get("depends_on", [])
+!         if not self._registry:
+!             return 0, None
+  
+!         dep_values = {}
+!         for dep_name in dependencies:
+!             snap = self._registry.get_latest(dep_name)
+!             if snap:
+!                 dep_values[dep_name.rsplit(".", 1)[-1]] = snap.value
+  
+!         try:
+!             value = _safe_eval_expr(formula, dep_values) if formula else sum(dep_values.values())
+!         except Exception:
+!             value = 0
+  
+!         anchor = {
+!             "source_type": "derived",
+!             "formula": formula,
+!             "dependencies": dependencies,
+!             "dep_values": dep_values,
+!             "record_time": time.time(),
+!         }
+!         return value, anchor
+  
+!     def replay(self, anchor_info: Dict[str, Any]) -> Any:
+!         formula = anchor_info.get("formula", "")
+!         dep_values = anchor_info.get("dep_values", {})
+!         try:
+!             return _safe_eval_expr(formula, dep_values) if formula else sum(dep_values.values())
+!         except Exception:
+!             return 0
+  
+  
+! class MetricRegistry:
+!     def __init__(self):
+!         self._metrics: Dict[str, MetricDef] = {}
+!         self._latest_snapshots: Dict[str, MetricSnapshot] = {}
+!         self._snapshot_history: Dict[str, List[MetricSnapshot]] = defaultdict(list)
+!         self._lock = threading.RLock()
+  
+!     def register(self, metric_def: MetricDef):
+!         with self._lock:
+!             self._metrics[metric_def.name] = metric_def
+!             logger.debug(f"[MetricRegistry] 注册指标: {metric_def.name} ({metric_def.metric_type.value})")
+  
+!     def register_batch(self, metric_defs: List[MetricDef]):
+!         for md in metric_defs:
+!             self.register(md)
+  
+!     def get(self, name: str) -> Optional[MetricDef]:
+!         return self._metrics.get(name)
+  
+!     def get_latest(self, name: str) -> Optional[MetricSnapshot]:
+!         return self._latest_snapshots.get(name)
+  
+!     def get_history(self, name: str, window_seconds: int = 600) -> List[MetricSnapshot]:
+!         with self._lock:
+!             history = self._snapshot_history.get(name, [])
+!             cutoff = time.time() - window_seconds
+!             return [s for s in history if s.timestamp >= cutoff]
+  
+!     def record(self, snapshot: MetricSnapshot):
+!         with self._lock:
+!             self._latest_snapshots[snapshot.name] = snapshot
+!             history = self._snapshot_history[snapshot.name]
+!             history.append(snapshot)
+!             metric_def = self._metrics.get(snapshot.name)
+!             retention = (metric_def.retention_hours if metric_def else 24) * 3600
+!             cutoff = time.time() - retention
+!             self._snapshot_history[snapshot.name] = [s for s in history if s.timestamp >= cutoff]
+  
+!     def all_metrics(self) -> List[MetricDef]:
+!         with self._lock:
+!             return list(self._metrics.values())
+  
+!     def all_latest(self) -> Dict[str, MetricSnapshot]:
+!         with self._lock:
+!             return dict(self._latest_snapshots)
+  
+!     def stats(self) -> Dict[str, Any]:
+!         with self._lock:
+!             return {
+!                 "total_metrics": len(self._metrics),
+!                 "total_snapshots": sum(len(h) for h in self._snapshot_history.values()),
+!                 "metrics_by_category": {
+!                     cat: sum(1 for m in self._metrics.values() if m.category == cat)
+!                     for cat in {m.category for m in self._metrics.values()}
+!                 },
+!                 "latest_timestamps": {
+!                     name: snap.timestamp
+!                     for name, snap in self._latest_snapshots.items()
+!                 },
+!             }
+  
+  
+! class StatCollector:
+!     def __init__(self):
+!         self.registry = MetricRegistry()
+!         self.adapters: Dict[SourceType, SourceAdapter] = {
+!             SourceType.ENGINE_API: EngineAPIAdapter(),
+!             SourceType.CONTAINER_MODULE: ContainerModuleAdapter(),
+!             SourceType.DERIVED: DerivedMetricAdapter(),
+!         }
+!         self._engine_provider: Optional[Callable[[], Any]] = None
+!         self._container_provider: Optional[Callable[[], Any]] = None
+!         self._running = False
+!         self._thread: Optional[threading.Thread] = None
+!         self._shutdown_event = threading.Event()
+!         self._collect_callbacks: List[Callable[[str, MetricSnapshot], None]] = []
+!         self._initialized = False
+  
+!         self._anchor_enabled = True
+!         self._anchor_db: Optional[sqlite3.Connection] = None
+  
+!         self._cumulative_counters: Dict[str, float] = {}
+!         self._collection_start_time: float = 0
+  
+!     def set_engine_provider(self, provider: Callable[[], Any]):
+!         self._engine_provider = provider
+!         adapter = self.adapters.get(SourceType.ENGINE_API)
+!         if isinstance(adapter, EngineAPIAdapter):
+!             adapter.set_engine_provider(provider)
+  
+!     def set_container_provider(self, provider: Callable[[], Any]):
+!         self._container_provider = provider
+!         adapter = self.adapters.get(SourceType.CONTAINER_MODULE)
+!         if isinstance(adapter, ContainerModuleAdapter):
+!             adapter.set_container_provider(provider)
+  
+!     def on_collect(self, callback: Callable[[str, MetricSnapshot], None]):
+!         self._collect_callbacks.append(callback)
+  
+!     def register_default_metrics(self):
+!         metrics = [
+!             MetricDef(
+!                 name="memory.total_entries", display_name="记忆总量",
+!                 metric_type=MetricType.GAUGE, source_type=SourceType.ENGINE_API,
+!                 source_config={"key": "total_entries"}, category="memory",
+!                 anchor_policy=AnchorPolicy.SAMPLE, unit="条",
+!                 description="ICME六层记忆总条目数",
+!             ),
+!             MetricDef(
+!                 name="memory.by_layer", display_name="记忆层分布",
+!                 metric_type=MetricType.GAUGE, source_type=SourceType.ENGINE_API,
+!                 source_config={"key": "layers"}, category="memory",
+!                 anchor_policy=AnchorPolicy.SAMPLE,
+!                 description="六层记忆各层条目分布",
+!             ),
+!             MetricDef(
+!                 name="memory.consolidations", display_name="固结次数",
+!                 metric_type=MetricType.COUNTER, source_type=SourceType.ENGINE_API,
+!                 source_config={"key": "consolidations"}, category="memory",
+!                 unit="次",
+!                 description="记忆层固结晋升总次数",
+!             ),
+!             MetricDef(
+!                 name="memory.hit_rate", display_name="缓存命中率",
+!                 metric_type=MetricType.GAUGE, source_type=SourceType.ENGINE_API,
+!                 source_config={"key": "hit_rate"}, category="memory",
+!                 unit="%",
+!                 description="记忆检索缓存命中率",
+!             ),
+!             MetricDef(
+!                 name="system.uptime_seconds", display_name="运行时长",
+!                 metric_type=MetricType.GAUGE, source_type=SourceType.ENGINE_API,
+!                 source_config={"key": "uptime_seconds"}, category="system",
+!                 unit="秒",
+!                 description="天机服务自启动以来的运行时长",
+!             ),
+!             MetricDef(
+!                 name="system.db_size_mb", display_name="数据库大小",
+!                 metric_type=MetricType.GAUGE, source_type=SourceType.ENGINE_API,
+!                 source_config={"key": "db_size_mb"}, category="system",
+!                 unit="MB",
+!                 description="SQLite数据库文件大小",
+!             ),
+!             MetricDef(
+!                 name="system.storage_backend", display_name="存储后端",
+!                 metric_type=MetricType.GAUGE, source_type=SourceType.ENGINE_API,
+!                 source_config={"key": "storage_backend"}, category="system",
+!                 description="当前使用的存储后端类型",
+!             ),
+!             MetricDef(
+!                 name="module.online_count", display_name="在线模块数",
+!                 metric_type=MetricType.GAUGE, source_type=SourceType.CONTAINER_MODULE,
+!                 source_config={"module": "__summary__", "key_path": "online_count"},
+!                 category="module", anchor_policy=AnchorPolicy.NONE, unit="个",
+!                 description="容器中运行中的模块总数",
+!             ),
+!             MetricDef(
+!                 name="module.total_count", display_name="总模块数",
+!                 metric_type=MetricType.GAUGE, source_type=SourceType.CONTAINER_MODULE,
+!                 source_config={"module": "__summary__", "key_path": "total_count"},
+!                 category="module", anchor_policy=AnchorPolicy.NONE, unit="个",
+!                 description="系统中注册的全部模块数",
+!             ),
+!             MetricDef(
+!                 name="module.available_count", display_name="可激活模块数",
+!                 metric_type=MetricType.GAUGE, source_type=SourceType.CONTAINER_MODULE,
+!                 source_config={"module": "__summary__", "key_path": "available_count"},
+!                 category="module", anchor_policy=AnchorPolicy.NONE, unit="个",
+!                 description="代码可导入但未激活的模块数",
+!             ),
+!             MetricDef(
+!                 name="module.unavailable_count", display_name="未安装模块数",
+!                 metric_type=MetricType.GAUGE, source_type=SourceType.CONTAINER_MODULE,
+!                 source_config={"module": "__summary__", "key_path": "unavailable_count"},
+!                 category="module", anchor_policy=AnchorPolicy.NONE, unit="个",
+!                 description="代码不可导入的模块数",
+!             ),
+!         ]
+!         self.registry.register_batch(metrics)
+  
+!     def register_module_metrics(self, module_name: str, module_display: str, category: str = "module"):
+!         metrics = [
+!             MetricDef(
+!                 name=f"module.{module_name}.state", display_name=f"{module_display}状态",
+!                 metric_type=MetricType.GAUGE, source_type=SourceType.CONTAINER_MODULE,
+!                 source_config={"module": module_name, "key_path": "state.value"},
+!                 category=category, anchor_policy=AnchorPolicy.NONE,
+!                 description=f"{module_display}当前运行状态",
+!             ),
+!             MetricDef(
+!                 name=f"module.{module_name}.instance_type", display_name=f"{module_display}类型",
+!                 metric_type=MetricType.GAUGE, source_type=SourceType.CONTAINER_MODULE,
+!                 source_config={"module": module_name, "key_path": "descriptor.display_name"},
+!                 category=category, anchor_policy=AnchorPolicy.NONE,
+!                 description=f"{module_display}描述符类型名",
+!             ),
+!         ]
+!         self.registry.register_batch(metrics)
+  
+!     def _ensure_dirs(self):
+!         for d in [DATA_DIR, ANCHOR_DIR]:
+!             d.mkdir(parents=True, exist_ok=True)
+  
+!     def _init_anchor_db(self):
+!         try:
+!             self._ensure_dirs()
+!             db_path = DATA_DIR / "anchors.db"
+!             self._anchor_db = sqlite3.connect(str(db_path), check_same_thread=False)
+!             self._anchor_db.execute("PRAGMA journal_mode=WAL")
+!             self._anchor_db.execute("PRAGMA synchronous=NORMAL")
+!             self._anchor_db.execute("""
+!                 CREATE TABLE IF NOT EXISTS anchors (
+!                     anchor_id TEXT PRIMARY KEY,
+!                     metric_name TEXT NOT NULL,
+!                     timestamp REAL NOT NULL,
+!                     source_type TEXT NOT NULL,
+!                     anchor_data TEXT NOT NULL,
+!                     content_hash TEXT,
+!                     created_at REAL DEFAULT (strftime('%s','now'))
+!                 )
+!             """)
+!             self._anchor_db.execute("CREATE INDEX IF NOT EXISTS idx_anchors_metric ON anchors(metric_name, timestamp)")
+!             self._anchor_db.commit()
+!             logger.info("[StatCollector] 锚定数据库初始化完成")
+!         except Exception as e:
+!             logger.warning(f"[StatCollector] 锚定数据库初始化跳过: {e}")
+!             self._anchor_db = None
+  
+!     def _store_anchor(self, metric_name: str, timestamp: float,
+!                       source_type: str, anchor_data: Dict[str, Any]) -> Optional[str]:
+!         if not self._anchor_enabled or not self._anchor_db:
+!             return None
+!         try:
+!             data_str = json.dumps(anchor_data, ensure_ascii=False, default=str)
+!             content_hash = hashlib.sha256(data_str.encode()).hexdigest()[:16]
+!             anchor_id = f"anc_{metric_name.replace('.', '_')}_{int(timestamp)}_{content_hash}"
+!             self._anchor_db.execute(
+!                 "INSERT OR REPLACE INTO anchors(anchor_id, metric_name, timestamp, source_type, anchor_data, content_hash) VALUES(?,?,?,?,?,?)",
+!                 (anchor_id, metric_name, timestamp, source_type, data_str, content_hash)
+!             )
+!             self._anchor_db.commit()
+!             return anchor_id
+!         except Exception as e:
+!             logger.debug(f"[StatCollector] 锚定存储失败: {e}")
+!             return None
+  
+!     def _collect_one(self, metric_def: MetricDef) -> Optional[MetricSnapshot]:
+!         adapter = self.adapters.get(metric_def.source_type)
+!         if adapter is None:
+!             logger.warning(f"[StatCollector] 无适配器处理 {metric_def.source_type.value}: {metric_def.name}")
+!             return None
+  
+!         try:
+!             value, raw_anchor = adapter.collect(metric_def)
+!         except Exception as e:
+!             logger.warning(f"[StatCollector] 采集失败 {metric_def.name}: {e}")
+!             return None
+  
+!         if metric_def.metric_type == MetricType.COUNTER and metric_def.name in self._cumulative_counters:
+!             self._cumulative_counters[metric_def.name] += (value - self._cumulative_counters.get(f"{metric_def.name}_last", value))
+!         elif metric_def.metric_type == MetricType.COUNTER:
+!             self._cumulative_counters[metric_def.name] = value
+  
+!         timestamp = time.time()
+  
+!         anchor_id = None
+!         anchor_info = None
+!         if metric_def.anchor_policy != AnchorPolicy.NONE and raw_anchor:
+!             anchor_info = raw_anchor
+!             anchor_id = self._store_anchor(metric_def.name, timestamp, metric_def.source_type.value, raw_anchor)
+  
+!         snap = MetricSnapshot(
+!             name=metric_def.name,
+!             timestamp=timestamp,
+!             value=value,
+!             anchor_id=anchor_id,
+!             anchor_info=anchor_info,
+!             metric_type=metric_def.metric_type,
+!             unit=metric_def.unit,
+!         )
+  
+!         self.registry.record(snap)
+!         for cb in self._collect_callbacks:
+!             try:
+!                 cb(metric_def.name, snap)
+!             except Exception:
+!                 pass
+  
+!         return snap
+  
+!     def collect_all(self) -> Dict[str, MetricSnapshot]:
+!         results = {}
+!         for metric_def in self.registry.all_metrics():
+!             if metric_def.source_type == SourceType.CONTAINER_MODULE:
+!                 continue
+!             snap = self._collect_one(metric_def)
+!             if snap:
+!                 results[metric_def.name] = snap
+  
+!         summary_snaps = self._collect_container_summary()
+!         for snap in summary_snaps:
+!             results[snap.name] = snap
+  
+!         return results
+  
+!     def _collect_container_summary(self) -> List[MetricSnapshot]:
+!         container = self._container_provider() if self._container_provider else None
+!         if container is None:
+!             return []
+  
+!         try:
+!             total = len(container._modules) if hasattr(container, "_modules") else 0
+!             online = sum(
+!                 1 for m in container._modules.values()
+!                 if getattr(m, "state", None) and m.state.value in ("running", "pend_active")
+!             )
+!             failed = sum(
+!                 1 for m in container._modules.values()
+!                 if getattr(m, "state", None) and m.state.value == "failed"
+!             )
+  
+!             from server.api.status_routes import _FULL_MODULE_CATALOG, _check_importable
+  
+!             available = 0
+!             unavailable = 0
+!             for name, meta in _FULL_MODULE_CATALOG.items():
+!                 if name in container._modules:
+!                     continue
+!                 if _check_importable(meta.get("import_path", "")):
+!                     available += 1
+!                 else:
+!                     unavailable += 1
+  
+!             total_all = total + available + unavailable
+!             ts = time.time()
+!             return [
+!                 MetricSnapshot(name="module.online_count", timestamp=ts, value=online,
+!                                metric_type=MetricType.GAUGE, unit="个"),
+!                 MetricSnapshot(name="module.total_count", timestamp=ts, value=total_all,
+!                                metric_type=MetricType.GAUGE, unit="个"),
+!                 MetricSnapshot(name="module.available_count", timestamp=ts, value=available,
+!                                metric_type=MetricType.GAUGE, unit="个"),
+!                 MetricSnapshot(name="module.unavailable_count", timestamp=ts, value=unavailable,
+!                                metric_type=MetricType.GAUGE, unit="个"),
+!                 MetricSnapshot(name="module.failed_count", timestamp=ts, value=failed,
+!                                metric_type=MetricType.GAUGE, unit="个"),
+!             ]
+!         except Exception:
+!             return []
+  
+!     def start(self):
+!         self._init_anchor_db()
+!         if self._collection_start_time == 0:
+!             self._collection_start_time = time.time()
+!         self._running = True
+!         self._shutdown_event.clear()
+!         self._thread = threading.Thread(target=self._collection_loop, daemon=True, name="StatCollector")
+!         self._thread.start()
+!         logger.info("[StatCollector] 统计采集引擎已启动")
+  
+!     def stop(self):
+!         self._running = False
+!         self._shutdown_event.set()
+!         if self._thread and self._thread.is_alive():
+!             self._thread.join(timeout=5)
+!         if self._anchor_db:
+!             try:
+!                 self._anchor_db.close()
+!             except Exception:
+!                 pass
+!         logger.info("[StatCollector] 统计采集引擎已停止")
+  
+!     def _collection_loop(self):
+!         last_container_scan = 0
+!         container_interval = 5
+  
+!         while self._running and not self._shutdown_event.is_set():
+!             now = time.time()
+  
+!             for metric_def in self.registry.all_metrics():
+!                 if metric_def.source_type == SourceType.CONTAINER_MODULE:
+!                     continue
+!                 self._collect_one(metric_def)
+  
+!             if now - last_container_scan >= container_interval:
+!                 summary_snaps = self._collect_container_summary()
+!                 for snap in summary_snaps:
+!                     self.registry.record(snap)
+!                 last_container_scan = now
+  
+!             self._shutdown_event.wait(timeout=max(1, min(5, self._get_min_interval())))
+  
+!     def _get_min_interval(self) -> float:
+!         intervals = [m.interval_seconds for m in self.registry.all_metrics()]
+!         return min(intervals) if intervals else 10
+  
+!     def verify_metric(self, metric_name: str, anchor_id: Optional[str] = None) -> Dict[str, Any]:
+!         snap = self.registry.get_latest(metric_name)
+!         if not snap:
+!             return {"status": "not_found", "metric": metric_name}
+  
+!         metric_def = self.registry.get(metric_name)
+!         if not metric_def:
+!             return {"status": "no_definition", "metric": metric_name}
+  
+!         adapter = self.adapters.get(metric_def.source_type)
+!         if not adapter:
+!             return {"status": "no_adapter", "metric": metric_name}
+  
+!         anchor_info = snap.anchor_info
+!         if not anchor_info:
+!             return {"status": "no_anchor", "metric": metric_name,
+!                     "detail": "该指标未启用锚定或锚定信息为空"}
+  
+!         try:
+!             replayed = adapter.replay(anchor_info)
+!             match = replayed == snap.value
+!             return {
+!                 "status": "verified" if match else "mismatch",
+!                 "metric": metric_name,
+!                 "original": snap.value,
+!                 "replayed": replayed,
+!                 "match": match,
+!                 "timestamp": snap.timestamp,
+!                 "anchor_id": snap.anchor_id,
+!             }
+!         except Exception as e:
+!             return {"status": "replay_error", "metric": metric_name, "detail": str(e)}
+  
+!     def verify_all(self) -> Dict[str, Any]:
+!         results = {}
+!         for metric_def in self.registry.all_metrics():
+!             if metric_def.anchor_policy == AnchorPolicy.NONE:
+!                 continue
+!             results[metric_def.name] = self.verify_metric(metric_def.name)
+!         verified = sum(1 for r in results.values() if r["status"] == "verified")
+!         mismatched = sum(1 for r in results.values() if r["status"] == "mismatch")
+!         return {
+!             "total": len(results),
+!             "verified": verified,
+!             "mismatched": mismatched,
+!             "results": results,
+!         }
+  
+!     def get_status(self) -> Dict[str, Any]:
+!         return {
+!             "running": self._running,
+!             "registry_stats": self.registry.stats(),
+!             "uptime_seconds": time.time() - self._collection_start_time if self._collection_start_time else 0,
+!             "anchor_db_size": os.path.getsize(DATA_DIR / "anchors.db") if (DATA_DIR / "anchors.db").exists() else 0,
+!             "adapters": [a.value for a in self.adapters.keys()],
+!         }
+  
+  
+! _collector_instance: Optional[StatCollector] = None
+! _collector_lock = threading.Lock()
+  
+  
+! def get_collector() -> StatCollector:
+!     global _collector_instance
+!     with _collector_lock:
+!         if _collector_instance is None:
+!             _collector_instance = StatCollector()
+!         return _collector_instance
+  
+  
+! def init_collector(engine_provider=None, container_provider=None) -> StatCollector:
+!     global _collector_instance
+!     with _collector_lock:
+!         _collector_instance = StatCollector()
+!         if engine_provider:
+!             _collector_instance.set_engine_provider(engine_provider)
+!         if container_provider:
+!             _collector_instance.set_container_provider(container_provider)
+!         _collector_instance.register_default_metrics()
+!         _collector_instance.start()
+!         return _collector_instance

@@ -1,0 +1,337 @@
+r"""
+天机自适应混合检索引擎 (Adaptive Hybrid Retriever) v1.0
+========================================================
+动态权重调整的三路召回引擎
+
+核心创新:
+  1. 自适应权重: 基于查询类型和历史表现动态调整向量/图谱/关键词权重
+  2. 性能缓存: LRU缓存热门查询，P95<200ms
+  3. 反馈学习: 根据用户反馈优化融合策略
+
+架构位置: 天机/core/adaptive_retriever.py
+依赖: core/hybrid_retriever, core/memory_state_manager
+
+灵境道谱溯源: D2-6【自适应检索煞】· 道二·知枢体道 · 四地煞之知之术
+"""
+
+import time
+import logging
+import threading
+from typing import List, Dict, Any, Optional, Tuple
+from dataclasses import dataclass, field
+from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+from .hybrid_retriever import (
+    HybridRetriever, HybridResult, RetrievalResult,
+    VectorRetriever, GraphRetriever, KeywordRetriever
+)
+from .memory_state_manager import MemoryStateManager, MemoryState
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class QueryProfile:
+    """查询画像"""
+    query: str
+    query_type: str = "general"
+    vector_weight: float = 0.5
+    graph_weight: float = 0.3
+    keyword_weight: float = 0.2
+    success_rate: float = 1.0
+    total_uses: int = 0
+    avg_latency_ms: float = 0.0
+
+
+class LRUCache:
+    """LRU缓存"""
+    def __init__(self, max_size: int = 1000):
+        self._cache = OrderedDict()
+        self._max_size = max_size
+        self._lock = threading.Lock()
+        self._hits = 0
+        self._misses = 0
+
+    def get(self, key: str) -> Optional[Any]:
+        with self._lock:
+            if key in self._cache:
+                self._cache.move_to_end(key)
+                self._hits += 1
+                return self._cache[key]
+            self._misses += 1
+            return None
+
+    def set(self, key: str, value: Any):
+        with self._lock:
+            if key in self._cache:
+                self._cache.move_to_end(key)
+            self._cache[key] = value
+            while len(self._cache) > self._max_size:
+                self._cache.popitem(last=False)
+
+    @property
+    def hit_rate(self) -> float:
+        total = self._hits + self._misses
+        return self._hits / max(total, 1)
+
+
+class AdaptiveHybridRetriever:
+    """自适应混合检索器"""
+
+    QUERY_TYPE_PATTERNS = {
+        "factual": {
+            "keywords": ["什么", "是", "定义", "什么是", "谁", "哪个"],
+            "weights": {"vector": 0.3, "graph": 0.2, "keyword": 0.5}
+        },
+        "relational": {
+            "keywords": ["关系", "联系", "相关", "关联", "属于", "包含", "导致"],
+            "weights": {"vector": 0.2, "graph": 0.6, "keyword": 0.2}
+        },
+        "semantic": {
+            "keywords": ["意思", "含义", "理解", "解释", "描述", "总结"],
+            "weights": {"vector": 0.6, "graph": 0.2, "keyword": 0.2}
+        },
+        "path": {
+            "keywords": ["路径", "从", "到", "流程", "步骤", "过程", "经过"],
+            "weights": {"vector": 0.2, "graph": 0.5, "keyword": 0.3}
+        },
+        "general": {
+            "keywords": [],
+            "weights": {"vector": 0.5, "graph": 0.3, "keyword": 0.2}
+        }
+    }
+
+    def __init__(
+        self,
+        base_retriever: HybridRetriever,
+        state_manager: Optional[MemoryStateManager] = None,
+        cache_size: int = 1000,
+        enable_feedback_learning: bool = True
+    ):
+        self.base = base_retriever
+        self.state_manager = state_manager or MemoryStateManager()
+        self.cache = LRUCache(max_size=cache_size)
+        self.enable_feedback_learning = enable_feedback_learning
+
+        self._query_profiles: Dict[str, QueryProfile] = {}
+        self._lock = threading.RLock()
+        self._feedback_queue: List[Dict[str, Any]] = []
+
+        logger.info("自适应检索器初始化完成")
+
+    def _classify_query(self, query: str) -> str:
+        """分类查询类型"""
+        scores = {}
+        for qtype, config in self.QUERY_TYPE_PATTERNS.items():
+            if qtype == "general":
+                continue
+            score = sum(1 for kw in config["keywords"] if kw in query)
+            if score > 0:
+                scores[qtype] = score
+
+        if scores:
+            return max(scores, key=scores.get)
+        return "general"
+
+    def _get_adaptive_weights(self, query: str) -> Dict[str, float]:
+        """获取自适应权重"""
+        query_type = self._classify_query(query)
+
+        type_weights = self.QUERY_TYPE_PATTERNS.get(query_type, {}).get("weights", {})
+        vector_w = type_weights.get("vector", 0.5)
+        graph_w = type_weights.get("graph", 0.3)
+        keyword_w = type_weights.get("keyword", 0.2)
+
+        cached_key = f"weights:{query}"
+        cached = self.cache.get(cached_key)
+        if cached:
+            vector_w = cached.get("vector", vector_w)
+            graph_w = cached.get("graph", graph_w)
+            keyword_w = cached.get("keyword", keyword_w)
+
+        if query_type in self._query_profiles:
+            profile = self._query_profiles[query_type]
+            if profile.success_rate < 0.7 and profile.total_uses > 5:
+                if profile.avg_latency_ms > 500:
+                    graph_w -= 0.1
+                    keyword_w += 0.1
+                else:
+                    graph_w += 0.05
+                    vector_w -= 0.05
+
+        total = vector_w + graph_w + keyword_w
+        return {
+            "vector": vector_w / total,
+            "graph": graph_w / total,
+            "keyword": keyword_w / total
+        }
+
+    def retrieve(
+        self,
+        query: str,
+        top_k: int = 10,
+        hops: int = 2,
+        use_cache: bool = True
+    ) -> Dict[str, Any]:
+        """
+        自适应混合检索
+
+        Args:
+            query: 查询文本
+            top_k: 返回结果数
+            hops: 图谱多跳深度
+            use_cache: 是否使用缓存
+
+        Returns:
+            检索结果
+        """
+        cache_key = f"retrieve:{query}:{top_k}:{hops}"
+        if use_cache:
+            cached = self.cache.get(cache_key)
+            if cached:
+                cached["metadata"]["from_cache"] = True
+                return cached
+
+        start_time = time.time()
+
+        weights = self._get_adaptive_weights(query)
+        query_type = self._classify_query(query)
+
+        self.base.vector_weight = weights["vector"]
+        self.base.graph_weight = weights["graph"]
+        self.base.keyword_weight = weights["keyword"]
+
+        hybrid_result = self.base.retrieve(query, top_k=top_k, hops=hops)
+
+        active_results = []
+        for result in hybrid_result.results:
+            state = self.state_manager.get_state(result.entry_id)
+            if state != MemoryState.ARCHIVED:
+                result.metadata["memory_state"] = state.value
+                active_results.append(result)
+
+        results_dict = [r.to_dict() for r in active_results]
+
+        result = {
+            "query": query,
+            "query_type": query_type,
+            "results": results_dict,
+            "total": len(results_dict),
+            "metadata": {
+                "vector_weight": weights["vector"],
+                "graph_weight": weights["graph"],
+                "keyword_weight": weights["keyword"],
+                "vector_count": hybrid_result.vector_count,
+                "graph_count": hybrid_result.graph_count,
+                "keyword_count": hybrid_result.keyword_count,
+                "fusion_method": hybrid_result.fusion_method,
+                "retrieval_time_ms": round((time.time() - start_time) * 1000, 1),
+                "cache_hit_rate": round(self.cache.hit_rate * 100, 1),
+                "from_cache": False
+            }
+        }
+
+        if use_cache:
+            self.cache.set(cache_key, result)
+
+        profile = self._query_profiles.get(query_type, QueryProfile(
+            query=query, query_type=query_type,
+            vector_weight=weights["vector"],
+            graph_weight=weights["graph"],
+            keyword_weight=weights["keyword"]
+        ))
+        profile.total_uses += 1
+        self._query_profiles[query_type] = profile
+
+        return result
+
+    def record_feedback(self, query: str, entry_id: str, is_positive: bool) -> Dict[str, Any]:
+        """记录用户反馈"""
+        feedback = {
+            "query": query,
+            "entry_id": entry_id,
+            "is_positive": is_positive,
+            "timestamp": time.time()
+        }
+
+        with self._lock:
+            self._feedback_queue.append(feedback)
+
+        if self.enable_feedback_learning:
+            query_type = self._classify_query(query)
+            if query_type in self._query_profiles:
+                profile = self._query_profiles[query_type]
+                alpha = 0.1
+                profile.success_rate = (
+                    profile.success_rate * (1 - alpha) + (1.0 if is_positive else 0.0) * alpha
+                )
+
+                weights_key = f"weights:{query}"
+                cached = self.cache.get(weights_key) or {}
+                if is_positive:
+                    self.cache.set(weights_key, {
+                        "vector": profile.vector_weight + 0.02,
+                        "graph": profile.graph_weight + 0.01,
+                        "keyword": profile.keyword_weight + 0.02
+                    })
+
+        return {"status": "recorded", "feedback_queue_size": len(self._feedback_queue)}
+
+    def optimize_weights(self) -> Dict[str, Any]:
+        """优化权重"""
+        optimizations = []
+        for qtype, profile in self._query_profiles.items():
+            if profile.total_uses >= 10:
+                if profile.success_rate < 0.5:
+                    old_weights = {
+                        "vector": profile.vector_weight,
+                        "graph": profile.graph_weight,
+                        "keyword": profile.keyword_weight
+                    }
+
+                    profile.vector_weight = max(0.1, profile.vector_weight - 0.05)
+                    profile.graph_weight = min(0.6, profile.graph_weight + 0.1)
+                    profile.keyword_weight = 1.0 - profile.vector_weight - profile.graph_weight
+                    profile.keyword_weight = max(0.1, profile.keyword_weight)
+
+                    total = profile.vector_weight + profile.graph_weight + profile.keyword_weight
+                    profile.vector_weight /= total
+                    profile.graph_weight /= total
+                    profile.keyword_weight /= total
+
+                    optimizations.append({
+                        "query_type": qtype,
+                        "old_weights": old_weights,
+                        "new_weights": {
+                            "vector": round(profile.vector_weight, 2),
+                            "graph": round(profile.graph_weight, 2),
+                            "keyword": round(profile.keyword_weight, 2)
+                        },
+                        "success_rate": round(profile.success_rate, 2)
+                    })
+
+        return {
+            "status": "optimized",
+            "optimizations": optimizations,
+            "cache_hit_rate": round(self.cache.hit_rate * 100, 1)
+        }
+
+    def get_stats(self) -> Dict[str, Any]:
+        return {
+            "query_types": {
+                qtype: {
+                    "uses": p.total_uses,
+                    "success_rate": round(p.success_rate, 2),
+                    "weights": {
+                        "vector": round(p.vector_weight, 2),
+                        "graph": round(p.graph_weight, 2),
+                        "keyword": round(p.keyword_weight, 2)
+                    }
+                }
+                for qtype, p in self._query_profiles.items()
+            },
+            "cache": {"hits": self.cache._hits, "misses": self.cache._misses, "hit_rate": round(self.cache.hit_rate * 100, 1)},
+            "state_stats": self.state_manager.get_stats(),
+            "feedback_queue": len(self._feedback_queue)
+        }

@@ -1,0 +1,212 @@
+> r"""
+> FileWatcher - 天机文件系统监控器 v1.0
+> =======================================
+> D20: 文件系统变更实时触发ChangeAtom流水线
+> watchdog Observer → ChangeTracker → ChangeAtom → AlignmentEngine
+> """
+  
+! import os
+! import time
+! import hashlib
+! import threading
+! from typing import Optional, Callable, Dict, List, Set
+! from pathlib import Path
+  
+! try:
+!     from watchdog.observers import Observer
+!     from watchdog.events import FileSystemEventHandler, FileCreatedEvent, FileModifiedEvent, FileDeletedEvent, FileMovedEvent
+!     HAS_WATCHDOG = True
+! except ImportError:
+!     HAS_WATCHDOG = False
+  
+  
+! class FileChangeHandler:
+!     def __init__(self, tracker=None, alignment_engine=None, debounce_ms: int = 500):
+!         self._tracker = tracker
+!         self._alignment_engine = alignment_engine
+!         self._debounce_ms = debounce_ms
+!         self._last_events: Dict[str, float] = {}
+!         self._lock = threading.Lock()
+!         self._stats = {
+!             "total_events": 0,
+!             "creates": 0,
+!             "updates": 0,
+!             "deletes": 0,
+!             "renames": 0,
+!             "debounced": 0,
+!         }
+!         self._content_cache: Dict[str, str] = {}
+  
+!     def on_created(self, path: str):
+!         if self._is_debounced(path):
+!             return
+!         content = self._read_file(path)
+!         self._stats["creates"] += 1
+!         self._stats["total_events"] += 1
+  
+!         if self._tracker:
+!             try:
+!                 self._tracker.track_create(path, content, trigger_source="file_watcher")
+!             except Exception:
+!                 pass
+  
+!     def on_modified(self, path: str):
+!         if self._is_debounced(path):
+!             return
+!         after = self._read_file(path)
+!         before = self._content_cache.get(path, "")
+!         self._content_cache[path] = after
+!         self._stats["updates"] += 1
+!         self._stats["total_events"] += 1
+  
+!         if self._tracker:
+!             try:
+!                 self._tracker.track_update(path, before, after, trigger_source="file_watcher")
+!             except Exception:
+!                 pass
+  
+!     def on_deleted(self, path: str):
+!         if self._is_debounced(path):
+!             return
+!         last_content = self._content_cache.pop(path, "")
+!         self._stats["deletes"] += 1
+!         self._stats["total_events"] += 1
+  
+!         if self._tracker:
+!             try:
+!                 self._tracker.track_delete(path, last_content, trigger_source="file_watcher")
+!             except Exception:
+!                 pass
+  
+!     def on_moved(self, old_path: str, new_path: str):
+!         self._stats["renames"] += 1
+!         self._stats["total_events"] += 1
+  
+!         if self._tracker:
+!             try:
+!                 content = self._content_cache.pop(old_path, "")
+!                 self._tracker.track_create(new_path, content, trigger_source="file_watcher_rename")
+!             except Exception:
+!                 pass
+  
+!     def _is_debounced(self, path: str) -> bool:
+!         now = time.time()
+!         with self._lock:
+!             last = self._last_events.get(path, 0)
+!             if (now - last) * 1000 < self._debounce_ms:
+!                 self._stats["debounced"] += 1
+!                 return True
+!             self._last_events[path] = now
+!             return False
+  
+!     def _read_file(self, path: str) -> str:
+!         try:
+!             with open(path, "r", encoding="utf-8", errors="replace") as f:
+!                 content = f.read()
+!             self._content_cache[path] = content
+!             return content
+!         except Exception:
+!             return ""
+  
+!     def get_stats(self) -> Dict:
+!         return dict(self._stats)
+  
+  
+! if HAS_WATCHDOG:
+!     class WatchdogEventHandler(FileSystemEventHandler):
+!         SKIP_SUFFIXES = {".pyc", ".pyo", ".tmp", ".bak", ".swp", ".DS_Store"}
+!         SKIP_DIRS = {"__pycache__", ".git", "node_modules", ".venv", "venv"}
+  
+!         def __init__(self, handler: FileChangeHandler, watch_dir: str):
+!             super().__init__()
+!             self._handler = handler
+!             self._watch_dir = str(Path(watch_dir).resolve())
+  
+!         def on_created(self, event):
+!             if event.is_directory:
+!                 return
+!             path = event.src_path
+!             if self._should_skip(path):
+!                 return
+!             self._handler.on_created(path)
+  
+!         def on_modified(self, event):
+!             if event.is_directory:
+!                 return
+!             path = event.src_path
+!             if self._should_skip(path):
+!                 return
+!             self._handler.on_modified(path)
+  
+!         def on_deleted(self, event):
+!             if event.is_directory:
+!                 return
+!             path = event.src_path
+!             if self._should_skip(path):
+!                 return
+!             self._handler.on_deleted(path)
+  
+!         def on_moved(self, event):
+!             if event.is_directory:
+!                 return
+!             if self._should_skip(event.src_path) or self._should_skip(event.dest_path):
+!                 return
+!             self._handler.on_moved(event.src_path, event.dest_path)
+  
+!         def _should_skip(self, path: str) -> bool:
+!             suffix = Path(path).suffix.lower()
+!             if suffix in self.SKIP_SUFFIXES:
+!                 return True
+!             for skip_dir in self.SKIP_DIRS:
+!                 if skip_dir in path:
+!                     return True
+!             return False
+  
+  
+! class FileWatcher:
+!     def __init__(self, watch_dir: str, tracker=None, alignment_engine=None):
+!         self._watch_dir = str(Path(watch_dir).resolve())
+!         self._handler = FileChangeHandler(tracker, alignment_engine)
+!         self._observer = None
+!         self._running = False
+  
+!     def start(self) -> bool:
+!         if not HAS_WATCHDOG:
+!             return False
+  
+!         if self._running:
+!             return True
+  
+!         try:
+!             event_handler = WatchdogEventHandler(self._handler, self._watch_dir)
+!             self._observer = Observer()
+!             self._observer.schedule(event_handler, self._watch_dir, recursive=True)
+!             self._observer.daemon = True
+!             self._observer.start()
+!             self._running = True
+!             return True
+!         except Exception:
+!             return False
+  
+!     def stop(self):
+!         if self._observer and self._running:
+!             self._observer.stop()
+!             self._observer.join(timeout=5)
+!             self._running = False
+  
+!     def is_running(self) -> bool:
+!         return self._running
+  
+!     def get_stats(self) -> Dict:
+!         return self._handler.get_stats()
+  
+!     def simulate_create(self, path: str, content: str = ""):
+!         self._handler.on_created(path)
+  
+!     def simulate_modify(self, path: str, before: str = "", after: str = ""):
+!         self._handler._content_cache[path] = before
+!         self._handler.on_modified(path)
+  
+!     def simulate_delete(self, path: str, last_content: str = ""):
+!         self._handler._content_cache[path] = last_content
+!         self._handler.on_deleted(path)
